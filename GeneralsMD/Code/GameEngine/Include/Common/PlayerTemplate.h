@@ -278,6 +278,8 @@ private:
 	typedef std::vector<PlayerTemplate> PlayerTemplateVector;
 
 	PlayerTemplateVector m_playerTemplates;
+	PlayerTemplateVector m_mapBaseTemplates;
+	Bool m_hasMapTemplates = FALSE;
 };
 
 // ----------------------------------------------------------------------------------------------

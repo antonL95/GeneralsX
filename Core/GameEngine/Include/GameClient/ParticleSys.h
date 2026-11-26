@@ -41,6 +41,8 @@
 
 #include <array>
 #include <span>
+#include <utility>
+#include <vector>
 
 
 /// @todo Once the client framerate is decoupled, the frame counters within will have to become time-based
@@ -1018,6 +1020,8 @@ public:
 	ParticleSystemTemplate *findTemplate( const AsciiString &name ) const;
 	ParticleSystemTemplate *findParentTemplate( const AsciiString &name, int parentNum ) const;
 	ParticleSystemTemplate *newTemplate( const AsciiString &name );
+	void saveMapTemplate(const AsciiString& name);
+	void restoreMapTemplates();
 
 	/// given a template, instantiate a particle system
 #if RETAIL_COMPATIBLE_CRC
@@ -1100,6 +1104,7 @@ protected:
 	Real m_drawnLogicFramePhase; ///< How far the render updates have integrated the current logic frame, ranging 0 to 1.
 
 private:
+	std::vector<std::pair<AsciiString, ParticleSystemTemplate*>> m_mapBaseTemplates;
 	TemplateMap m_templateMap;		///< a hash map of all particle system templates
 	ParticleSystemIDMap m_systemMap; ///< a hash map of all particle systems
 };

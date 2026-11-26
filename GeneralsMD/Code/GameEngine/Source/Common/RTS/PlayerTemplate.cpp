@@ -353,13 +353,19 @@ PlayerTemplateStore::~PlayerTemplateStore()
 void PlayerTemplateStore::init()
 {
 	m_playerTemplates.clear();
+	m_mapBaseTemplates.clear();
+	m_hasMapTemplates = FALSE;
 }
 
 //-----------------------------------------------------------------------------
 void PlayerTemplateStore::reset()
 {
-// don't reset this list here; we want to retain this info.
-//	m_playerTemplates.clear();
+	if (m_hasMapTemplates)
+	{
+		m_playerTemplates = m_mapBaseTemplates;
+		m_mapBaseTemplates.clear();
+		m_hasMapTemplates = FALSE;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -468,6 +474,11 @@ void PlayerTemplateStore::getAllSideStrings(AsciiStringList *outStringList)
 //-------------------------------------------------------------------------------------------------
 /*static*/ void PlayerTemplateStore::parsePlayerTemplateDefinition( INI* ini )
 {
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES && !ThePlayerTemplateStore->m_hasMapTemplates)
+	{
+		ThePlayerTemplateStore->m_mapBaseTemplates = ThePlayerTemplateStore->m_playerTemplates;
+		ThePlayerTemplateStore->m_hasMapTemplates = TRUE;
+	}
 	const char* c = ini->getNextToken();
 	NameKeyType namekey = NAMEKEY(c);
 

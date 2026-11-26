@@ -1331,6 +1331,8 @@ void GameEngine::resetSubsystems()
 	TheGameLogic->reset();
 
 	TheSubsystemList->resetAll();
+	if (TheParticleSystemManager)
+		TheParticleSystemManager->restoreMapTemplates();
 }
 
 /// -----------------------------------------------------------------------------------------------

@@ -43,6 +43,8 @@ void INI::parseParticleSystemDefinition( INI* ini )
 	// read the name
 	const char* c = ini->getNextToken();
 	name.set( c );
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+		TheParticleSystemManager->saveMapTemplate(name);
 
 	// find existing item if present
 	ParticleSystemTemplate *sysTemplate = const_cast<ParticleSystemTemplate*>(TheParticleSystemManager->findTemplate( name ));
@@ -64,6 +66,8 @@ void INI::parseFXParticleSystemDefinition( INI* ini )
 
 	AsciiString name;
 	name.set( ini->getNextToken() );
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+		TheParticleSystemManager->saveMapTemplate(name);
 
 	ParticleSystemTemplate *sysTemplate = const_cast<ParticleSystemTemplate*>(TheParticleSystemManager->findTemplate( name ));
 	if (sysTemplate == nullptr)

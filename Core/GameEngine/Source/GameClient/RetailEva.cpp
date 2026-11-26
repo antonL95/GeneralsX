@@ -7,7 +7,9 @@
 #include <cstdlib>
 #include <deque>
 #include <map>
+#include <memory>
 #include <set>
+#include <utility>
 
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
@@ -54,6 +56,8 @@ struct Event
 	Bool jumpTo = TRUE;
 	std::vector<AsciiString> blocks;
 	std::vector<SideSound> sides;
+	std::shared_ptr<Event> mapBase;
+	Bool mapOnly = FALSE;
 };
 
 struct Pending
@@ -287,11 +291,32 @@ void parseEvent(INI *ini)
 
 	const AsciiString name = ini->getNextToken();
 	Event event = s_defaults;
+	event.mapBase.reset();
+	event.mapOnly = FALSE;
 	ini->initFromINI(&event, fields);
 	if (name.compareNoCase("DefaultEvaEvent") == 0)
+	{
+		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+			event.mapBase = s_defaults.mapBase ? s_defaults.mapBase : std::make_shared<Event>(s_defaults);
 		s_defaults = event;
+	}
 	else
-		s_events[eventKey(name)] = event;
+	{
+		const AsciiString key = eventKey(name);
+		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+		{
+			const auto previous = s_events.find(key);
+			if (previous == s_events.end())
+				event.mapOnly = TRUE;
+			else
+			{
+				event.mapOnly = previous->second.mapOnly;
+				if (!event.mapOnly)
+					event.mapBase = previous->second.mapBase ? previous->second.mapBase : std::make_shared<Event>(previous->second);
+			}
+		}
+		s_events[key] = event;
+	}
 }
 
 void parseSettings(INI *ini)
@@ -313,6 +338,25 @@ void reset()
 {
 	resetPlayback();
 	s_scoredKills = s_defaultScoredKills;
+	if (s_defaults.mapBase)
+	{
+		Event original = *s_defaults.mapBase;
+		s_defaults = std::move(original);
+	}
+	for (auto it = s_events.begin(); it != s_events.end();)
+	{
+		if (it->second.mapOnly)
+			it = s_events.erase(it);
+		else
+		{
+			if (it->second.mapBase)
+			{
+				Event original = *it->second.mapBase;
+				it->second = std::move(original);
+			}
+			++it;
+		}
+	}
 }
 
 void parseScoredKillAnnouncer(INI* ini)

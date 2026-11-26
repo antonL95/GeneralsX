@@ -3537,6 +3537,7 @@ ParticleSystemManager::ParticleSystemManager()
 ParticleSystemManager::~ParticleSystemManager()
 {
 	reset();
+	restoreMapTemplates();
 
 	TemplateMap::iterator begin(m_templateMap.begin());
 	TemplateMap::iterator end(m_templateMap.end());
@@ -3867,6 +3868,45 @@ ParticleSystemTemplate *ParticleSystemManager::newTemplate( const AsciiString &n
 	}
 
 	return sysTemplate;
+}
+
+void ParticleSystemManager::saveMapTemplate(const AsciiString& name)
+{
+	for (const auto& entry : m_mapBaseTemplates)
+		if (entry.first == name)
+			return;
+	ParticleSystemTemplate* current = findTemplate(name);
+	ParticleSystemTemplate* original = current ? newInstance(ParticleSystemTemplate)(*current) : nullptr;
+	m_mapBaseTemplates.emplace_back(name, original);
+}
+
+void ParticleSystemManager::restoreMapTemplates()
+{
+	if (m_mapBaseTemplates.empty())
+		return;
+	for (auto& entry : m_templateMap)
+		entry.second->m_slaveTemplate = nullptr;
+	for (const auto& entry : m_mapBaseTemplates)
+	{
+		auto current = m_templateMap.find(entry.first);
+		if (current == m_templateMap.end())
+		{
+			deleteInstance(entry.second);
+			continue;
+		}
+		if (entry.second)
+		{
+			*current->second = *entry.second;
+			current->second->m_slaveTemplate = nullptr;
+			deleteInstance(entry.second);
+		}
+		else
+		{
+			deleteInstance(current->second);
+			m_templateMap.erase(current);
+		}
+	}
+	m_mapBaseTemplates.clear();
 }
 
 // ------------------------------------------------------------------------------------------------
