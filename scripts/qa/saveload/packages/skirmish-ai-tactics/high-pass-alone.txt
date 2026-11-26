@@ -1,0 +1,10 @@
+45 destroy Player_2 MordorPorter 1
+45 destroy Player_2 MordorPorter 0
+45 create Player_2 SkirmishTacticsPorter 0 2780,3240,0
+45 create Player_2 SkirmishTacticsFarm 0 3220,3200,0
+45 create Player_2 SkirmishTacticsFarm 1 3190,3300,0
+45 pkg23-set-cash Player_2 - 0 600
+80 skirmish-tactic-mill Player_2 SkirmishTacticsPorter 0 Player_2:MordorFortressCitadel:0
+85 create Player_2 SkirmishTacticsFarm 2 2800,3200,0
+132 skirmish-tactic-mill Player_2 SkirmishTacticsPorter 0 Player_2:MordorFortressCitadel:0
+133 skirmish-tactic-mill Player_2 SkirmishTacticsPorter 0 Player_2:MordorFortressCitadel:0
