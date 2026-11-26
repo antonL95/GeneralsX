@@ -29,6 +29,10 @@
 
 #include "PreRTS.h" // This must go first in EVERY cpp file in the GameEngine
 
+#include <limits>
+
+#include "WWMath/wwmath.h"
+
 #include "Common/BitFlagsIO.h"
 #include "Common/GameAudio.h"
 #include "Common/GlobalData.h"
@@ -1401,25 +1405,26 @@ Bool SpecialAbilityUpdate::continuePreparation()
 }
 
 //-------------------------------------------------------------------------------------------------
-static Object* findLinkedBuilding(Object* flag, Team* oldTeam, Real& nearestDistance)
+static Object* findLinkedBuilding(const Object* flag, Real& nearestDistance)
 {
 	const Real linkRange = 150.0f;
+	const Real partitionRange = linkRange * (1.0f + std::numeric_limits<Real>::epsilon());
 	PartitionFilterAcceptByKindOf linkedFilter(MAKE_KINDOF_MASK(KINDOF_LINKED_TO_FLAG), KINDOFMASK_NONE);
 	PartitionFilter* filters[] = { &linkedFilter, nullptr };
-	ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(flag,
-		linkRange, FROM_CENTER_3D, filters, ITER_FASTEST);
+	ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(flag->getPosition(),
+		partitionRange, FROM_BOUNDINGSPHERE_2D, filters, ITER_FASTEST);
 	MemoryPoolObjectHolder hold(iter);
 	Object* nearest = nullptr;
-	nearestDistance = linkRange * linkRange;
-	const Bool neutralFlag = !oldTeam->getControllingPlayer()->isPlayableSide();
+	nearestDistance = sqr(linkRange);
 	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
 	{
-		if (candidate->isEffectivelyDead() ||
-			(candidate->getControllingPlayer() != oldTeam->getControllingPlayer() &&
-				(!neutralFlag || candidate->getControllingPlayer()->isPlayableSide())))
+		if (candidate->isEffectivelyDead())
 			continue;
-		const Real distance = ThePartitionManager->getDistanceSquared(flag, candidate, FROM_CENTER_3D);
-		if (distance < nearestDistance || (distance == nearestDistance && (!nearest || candidate->getID() < nearest->getID())))
+		const Real centerDistance = WWMath::SqrtfOrigin(ThePartitionManager->getDistanceSquared(flag, candidate, FROM_CENTER_2D));
+		const Real boundaryDistance = centerDistance - candidate->getGeometryInfo().getBoundingCircleRadius();
+		const Real distance = boundaryDistance < 0.0f ? -sqr(boundaryDistance) : sqr(boundaryDistance);
+		if (distance < nearestDistance ||
+			(distance == nearestDistance && (!nearest || candidate->getID() < nearest->getID())))
 		{
 			nearest = candidate;
 			nearestDistance = distance;
@@ -1634,13 +1639,12 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
         TheEva->setShouldPlay( EVA_BuildingStolen );
       }
 
-			Team* oldTeam = target->getTeam();
 			Team* newTeam = object->getControllingPlayer()->getDefaultTeam();
 			const Bool retailFlag = RetailFileLayers::enabled() && target->isKindOf(KINDOF_CAPTUREFLAG);
 			if (retailFlag)
 			{
 				Real nearestDistance = 0.0f;
-				Object* linked = findLinkedBuilding(target, oldTeam, nearestDistance);
+				Object* linked = findLinkedBuilding(target, nearestDistance);
 				if (!linked)
 				{
 					if (std::getenv("GENERALSX_TEST_COMMANDS"))

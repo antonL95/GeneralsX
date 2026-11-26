@@ -1,5 +1,19 @@
 44 power-reveal - - 0
 45 create Player_2 MordorGorbag 0 2580,1332,0
+46 create PlyrCivilian FlagPairingFixtureFlag 0 1120,1120,0
+46 create Player_2 FlagPairingFixtureBuilding 0 1300,1120,0
+46 create Player_1 GondorForlong 0 1110,1120,0
+47 create PlyrCivilian FlagPairingFixtureFlag 0 1120,650,0
+47 create PlyrCivilian FlagPairingFixtureBuilding 0 1301,650,0
+47 create Player_1 GondorForlong 0 1110,650,0
+48 power Player_1 GondorForlong 0 SpecialAbilityCaptureBuilding
+49 aim Player_1 GondorForlong 0 *:FlagPairingFixtureFlag:0
+50 power Player_1 GondorForlong 1 SpecialAbilityCaptureBuilding
+51 aim Player_1 GondorForlong 1 *:FlagPairingFixtureFlag:1
+600 neutralstate Player_1 FlagPairingFixtureFlag 0
+600 neutralstate Player_1 FlagPairingFixtureBuilding 0
+600 neutralstate PlyrCivilian FlagPairingFixtureFlag 0
+600 health PlyrCivilian FlagPairingFixtureBuilding 0
 620 neutralstate * CaptureFlag 0
 1100 neutralstate * CaptureFlag 0
 1100 neutralstate * SignalFire 0
