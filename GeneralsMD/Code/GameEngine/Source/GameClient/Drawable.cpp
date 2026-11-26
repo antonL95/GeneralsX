@@ -1999,7 +1999,6 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 }
 
 //-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 static Bool getFootprintGroundNormal(const Object &object, const Coord3D &dir, Coord3D &normal)
 {
 	const Coord3D &center = *object.getPosition();
@@ -2038,7 +2037,6 @@ static Bool getFootprintGroundNormal(const Object &object, const Coord3D &dir, C
 	return TRUE;
 }
 
-//-------------------------------------------------------------------------------------------------
 void Drawable::getWheelGroundTilt( const Locomotor &locomotor, Real &pitch, Real &roll ) const
 {
 	pitch = 0.0f;
