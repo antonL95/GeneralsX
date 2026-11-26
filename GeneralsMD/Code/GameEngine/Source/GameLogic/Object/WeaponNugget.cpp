@@ -208,6 +208,14 @@ const FieldParse s_oclFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_spawnAndFadeFields[] =
+{
+	{ "ObjectTargetFilter", parseSpecialObjectFilter, nullptr, 0 },
+	{ "SpawnedObjectName", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_spawnedObjectName) },
+	{ "SpawnOffset", INI::parseCoord3D, nullptr, offsetof(WeaponNugget, m_spawnOffset) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 const FieldParse s_grabFields[] =
 {
 	{ "ContainTargetOnEffect", INI::parseBool, nullptr, offsetof(WeaponNugget, m_containTargetOnEffect) },
@@ -290,6 +298,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_DAMAGE_FIELD: return "DamageFieldNugget";
 		case WEAPON_NUGGET_GRAB: return "GrabNugget";
 		case WEAPON_NUGGET_FIRE_LOGIC: return "FireLogicNugget";
+		case WEAPON_NUGGET_SPAWN_AND_FADE: return "SpawnAndFadeNugget";
 	}
 	return "Nugget";
 }
@@ -363,6 +372,11 @@ void WeaponNugget::parseFireLogicNugget(INI* ini, void*, void* store, const void
 	parseNugget(ini, store, WEAPON_NUGGET_FIRE_LOGIC, s_damageFields, s_fireFields);
 }
 
+void WeaponNugget::parseSpawnAndFadeNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_SPAWN_AND_FADE, s_spawnAndFadeFields);
+}
+
 void WeaponNugget::postProcessLoad()
 {
 	m_requiredUpgrades.clear();
@@ -385,6 +399,8 @@ void WeaponNugget::postProcessLoad()
 		m_fieldWeapon = TheWeaponStore->findWeaponTemplate(m_fieldWeaponName);
 	if (!m_oclName.isEmpty())
 		m_ocl = TheObjectCreationListStore->findObjectCreationList(m_oclName.str());
+	if (!m_spawnedObjectName.isEmpty())
+		m_spawnedObject = TheThingFactory->findTemplate(m_spawnedObjectName, FALSE);
 }
 
 Bool WeaponNugget::isEnabledFor(const Object* attacker) const
@@ -832,6 +848,23 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		pos = primaryVictim->getPosition();
 	if (!pos || (dotTick && (!primaryVictim || primaryVictim->isEffectivelyDead())))
 		return;
+
+	if (nugget.m_type == WEAPON_NUGGET_SPAWN_AND_FADE)
+	{
+		if (!nugget.m_spawnedObject || !source || source->isEffectivelyDead() ||
+			(primaryVictim && !nugget.affects(source, primaryVictim)))
+			return;
+		Coord3D location;
+		source->transformPoint(&nugget.m_spawnOffset, &location);
+		if (Object* spawned = TheThingFactory->newObject(nugget.m_spawnedObject, source->getTeam()))
+		{
+			spawned->setProducer(source);
+			spawned->setPosition(&location);
+			spawned->setOrientation(source->getOrientation());
+			source->kill(DAMAGE_UNRESISTABLE, DEATH_FADED);
+		}
+		return;
+	}
 
 	if (nugget.m_type == WEAPON_NUGGET_GRAB)
 	{

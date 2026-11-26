@@ -28,6 +28,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_DAMAGE_FIELD,
 	WEAPON_NUGGET_GRAB,
 	WEAPON_NUGGET_FIRE_LOGIC,
+	WEAPON_NUGGET_SPAWN_AND_FADE,
 };
 
 struct WeaponNuggetScalar
@@ -43,7 +44,7 @@ struct WeaponNugget
 	Bool isEnabledFor(const Object* attacker) const;
 	Bool affects(const Object* attacker, const Object* victim) const;
 	Real scalarFor(const Object* attacker, const Object* victim) const;
-	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB || m_type == WEAPON_NUGGET_FIRE_LOGIC; }
+	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB || m_type == WEAPON_NUGGET_FIRE_LOGIC || m_type == WEAPON_NUGGET_SPAWN_AND_FADE; }
 	Bool dealsDamage() const { return m_type == WEAPON_NUGGET_DAMAGE || m_type == WEAPON_NUGGET_DOT; }
 	void postProcessLoad();
 
@@ -58,6 +59,7 @@ struct WeaponNugget
 	static void parseDamageFieldNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseGrabNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseFireLogicNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseSpawnAndFadeNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;
@@ -127,6 +129,10 @@ struct WeaponNugget
 
 	AsciiString m_oclName;
 	const ObjectCreationList* m_ocl = nullptr;
+
+	AsciiString m_spawnedObjectName;
+	const ThingTemplate* m_spawnedObject = nullptr;
+	Coord3D m_spawnOffset = {0.0f, 0.0f, 0.0f};
 
 	AsciiString m_attributeModifier;
 	std::vector<AsciiString> m_antiCategories;

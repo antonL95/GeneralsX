@@ -293,6 +293,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "DamageFieldNugget", WeaponNugget::parseDamageFieldNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "GrabNugget", WeaponNugget::parseGrabNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FireLogicNugget", WeaponNugget::parseFireLogicNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "SpawnAndFadeNugget", WeaponNugget::parseSpawnAndFadeNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
 	{ "IdleAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_idleAfterFiringDelay) },
 	{ "HoldAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_holdAfterFiringDelay) },
