@@ -33,5 +33,8 @@ public:
 	virtual void onDie( const DamageInfo *damageInfo ) override;
 
 private:
-	UnsignedInt m_triggeredUntil = 0;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	UnsignedInt m_triggeredFrame = 0;
+	Int m_sourcePlayerIndex = -1;
 };
