@@ -1,0 +1,5 @@
+299 ring-drop-state Player_1 - 0
+301 ring-drop-state Player_1 - 0
+320 ring-drop-spawn Player_1 RingDropCarrier 0
+325 ring-drop-order Player_1 RingDropCarrier 0
+480 ring-drop-state Player_1 - 0
