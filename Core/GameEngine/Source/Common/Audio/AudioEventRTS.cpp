@@ -321,7 +321,7 @@ void AudioEventRTS::setEventName( AsciiString name )
 }
 
 //-------------------------------------------------------------------------------------------------
-void AudioEventRTS::generateFilename()
+void AudioEventRTS::generateFilename(Bool randomByDefault)
 {
 	// A Logic Random Value is used because we may ask "How long will it take to play this sound?"
 	// In that case, we need the same answer across all pcs.
@@ -346,9 +346,10 @@ void AudioEventRTS::generateFilename()
 
 
 
-		if (!BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL) || BitIsSet(m_eventInfo->m_control, AC_RANDOM))
+		const Bool authoredRandom = BitIsSet(m_eventInfo->m_control, AC_RANDOM);
+		if (authoredRandom || (randomByDefault && !BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL)))
 		{
-			if (m_isLogicalAudio)
+			if (m_isLogicalAudio && authoredRandom)
 			{
 				which = GameLogicRandomValueUnchanged(0, m_eventInfo->m_sounds.size() - 1);
 			}

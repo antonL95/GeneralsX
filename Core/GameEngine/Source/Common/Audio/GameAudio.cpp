@@ -1069,7 +1069,7 @@ Real AudioManager::getAudioLengthMS( const AudioEventRTS *event )
 
 	AudioEventRTS tmpEvent = *event;
 
-	tmpEvent.generateFilename();
+	tmpEvent.generateFilename(FALSE);
 	tmpEvent.generatePlayInfo();
 	return getFileLengthMS(tmpEvent.getAttackFilename()) +
 				 getFileLengthMS(tmpEvent.getFilename()) +
