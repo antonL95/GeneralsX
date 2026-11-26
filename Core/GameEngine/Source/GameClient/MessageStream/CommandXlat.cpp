@@ -75,6 +75,8 @@
 #include "GameClient/SelectionXlat.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -278,6 +280,19 @@ static Bool isSystemMessage( const GameMessage *msg );
 
 enum{ DROPPED_MAX_PARTICLE_COUNT = 1000};
 
+static Bool canAttachToSelected(const Object& target, const Object& selected)
+{
+	const auto* attach = static_cast<const AttachUpdate*>(target.findUpdateModule(NAMEKEY("AttachUpdate")));
+	if (!attach)
+		return FALSE;
+	if (attach->canAttachTo(selected))
+		return TRUE;
+	const HordeContain* horde = HordeContain::get(&selected);
+	const ContainedItemsList* members = horde ? horde->getContainedItemsList() : nullptr;
+	return members && std::any_of(members->begin(), members->end(),
+		[attach](const Object* member) { return attach->canAttachTo(*member); });
+}
+
 static Bool canSelectionSalvage( const Object *targetObj)
 {
 	if (!targetObj) {
@@ -308,6 +323,8 @@ static Bool canSelectionSalvage( const Object *targetObj)
 
 		if (retail)
 		{
+			if (canAttachToSelected(*targetObj, *obj))
+				return TRUE;
 			for (BehaviorModule** module = targetObj->getBehaviorModules(); *module; ++module)
 			{
 				const CollideModuleInterface* collider = (*module)->getCollide();
