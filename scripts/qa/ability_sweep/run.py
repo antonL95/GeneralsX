@@ -215,10 +215,9 @@ def run_faction(build, faction, pending, writer):
             writer.writerow(result_row(case, results[case["id"]]))
             finished += 1
         print(f"{faction}: {finished}/{len(batch)} cases, {failure or 'completed'}", file=sys.stderr)
-        out_of_time = timed_out and not stall_reason and finished > 0
-        if finished < len(batch) and not out_of_time:
+        if finished < len(batch):
             last = stall_reason or next((line for line in reversed(log.splitlines()) if line.startswith("TEST ")), "no log line")
-            verdict = "hang" if stall_reason or timed_out else "session failed"
+            verdict = "hang" if stall_reason else "not run" if timed_out else "session failed"
             writer.writerow(unfinished_row(batch[finished], verdict, last[:200]))
             print("\n".join(log.splitlines()[-30:]), file=sys.stderr)
             finished += 1

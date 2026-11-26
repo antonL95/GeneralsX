@@ -1,9 +1,11 @@
 import importlib.util
+import io
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from contextlib import redirect_stderr
 
 spec = importlib.util.spec_from_file_location("sweep", Path(__file__).with_name("run.py"))
 sweep = importlib.util.module_from_spec(spec)
@@ -35,6 +37,20 @@ class VerdictTest(unittest.TestCase):
             self.assertTrue(stalled.is_set())
             self.assertIn("frame=696", reason[0])
             kill.assert_called_once_with()
+
+    def test_timeout_after_completed_cases_does_not_retry_interrupted_case(self):
+        cases = [dict(id=index, faction="Wild", unit="unit", hero="1", command_set="set",
+                      button="button", command="SPECIAL_POWER") for index in range(1, 4)]
+        rows = []
+        writer = type("Writer", (), {"writerow": lambda self, row: rows.append(row)})()
+        sessions = [("first", "exit 137", True, ""), ("second", None, False, "")]
+        with patch.object(sweep, "session", side_effect=sessions) as session, \
+             patch.object(sweep, "parse", side_effect=[{1: {}}, {3: {}}]), \
+             patch.object(sweep, "result_row", side_effect=lambda case, values: [case["id"]]), \
+             redirect_stderr(io.StringIO()):
+            sweep.run_faction(Path("/build"), "Wild", cases, writer)
+        self.assertEqual([case["id"] for case in session.call_args_list[1].args[1]], [3])
+        self.assertEqual(rows[1][7], "not run")
 
 
 if __name__ == "__main__":
