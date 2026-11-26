@@ -2607,6 +2607,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						Coord3D goalPos;
 						Real onPathDistToGoal;
 						Real arcTurn = 0.0f;
+						PathfindLayerEnum wallScaleTargetLayer = LAYER_INVALID;
 						if (!isDoingGroundMovement())
 						{
 							// airborne locomotor.  Get the goal and distance direct to the goal, don't consider obstacles.
@@ -2623,6 +2624,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							onPathDistToGoal = info.distAlongPath;
 							goalPos = info.posOnPath;
 							arcTurn = info.arcTurn;
+							wallScaleTargetLayer = info.wallScaleTargetLayer;
 							if (RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_HORDE))
 							{
 								const Coord3D delta = goalPos - *getObject()->getPosition();
@@ -2636,8 +2638,8 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 									onPathDistToGoal = steeringDistance;
 								}
 							}
-							// layer is a possible bridge in the path.  Check & set the layer if applicable.
-							TheAI->pathfinder()->updateLayer(getObject(), info.layer);
+							if (wallScaleTargetLayer == LAYER_INVALID && !(m_curLocomotor && m_curLocomotor->isScalingWall()))
+								TheAI->pathfinder()->updateLayer(getObject(), info.layer);
 						}
 
 						Real speed = m_desiredSpeed;
@@ -2670,8 +2672,10 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						}
 
 						m_curLocomotor->setRetailArcTurn(arcTurn);
+						m_curLocomotor->setRetailWallScaleTarget(wallScaleTargetLayer);
 						m_curLocomotor->locoUpdate_moveTowardsPosition(getObject(), goalPos,
 							onPathDistToGoal+getPathExtraDistance(), speed, &blocked);
+						m_curLocomotor->setRetailWallScaleTarget(LAYER_INVALID);
 						m_curLocomotor->setRetailArcTurn(0.0f);
 
 						m_doFinalPosition = FALSE;
@@ -2687,6 +2691,8 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 
 				case NONE:
 					{
+						if (m_curLocomotor && m_curLocomotor->isScalingWall())
+							m_curLocomotor->stopScalingWall(getObject());
 						if (!m_doFinalPosition && steerInFormation())
 							break;
 						if (m_doFinalPosition)

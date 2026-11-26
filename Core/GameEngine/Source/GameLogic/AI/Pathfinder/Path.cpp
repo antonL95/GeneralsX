@@ -46,6 +46,7 @@ m_cpopValid(FALSE)
 	m_cpopOut.distAlongPath=0;
 	m_cpopOut.arcTurn = 0.0f;
 	m_cpopOut.layer = LAYER_GROUND;
+	m_cpopOut.wallScaleTargetLayer = LAYER_INVALID;
 	m_cpopOut.posOnPath.zero();
 }
 
@@ -93,7 +94,12 @@ void Path::xferRetailBlocks(Xfer* xfer, Bool present)
 				node->setGeneratedArc(FALSE);
 		}},
 		{"path-cached-arc-turn", [this](Xfer* transfer) { transfer->xferReal(&m_cpopOut.arcTurn); },
-			[this] { m_cpopOut.arcTurn = 0.0f; }}
+			[this] { m_cpopOut.arcTurn = 0.0f; }},
+		{"path-wall-scale-target", [this](Xfer* transfer) {
+			Int layer = static_cast<Int>(m_cpopOut.wallScaleTargetLayer);
+			transfer->xferInt(&layer);
+			m_cpopOut.wallScaleTargetLayer = static_cast<PathfindLayerEnum>(layer);
+		}, [this] { m_cpopOut.wallScaleTargetLayer = LAYER_INVALID; }}
 	});
 }
 
@@ -834,6 +840,7 @@ void Path::computePointOnPath(
 	CRCDEBUG_LOG(("Path::computePointOnPath() for %s", DebugDescribeObject(obj).str()));
 
 	out.layer = LAYER_GROUND;
+	out.wallScaleTargetLayer = LAYER_INVALID;
 	out.posOnPath.zero();
 	out.distAlongPath = 0;
 	out.arcTurn = 0.0f;
@@ -969,7 +976,19 @@ void Path::computePointOnPath(
 			out.layer = closeNext->getLayer();
 		}
 
-		// compute vector from start of segment to pos
+		const Bool scalesWalls = locomotorSet.scalesWalls();
+		const Bool isWallScaleSegment = scalesWalls &&
+			((closeNode->getLayer() == LAYER_GROUND && closeNext->getLayer() == LAYER_WALL) ||
+				(closeNode->getLayer() == LAYER_WALL && closeNext->getLayer() == LAYER_GROUND) ||
+				(obj && obj->getLayer() == LAYER_GROUND && closeNext->getLayer() == LAYER_WALL) ||
+				(obj && obj->getLayer() == LAYER_WALL && closeNext->getLayer() == LAYER_GROUND));
+		if (isWallScaleSegment)
+		{
+			out.wallScaleTargetLayer = closeNext->getLayer();
+			if (obj)
+				out.layer = obj->getLayer();
+		}
+
 		toPos.x = pos.x - closeNodePos->x;
 		toPos.y = pos.y - closeNodePos->y;
 
@@ -996,8 +1015,12 @@ void Path::computePointOnPath(
 			k = 1.0f;
 
 		Bool gotPos = false;
-		CRCDEBUG_LOG(("Path::computePointOnPath() calling isLinePassable() 1"));
-		if (TheAI->pathfinder()->isLinePassable( obj, locomotorSet.getValidSurfaces(), out.layer, pos, *nextNodePos,
+		if (isWallScaleSegment)
+		{
+			out.posOnPath = *nextNodePos;
+			gotPos = true;
+		}
+		else if (TheAI->pathfinder()->isLinePassable( obj, locomotorSet.getValidSurfaces(), out.layer, pos, *nextNodePos,
 			false, true ))
 		{
 			out.posOnPath = *nextNodePos;
@@ -1095,6 +1118,12 @@ void Path::computePointOnPath(
 	if (lenDelta > out.distAlongPath && out.distAlongPath > PATHFIND_CLOSE_ENOUGH)
 	{
 		out.distAlongPath = lenDelta;
+	}
+	if (out.wallScaleTargetLayer != LAYER_INVALID)
+	{
+		const Real dz = fabs(out.posOnPath.z - pos.z);
+		if (dz > 0.5f)
+			out.distAlongPath += dz;
 	}
 
 	if (updateCache)

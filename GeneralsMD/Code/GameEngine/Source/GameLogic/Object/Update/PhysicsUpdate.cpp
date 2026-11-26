@@ -648,6 +648,9 @@ UpdateSleepTime PhysicsBehavior::update()
 	const PhysicsBehaviorModuleData*	d = getPhysicsBehaviorModuleData();
 	const Bool retail = RetailFileLayers::enabled();
 	const Bool impactFlight = retail && m_impactFlightFrames != 0;
+	const AIUpdateInterface* scalingAI = obj->getAI();
+	const Locomotor* scalingLocomotor = scalingAI ? scalingAI->getCurLocomotor() : nullptr;
+	const Bool scalingWall = scalingLocomotor && scalingLocomotor->isScalingWall();
 	Bool															airborneAtStart = obj->isAboveTerrain();
 	Real															activeVelZ = 0;
 	Coord3D														bounceForce;
@@ -682,7 +685,8 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 		else
 		{
-			applyGravitationalForces();
+			if (!scalingWall)
+				applyGravitationalForces();
 			applyFrictionalForces();
 			m_vel.x += m_accel.x;
 			m_vel.y += m_accel.y;
@@ -817,11 +821,10 @@ UpdateSleepTime PhysicsBehavior::update()
 			groundZ += obj->getCarrierDeckHeight();
 		}
 		const Coord3D landing{mtx.Get_X_Translation(), mtx.Get_Y_Translation(), mtx.Get_Z_Translation()};
-		gotBounceForce = !impactFlight && handleBounce(oldPosZ, landing, groundZ, &bounceForce);
+		gotBounceForce = !impactFlight && !scalingWall && handleBounce(oldPosZ, landing, groundZ, &bounceForce);
 
-		// remember our z-vel prior to doing ground-slam adjustment
 		activeVelZ = m_vel.z;
-		if (mtx.Get_Z_Translation() <= groundZ)
+		if (!scalingWall && mtx.Get_Z_Translation() <= groundZ)
 		{
 			// Note - when vehicles are going down a slope, they will maintain a small negative
 			// z velocity as they go down.  So don't slam it to 0 if they aren't slamming into the
@@ -845,7 +848,7 @@ UpdateSleepTime PhysicsBehavior::update()
 				obj->setModelConditionState(MODELCONDITION_STUNNED);
 			}
 		}
-		else if (mtx.Get_Z_Translation() > groundZ)
+		else if (!scalingWall && mtx.Get_Z_Translation() > groundZ)
 		{
 			if (getFlag(IS_IN_FREEFALL))
 			{
@@ -912,7 +915,7 @@ UpdateSleepTime PhysicsBehavior::update()
 	// the start and end of this func... we have to compare since last frame,
 	// since (if we're held by a parachute, for instance) we might have been
 	// moved by other bits of code!
-	if (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE))
+	if (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE) && !scalingWall)
 	{
 		doBounceSound(prevPos);
 

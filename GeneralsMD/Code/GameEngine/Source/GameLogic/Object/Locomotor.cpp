@@ -1034,6 +1034,7 @@ Locomotor::Locomotor(const Locomotor& that)
 	m_angleOffset = that.m_angleOffset;
 	m_offsetIncrement = that.m_offsetIncrement;
 	m_retailScalarSpeed = that.m_retailScalarSpeed;
+	m_retailScalingWall = that.m_retailScalingWall;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1057,6 +1058,7 @@ Locomotor& Locomotor::operator=(const Locomotor& that)
 		m_preferredHeight = that.m_preferredHeight;
 		m_preferredHeightDamping = that.m_preferredHeightDamping;
 		m_retailScalarSpeed = that.m_retailScalarSpeed;
+		m_retailScalingWall = that.m_retailScalingWall;
 	}
 	return *this;
 }
@@ -1078,6 +1080,9 @@ void Locomotor::xferRetailBlocks(Xfer* xfer, Bool present)
 		{ "locomotor-scalar-speed",
 			[this](Xfer* x) { x->xferReal(&m_retailScalarSpeed); },
 			[this] { m_retailScalarSpeed = 0.0f; } },
+		{ "locomotor-scaling-wall",
+			[this](Xfer* x) { x->xferBool(&m_retailScalingWall); },
+			[this] { m_retailScalingWall = FALSE; } },
 	});
 }
 
@@ -1518,11 +1523,14 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 //	DEBUG_ASSERTLOG(obj->getID() != TheObjectIDToDebug, ("locoUpdate_moveTowardsPosition %f %f %f (dtg %f, spd %f), speed %f (%f)",goalPos.x,goalPos.y,goalPos.z,onPathDistToGoal,desiredSpeed,physics->getSpeed(),physics->getForwardSpeed2D()));
 #endif
 
-	//
-	// do not allow for invalid positions that the pathfinder cannot handle ... for airborne
-	// objects we don't need the pathfinder so we'll ignore this
-	//
+	if (scalesWalls() && (m_retailWallScaleTarget != LAYER_INVALID || m_retailScalingWall))
+	{
+		if (stepRetailWallScale(obj, physics, goalPos, desiredSpeed))
+			return;
+	}
+
 	if( BitIsSet( m_template->m_surfaces, LOCOMOTORSURFACE_AIR ) == false &&
+			!(scalesWalls() && (m_retailScalingWall || m_retailWallScaleTarget != LAYER_INVALID)) &&
 			!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, obj->getPosition()) &&
 			!getFlag(ALLOW_INVALID_POSITION))
 	{
@@ -3952,6 +3960,139 @@ Locomotor* LocomotorSet::findLocomotor(LocomotorSurfaceTypeMask t)
 			return curLocomotor;
 	}
 	return nullptr;
+}
+
+void Locomotor::stopScalingWall(Object* obj)
+{
+	if (!m_retailScalingWall)
+		return;
+	m_retailScalingWall = FALSE;
+	if (obj)
+		obj->clearModelConditionState(MODELCONDITION_CLIMBING);
+}
+
+Bool Locomotor::stepRetailWallScale(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos, Real desiredSpeed)
+{
+	if (!obj || !physics || !scalesWalls())
+		return FALSE;
+
+	const Real wallScaleSpeedMultiplier = 0.6f;
+	const Real climbSpeed = desiredSpeed * wallScaleSpeedMultiplier;
+	if (climbSpeed <= 0.0f)
+		return FALSE;
+
+	const PathfindLayerEnum currentLayer = obj->getLayer();
+	const PathfindLayerEnum targetLayer = m_retailWallScaleTarget != LAYER_INVALID ? m_retailWallScaleTarget : currentLayer;
+	if (currentLayer == targetLayer && !m_retailScalingWall)
+		return FALSE;
+
+	Coord3D pos = *obj->getPosition();
+	const Real dx = goalPos.x - pos.x;
+	const Real dy = goalPos.y - pos.y;
+	const Real distXY = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+	const Real heightEpsilon = 0.5f;
+
+	if (currentLayer == LAYER_GROUND && targetLayer == LAYER_WALL)
+	{
+		Coord3D probe = pos;
+		if (distXY > 0.01f)
+		{
+			const Real step = MIN(distXY, PATHFIND_CELL_SIZE_F * 0.5f);
+			probe.x += (dx / distXY) * step;
+			probe.y += (dy / distXY) * step;
+		}
+		if (!m_retailScalingWall &&
+			!TheAI->pathfinder()->isPointOnWall(&pos) &&
+			!TheAI->pathfinder()->isPointOnWall(&probe) &&
+			distXY > PATHFIND_CELL_SIZE_F)
+			return FALSE;
+
+		m_retailScalingWall = TRUE;
+		const Real targetZ = TheAI->pathfinder()->getWallHeightAt(goalPos);
+		if (distXY > 0.01f)
+			locoUpdate_moveTowardsAngle(obj, WWMath::Atan2Origin(dy, dx));
+		physics->scrubVelocity2D(0.0f);
+		physics->scrubVelocityZ(0.0f);
+		Coord3D nullAccel;
+		nullAccel.zero();
+		physics->applyMotiveForce(&nullAccel);
+		obj->setModelConditionState(MODELCONDITION_CLIMBING);
+		advanceRetailScalarSpeed(obj, climbSpeed);
+
+		if (pos.z + heightEpsilon < targetZ)
+		{
+			pos.z += climbSpeed;
+			if (pos.z > targetZ)
+				pos.z = targetZ;
+			obj->setPosition(&pos);
+			return TRUE;
+		}
+
+		pos.z = targetZ;
+		if (!TheAI->pathfinder()->isPointOnWall(&pos) && distXY > 0.01f)
+		{
+			const Real step = MIN(distXY, climbSpeed);
+			pos.x += (dx / distXY) * step;
+			pos.y += (dy / distXY) * step;
+			obj->setPosition(&pos);
+			if (TheAI->pathfinder()->isPointOnWall(&pos))
+			{
+				obj->setLayer(LAYER_WALL);
+				m_retailScalingWall = FALSE;
+				obj->clearModelConditionState(MODELCONDITION_CLIMBING);
+			}
+			return TRUE;
+		}
+
+		obj->setPosition(&pos);
+		obj->setLayer(LAYER_WALL);
+		m_retailScalingWall = FALSE;
+		obj->clearModelConditionState(MODELCONDITION_CLIMBING);
+		return FALSE;
+	}
+
+	if (currentLayer == LAYER_WALL && targetLayer == LAYER_GROUND)
+	{
+		m_retailScalingWall = TRUE;
+		if (distXY > 0.01f)
+			locoUpdate_moveTowardsAngle(obj, WWMath::Atan2Origin(dy, dx));
+		physics->scrubVelocity2D(0.0f);
+		physics->scrubVelocityZ(0.0f);
+		Coord3D nullAccel;
+		nullAccel.zero();
+		physics->applyMotiveForce(&nullAccel);
+		obj->setModelConditionState(MODELCONDITION_CLIMBING);
+		advanceRetailScalarSpeed(obj, climbSpeed);
+
+		if (TheAI->pathfinder()->isPointOnWall(&pos) && distXY > 0.01f)
+		{
+			const Real step = MIN(distXY, climbSpeed);
+			pos.x += (dx / distXY) * step;
+			pos.y += (dy / distXY) * step;
+			obj->setPosition(&pos);
+			return TRUE;
+		}
+
+		const Real groundZ = TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+		if (pos.z - heightEpsilon > groundZ)
+		{
+			pos.z -= climbSpeed;
+			if (pos.z < groundZ)
+				pos.z = groundZ;
+			obj->setPosition(&pos);
+			return TRUE;
+		}
+
+		pos.z = groundZ;
+		obj->setPosition(&pos);
+		obj->setLayer(LAYER_GROUND);
+		m_retailScalingWall = FALSE;
+		obj->clearModelConditionState(MODELCONDITION_CLIMBING);
+		return FALSE;
+	}
+
+	stopScalingWall(obj);
+	return FALSE;
 }
 
 Bool LocomotorSet::scalesWalls() const

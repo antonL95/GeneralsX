@@ -364,6 +364,8 @@ protected:
 	static Bool validMovementTerrainCell(const PathfindCell* cell, LocomotorSurfaceTypeMask acceptableSurfaces);
 
 	void checkChangeLayers(PathfindCell *parentCell);
+	void checkScaleWallTransitions(PathfindCell* parentCell, PathfindCell* goalCell, const LocomotorSet& locomotorSet,
+		Bool isHuman, Bool centerInCell, Int radius, const Object* obj);
 
 	bool checkCellOutsideExtents(ICoord2D& cell);
 

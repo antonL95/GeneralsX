@@ -2705,6 +2705,147 @@ void Pathfinder::checkChangeLayers(PathfindCell *parentCell)
 	newCell->putOnSortedOpenList( m_openList );
 }
 
+void Pathfinder::checkScaleWallTransitions(PathfindCell* parentCell, PathfindCell* goalCell,
+	const LocomotorSet& locomotorSet, Bool isHuman, Bool centerInCell, Int radius, const Object* obj)
+{
+	if (!locomotorSet.scalesWalls() || m_layers[LAYER_WALL].isUnused())
+		return;
+	const PathfindLayerEnum parentLayer = parentCell->getLayer();
+	if (parentLayer != LAYER_GROUND && parentLayer != LAYER_WALL)
+		return;
+
+	const Int px = parentCell->getXIndex();
+	const Int py = parentCell->getYIndex();
+	const Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : FALSE;
+	const Int maxProbeSteps = 7;
+	const ICoord2D dirs[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+
+	for (Int d = 0; d < 4; ++d)
+	{
+		const Int dx = dirs[d].x;
+		const Int dy = dirs[d].y;
+		const Int x1 = px + dx;
+		const Int y1 = py + dy;
+		if (x1 < m_extent.lo.x || x1 > m_extent.hi.x || y1 < m_extent.lo.y || y1 > m_extent.hi.y)
+			continue;
+
+		if (parentLayer == LAYER_GROUND)
+		{
+			if (m_map[x1][y1].getType() != PathfindCell::CELL_OBSTACLE &&
+				m_layers[LAYER_WALL].getCell(x1, y1) == nullptr)
+				continue;
+
+			for (Int step = 1; step <= maxProbeSteps; ++step)
+			{
+				ICoord2D coord = { px + dx * step, py + dy * step };
+				if (coord.x < m_extent.lo.x || coord.x > m_extent.hi.x ||
+					coord.y < m_extent.lo.y || coord.y > m_extent.hi.y)
+					break;
+				if (isHuman && checkCellOutsideExtents(coord))
+					break;
+
+				PathfindCell* wallCell = m_layers[LAYER_WALL].getCell(coord.x, coord.y);
+				if (wallCell && wallCell->getLayer() == LAYER_WALL && wallCell->getType() == PathfindCell::CELL_CLEAR)
+				{
+					if (!validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), wallCell, parentCell, obj))
+						break;
+					TCheckMovementInfo info;
+					info.cell = coord;
+					info.layer = LAYER_WALL;
+					info.centerInCell = centerInCell;
+					info.radius = radius;
+					info.considerTransient = FALSE;
+					info.acceptableSurfaces = locomotorSet.getValidSurfaces();
+					if (obj && (!checkForMovement(obj, info) || info.enemyFixed))
+						break;
+
+					const UnsignedInt newCostSoFar = parentCell->getCostSoFar() +
+						static_cast<UnsignedInt>(step + 1) * COST_ORTHOGONAL;
+					if (wallCell->hasInfo() && (wallCell->getOpen() || wallCell->getClosed()))
+					{
+						if (wallCell->getCostSoFar() <= newCostSoFar)
+							break;
+						if (wallCell->getClosed())
+							wallCell->removeFromClosedList(m_closedList);
+						if (wallCell->getOpen())
+							wallCell->removeFromOpenList(m_openList);
+					}
+					else if (!wallCell->allocateInfo(coord))
+					{
+						break;
+					}
+					wallCell->setBlockedByAlly(FALSE);
+					wallCell->setParentCell(parentCell);
+					wallCell->setCostSoFar(newCostSoFar);
+					const Int remaining = goalCell ? wallCell->costToGoal(goalCell) : 0;
+					wallCell->setTotalCost(newCostSoFar + remaining);
+					wallCell->putOnSortedOpenList(m_openList);
+					break;
+				}
+				if (!wallCell && m_map[coord.x][coord.y].getType() != PathfindCell::CELL_OBSTACLE)
+					break;
+			}
+		}
+		else
+		{
+			PathfindCell* adjWall = m_layers[LAYER_WALL].getCell(x1, y1);
+			if (adjWall && adjWall->getType() == PathfindCell::CELL_CLEAR)
+				continue;
+
+			for (Int step = 1; step <= maxProbeSteps; ++step)
+			{
+				ICoord2D coord = { px + dx * step, py + dy * step };
+				if (coord.x < m_extent.lo.x || coord.x > m_extent.hi.x ||
+					coord.y < m_extent.lo.y || coord.y > m_extent.hi.y)
+					break;
+				if (isHuman && checkCellOutsideExtents(coord))
+					break;
+
+				PathfindCell* groundCell = &m_map[coord.x][coord.y];
+				if (groundCell->getType() == PathfindCell::CELL_CLEAR &&
+					validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), groundCell, parentCell, obj))
+				{
+					TCheckMovementInfo info;
+					info.cell = coord;
+					info.layer = LAYER_GROUND;
+					info.centerInCell = centerInCell;
+					info.radius = radius;
+					info.considerTransient = FALSE;
+					info.acceptableSurfaces = locomotorSet.getValidSurfaces();
+					if (obj && (!checkForMovement(obj, info) || info.enemyFixed))
+						break;
+
+					const UnsignedInt newCostSoFar = parentCell->getCostSoFar() +
+						static_cast<UnsignedInt>(step + 1) * COST_ORTHOGONAL;
+					if (groundCell->hasInfo() && (groundCell->getOpen() || groundCell->getClosed()))
+					{
+						if (groundCell->getCostSoFar() <= newCostSoFar)
+							break;
+						if (groundCell->getClosed())
+							groundCell->removeFromClosedList(m_closedList);
+						if (groundCell->getOpen())
+							groundCell->removeFromOpenList(m_openList);
+					}
+					else if (!groundCell->allocateInfo(coord))
+					{
+						break;
+					}
+					groundCell->setBlockedByAlly(FALSE);
+					groundCell->setParentCell(parentCell);
+					groundCell->setCostSoFar(newCostSoFar);
+					const Int remaining = goalCell ? groundCell->costToGoal(goalCell) : 0;
+					groundCell->setTotalCost(newCostSoFar + remaining);
+					groundCell->putOnSortedOpenList(m_openList);
+					break;
+				}
+				if (groundCell->getType() != PathfindCell::CELL_OBSTACLE &&
+					m_layers[LAYER_WALL].getCell(coord.x, coord.y) == nullptr)
+					break;
+			}
+		}
+	}
+}
+
 bool Pathfinder::checkCellOutsideExtents(ICoord2D& cell) {
 	return 	cell.x < m_logicalExtent.lo.x ||
 					cell.x > m_logicalExtent.hi.x ||
@@ -3183,7 +3324,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), isCrusher, parentCell->getZone());
 	zone2 =  m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), isCrusher, goalCell->getZone());
 
-	if ( (layer==LAYER_WALL && zone1 == 0) || (destinationLayer==LAYER_WALL && zone2 == 0) ) {
+	if ( !locomotorSet.scalesWalls() && ((layer==LAYER_WALL && zone1 == 0) || (destinationLayer==LAYER_WALL && zone2 == 0)) ) {
 #if RETAIL_COMPATIBLE_PATHFINDING
 		if (s_useFixedPathfinding)
 #endif
@@ -3205,7 +3346,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 
 	//DEBUG_LOG(("Zones %d to %d", zone1, zone2));
 
-	if ( zone1 != zone2) {
+	if ( zone1 != zone2 && !(locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused()) ) {
 		//DEBUG_LOG(("Intense Debug Info - Pathfind Zone screen failed-cannot reach desired location."));
 		goalCell->releaseInfo();
 		parentCell->releaseInfo();
@@ -3298,8 +3439,8 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
-		// Check to see if we can change layers in this cell.
 		checkChangeLayers(parentCell);
+		checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
 
 		cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 
@@ -3780,8 +3921,6 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 	// m_isCrusher = false;
 	zone1 = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, false, parentCell->getZone());
 	zone2 =  m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, false, goalCell->getZone());
-
-	//DEBUG_LOG(("Zones %d to %d", zone1, zone2));
 
 	if ( zone1 != zone2) {
 		goalCell->releaseInfo();
@@ -4856,12 +4995,11 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
 		zone2 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone2);
 		zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
 	}
-	// If the terrain is connected using this locomotor set, we can path somehow.
-	if (zone1 == zone2) {
-		// There is not terrain blocking the from & to.
+	if (zone1 == zone2 || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+		(fromLayer == LAYER_WALL || destinationLayer == LAYER_WALL))) {
 		return true;
 	}
-	return FALSE;  // no path exists
+	return FALSE;
 
 }
 
@@ -4913,12 +5051,11 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		// It is better to return a false positive than a false negative. jba.
 		return true;
 	}
-	// If the terrain is connected using this locomotor set, we can path somehow.
-	if (zone1 == zone2) {
-		// There is not terrain blocking the from & to.
+	if (zone1 == zone2 || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+		(fromLayer == LAYER_WALL || destinationLayer == LAYER_WALL))) {
 		return true;
 	}
-	return FALSE;  // no path exists
+	return FALSE;
 
 }
 
@@ -5346,7 +5483,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	if (goalCell == nullptr)
 		return nullptr;
 
-	if (goalCell->getZone()==0 && destinationLayer==LAYER_WALL) {
+	if (!locomotorSet.scalesWalls() && goalCell->getZone()==0 && destinationLayer==LAYER_WALL) {
 		return nullptr;
 	}
 
@@ -5398,8 +5535,8 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	}
 
 	Bool gotHierarchicalPath = false;
-	if (m_isTunneling) {
-		m_zoneManager.setAllPassable(); // can't optimize.
+	if (m_isTunneling || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused())) {
+		m_zoneManager.setAllPassable();
 	}	else {
 		m_zoneManager.clearPassableFlags();
 		Path *hPat = findClosestHierarchicalPath(isHuman, locomotorSet, from, rawTo, false);
@@ -5559,8 +5696,8 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 		}
 		// If we haven't already found the goal cell, continue examining. [8/25/2003]
 		if (!foundGoal) {
-			// Check to see if we can change layers in this cell.
 			checkChangeLayers(parentCell);
+			checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
 			count += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 		}
 	}
@@ -5745,6 +5882,12 @@ void Pathfinder::prependCells( Path *path, const Coord3D *fromPos,
 		}
 
 		Bool canOptimize = true;
+		if (prevCell && cell->getLayer() != prevCell->getLayer())
+		{
+			if (path->getFirstNode())
+				path->getFirstNode()->setCanOptimize(false);
+			canOptimize = false;
+		}
 		if (cell->getType() == PathfindCell::CELL_CLIFF) {
 			if (prevCell && prevCell->getType() != PathfindCell::CELL_CLIFF) {
 				if (path->getFirstNode()) {
@@ -7152,8 +7295,8 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
-		// Check to see if we can change layers in this cell.
 		checkChangeLayers(parentCell);
+		checkScaleWallTransitions(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, obj);
 
 		examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 
@@ -7381,8 +7524,8 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 		parentCell->putOnClosedList( m_closedList );
 
 		if (cellCount < CELL_LIMIT) {
-			// Check to see if we can change layers in this cell.
 			checkChangeLayers(parentCell);
+			checkScaleWallTransitions(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, obj);
 			cellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 		}
 	}
@@ -7724,8 +7867,8 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 		parentCell->putOnClosedList( m_closedList );
 
 		if (cellCount < ATTACK_CELL_LIMIT) {
-				// Check to see if we can change layers in this cell.
 			checkChangeLayers(parentCell);
+			checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
 			cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell,
 				radius, startCellNdx, obj, attackDistance);
 		}
@@ -7920,8 +8063,8 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
-		// Check to see if we can change layers in this cell.
 		checkChangeLayers(parentCell);
+		checkScaleWallTransitions(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, obj);
 
 		cellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 

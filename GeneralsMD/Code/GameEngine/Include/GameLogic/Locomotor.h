@@ -319,6 +319,9 @@ public:
 	Bool usesFloatingZ() const { return m_template->m_behaviorZ == Z_FLOATING_Z; }
 	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
 	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
+	Bool isScalingWall() const { return m_retailScalingWall; }
+	void setRetailWallScaleTarget(PathfindLayerEnum layer) { m_retailWallScaleTarget = layer; }
+	void stopScalingWall(Object* obj);
 	Bool usesTerrainSmoothing() const { return m_template->m_rotwk.useTerrainSmoothing; }
 	Real getMaxTurnRate(BodyDamageType condition) const;  ///< get max turning rate given condition
 	Real getMaxAcceleration(BodyDamageType condition) const;  ///< get acceleration given condition
@@ -568,8 +571,10 @@ private:
 	Bool m_retailWasRunning = FALSE;
 	Real m_retailScalarSpeed = 0.0f;
 	Real m_retailArcTurn = 0.0f;
+	Bool m_retailScalingWall = FALSE;
+	PathfindLayerEnum m_retailWallScaleTarget = LAYER_INVALID;
 
-
+	Bool stepRetailWallScale(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos, Real desiredSpeed);
 };
 
 //-------------------------------------------------------------------------------------------------

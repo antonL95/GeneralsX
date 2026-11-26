@@ -31,6 +31,7 @@ struct ClosestPointOnPathInfo
 	Real								arcTurn;
 	Coord3D							posOnPath;
 	PathfindLayerEnum		layer;
+	PathfindLayerEnum		wallScaleTargetLayer;
 };
 
 /**
