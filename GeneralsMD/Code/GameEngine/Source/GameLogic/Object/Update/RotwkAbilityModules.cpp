@@ -453,7 +453,7 @@ UpdateSleepTime StrafeAreaUpdate::update()
 				ai->chooseLocomotorSet(LOCOMOTORSET_SUPERSONIC);
 				self->clearModelConditionState(MODELCONDITION_ATTACKING);
 			}
-			else if (distance < data->m_radius * (1.0f / 12.0f) && ai->isIdle())
+			else if (ai->isIdle() && (now >= m_firstShotFrame || distance < data->m_radius * (1.0f / 12.0f)))
 				orderDeparture(ai);
 			break;
 		case DEPART:
