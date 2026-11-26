@@ -8,6 +8,8 @@
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
@@ -36,6 +38,63 @@ Bool attack(Team* team, Object* unit, const char* waypoint)
 			unit->getAI()->getCurrentStateID() == AI_ATTACK_MOVE_TO;
 	}
 	return FALSE;
+}
+
+Bool teamHealthCondition(Team* team, Int comparison, Int percent)
+{
+	for (Int i = 0; i < Condition::NUM_ITEMS; ++i)
+	{
+		const Template* definition = TheScriptEngine->getConditionTemplate(i);
+		if (definition->m_internalName != "EVAL_TEAM_HEALTH" ||
+			ScriptEngine::findRotwkConditionByRetailIndex(174) != i || definition->getNumParameters() != 3 ||
+			definition->getParameterType(0) != Parameter::TEAM || definition->getParameterType(1) != Parameter::COMPARISON ||
+			definition->getParameterType(2) != Parameter::INT)
+			continue;
+		auto* condition = newInstance(Condition)(static_cast<Condition::ConditionType>(i));
+		condition->getParameter(0)->friend_setString("<This Team>");
+		condition->getParameter(1)->friend_setInt(comparison);
+		condition->getParameter(2)->friend_setInt(percent);
+		auto* clause = newInstance(OrCondition);
+		clause->setFirstAndCondition(condition);
+		auto* script = newInstance(Script);
+		script->setOrCondition(clause);
+		const Bool result = TheScriptEngine->evaluateConditions(script, team);
+		deleteInstance(script);
+		return result;
+	}
+	return FALSE;
+}
+
+void removeHordeMember(const RetailTestCommands::Context& ctx)
+{
+	Object* horde = ctx.requireObject();
+	if (!horde || !horde->getContain())
+		return;
+	const ContainedItemsList* members = horde->getContain()->getContainedItemsList();
+	if (members && !members->empty())
+		TheGameLogic->destroyObject(*members->begin());
+}
+
+void teamHealthProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* horde = ctx.requireObject();
+	Object* unit = ctx.findTarget(std::string_view("Player_1:MapScriptVeterancyProbe:0"));
+	if (!horde || !horde->getContain() || !unit)
+		return;
+	const Int count = horde->getContain()->getContainCount();
+	const Int maximum = horde->getContain()->getContainMax();
+	Team* original = horde->getTeam();
+	Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+	horde->setTemporaryTeam(team);
+	unit->setTemporaryTeam(team);
+	const Int expected = maximum > 0 ? (count + 1) * 100 / (maximum + 1) : 0;
+	const Bool partial = count > 0 && count < maximum;
+	const Bool match = teamHealthCondition(team, 2, expected);
+	const Bool reject = !teamHealthCondition(team, 2, expected + 1);
+	horde->setTemporaryTeam(original);
+	unit->setTemporaryTeam(original);
+	deleteInstance(team);
+	std::fprintf(stderr, "TEST map-unit-ops health frame=%u partial=%d match=%d reject=%d\n", ctx.frame, partial, match, reject);
 }
 
 Bool veteranCondition(const char* owner, const char* type, Int comparison, Int rank)
@@ -262,6 +321,8 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);
 	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
+	registerAction("map-unit-ops-horde-remove", removeHordeMember);
+	registerAction("map-unit-ops-health", teamHealthProbe);
 #endif
 }
 }

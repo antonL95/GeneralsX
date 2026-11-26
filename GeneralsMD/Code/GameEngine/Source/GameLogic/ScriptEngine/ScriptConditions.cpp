@@ -3161,6 +3161,35 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 					BfmeScriptRules::compare(comparison, object.getExperienceTracker()->getRank(), rank);
 			}) > 0;
 		}
+		case Condition::EVAL_TEAM_HEALTH:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			if (!team)
+				return FALSE;
+			Int current = 0;
+			Int maximum = 0;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				const Object* unit = member.cur();
+				if (unit->isKindOf(KINDOF_INERT) || unit->isKindOf(KINDOF_IGNORED_IN_GUI) || unit->isKindOf(KINDOF_REBUILD_HOLE))
+					continue;
+				if (unit->isKindOf(KINDOF_HORDE))
+				{
+					if (const auto* contain = unit->getContain())
+					{
+						maximum += contain->getContainMax();
+						current += contain->getContainCount();
+					}
+				}
+				else
+				{
+					++maximum;
+					++current;
+				}
+			}
+			const Int percent = maximum ? current * 100 / maximum : 0;
+			return BfmeScriptRules::compare(pCondition->getParameter(1)->getInt(), percent, pCondition->getParameter(2)->getInt());
+		}
 		case Condition::PLAYER_HAS_NUMBER_OBJECTS_WITH_MODELCONDITION:
 		{
 			if (!RetailFileLayers::enabled())

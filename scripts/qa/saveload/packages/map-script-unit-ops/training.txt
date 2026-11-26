@@ -1,13 +1,16 @@
+225 create Player_1 GondorFighterHorde 0 2000,220,0
 234 create Player_1 MapScriptUnitOpsProbe 0 2000,150,0
 235 create Player_1 MapScriptUnitOpsXP 0 2000,170,0
 235 create Player_1 MapScriptUnitOpsXP 1 2000,180,0
 235 create Player_1 MapScriptUnitOpsXP 2 2000,190,0
 235 create Player_1 MapScriptVeterancyProbe 0 2000,200,0
+238 map-unit-ops-horde-remove Player_1 GondorFighterHorde 0
 239 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 240 map-unit-ops-team-xp Player_1 MapScriptUnitOpsXP 0
 240 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
 241 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
 243 map-unit-ops-veterancy Player_1 MapScriptVeterancyProbe 0
+243 map-unit-ops-health Player_1 GondorFighterHorde 0
 
 
 246 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
@@ -16,6 +19,8 @@
 248 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 248 map-unit-ops-team-xp Player_1 MapScriptUnitOpsXP 0
 249 map-unit-ops-veterancy Player_1 MapScriptVeterancyProbe 0
+249 map-unit-ops-health Player_1 GondorFighterHorde 0
+250 destroy Player_1 GondorFighterHorde 0
 250 destroy Player_1 MapScriptVeterancyProbe 0
 250 destroy Player_1 MapScriptUnitOpsProbe 0
 250 destroy Player_1 MapScriptUnitOpsXP 0
