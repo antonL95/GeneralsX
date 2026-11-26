@@ -1,0 +1,24 @@
+3 cash Player_1 - 0 90000
+45 ringchain-gollum Player_1 RingEvilGollum 0
+60 ringchain-state Player_1 - 0
+75 ringchain-kill-gollum Player_1 RingEvilGollum 0
+100 ringchain-state Player_1 - 0
+105 ringchain-carrier Player_1 RingEvilCarrier 0
+110 ringchain-pickup Player_1 RingEvilCarrier 0
+240 ringchain-state Player_1 - 0
+245 ringchain-kill-carrier Player_1 - 0
+270 ringchain-state Player_1 - 0
+275 ringchain-carrier Player_1 RingEvilCarrier 0
+280 ringchain-pickup Player_1 RingEvilCarrier 0
+400 ringchain-state Player_1 - 0
+409 select Player_1 RingEvilCarrier 0
+410 ringchain-deliver Player_1 - 0
+950 ringchain-state Player_1 - 0
+960 ringchain-recruit Player_1 - 0
+400 ringchain-eva Player_1 DiscoveredRing 0
+400 ringchain-eva Player_1 RingPickedUpLocal 0
+400 ringchain-eva Player_1 LocalPlayerLosesRing 0
+970 ringchain-eva Player_1 LocalPlayerGainsRing 0
+6500 ringchain-state Player_1 - 0
+6510 ringchain-kill-hero Player_1 - 0
+6550 ringchain-state Player_1 - 0
