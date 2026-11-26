@@ -457,6 +457,35 @@ void AI::addSideInfo(AISideInfo *infoToAdd)
 
 }
 
+void AI::parseRetailDozerAssignment(INI* ini)
+{
+	ini->getNextToken();
+	struct Assignment
+	{
+		AsciiString side;
+		AsciiString unit;
+	} assignment;
+	static const FieldParse fields[] = {
+		{ "Side", INI::parseAsciiString, nullptr, offsetof(Assignment, side) },
+		{ "Unit", INI::parseAsciiString, nullptr, offsetof(Assignment, unit) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&assignment, fields);
+	if (!TheAI || assignment.side.isEmpty())
+		return;
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES && !TheAI->m_aiData->m_next)
+		TheAI->newOverride();
+	assignment.side.toLower();
+	TheAI->m_aiData->m_retailDozerAssignments.insert_or_assign(assignment.side, assignment.unit);
+}
+
+AsciiString TAiData::getRetailDozerAssignment(AsciiString side) const
+{
+	side.toLower();
+	const auto found = m_retailDozerAssignments.find(side);
+	return found != m_retailDozerAssignments.end() ? found->second : AsciiString::TheEmptyString;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Parse GameData entry */
 //-------------------------------------------------------------------------------------------------

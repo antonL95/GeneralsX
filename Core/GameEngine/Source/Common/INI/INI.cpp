@@ -47,6 +47,7 @@
 #if !RTS_GENERALS
 #include "Common/Team.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/AI.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
@@ -606,13 +607,7 @@ static INIBlockParse findBlockParse(const char* token)
 	if (RetailFileLayers::enabled() && strcmp(token, "AIBase") == 0)
 		return AISkirmishPlayer::parseRetailBase;
 	if (RetailFileLayers::enabled() && strcmp(token, "AIDozerAssignment") == 0)
-		return [](INI* ini) {
-			const std::string line = ini->currentRawLine();
-			INIBlockStructure::LineHead head{};
-			INIBlockStructure::parseLineHead(line, head);
-			ini->recordSkipped("block", std::string(head.keyword).c_str());
-			ini->readRawBlock(INI::getEndToken());
-		};
+		return AI::parseRetailDozerAssignment;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "StanceTemplate") == 0)
 		return AttributeModifierStore::parseStanceTemplateDefinition;
 #endif

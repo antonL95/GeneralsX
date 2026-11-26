@@ -2432,6 +2432,7 @@ void AISkirmishPlayer::updateRetail()
 
 	Object* keep = nullptr;
 	Bool fortressPresent = FALSE;
+	Bool hasDozer = FALSE;
 	std::vector<Object*> builders;
 	std::vector<Object*> plots;
 	std::vector<Object*> producers;
@@ -2444,6 +2445,9 @@ void AISkirmishPlayer::updateRetail()
 		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
 			continue;
 		owned.push_back(object);
+		AIUpdateInterface* ai = object->getAI();
+		DozerAIInterface* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+		hasDozer |= dozer != nullptr;
 		const Bool ordinaryFarm = isFarm(*object->getTemplate());
 		const Bool finished = !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 		if (difficulty == DIFFICULTY_EASY && finished &&
@@ -2470,9 +2474,9 @@ void AISkirmishPlayer::updateRetail()
 			plots.push_back(object);
 		if (object->getProductionUpdateInterface())
 			producers.push_back(object);
-		if (AIUpdateInterface* ai = object->getAI())
+		if (ai)
 		{
-			if (DozerAIInterface* dozer = ai->getDozerAIInterface())
+			if (dozer)
 			{
 				if (!dozer->isAnyTaskPending() && ai->isIdle())
 					builders.push_back(object);
@@ -2608,6 +2612,17 @@ void AISkirmishPlayer::updateRetail()
 		return selected;
 	};
 	const Bool canBuildArmy = !retailTuning.disableUnitBuilding && m_player->getCanBuildUnits();
+	const ThingTemplate* replacementDozer = nullptr;
+	if (!hasDozer && canBuildArmy && !retailTuning.disableBaseBuilding && m_player->getCanBuildBase())
+	{
+		const AsciiString assignment = TheAI->getAiData()->getRetailDozerAssignment(m_player->getSide());
+		if (assignment.isNotEmpty())
+			replacementDozer = TheThingFactory->findTemplate(assignment, FALSE);
+	}
+	Bool needsDozer = replacementDozer && !std::any_of(owned.begin(), owned.end(), [replacementDozer](Object* object) {
+		const ProductionUpdateInterface* production = object->getProductionUpdateInterface();
+		return production && production->countUnitTypeInQueue(replacementDozer) != 0;
+	});
 	std::set<AsciiString> supportedUnitRequests;
 	if (canBuildArmy)
 	{
@@ -3114,6 +3129,20 @@ void AISkirmishPlayer::updateRetail()
 			}
 			return TRUE;
 		};
+		if (needsDozer)
+		{
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				if (replacementDozer->isEquivalentTo(armyRecipe(*producer, button)) && train(replacementDozer, button))
+				{
+					needsDozer = FALSE;
+					break;
+				}
+			}
+			if (production->getProductionCount() != 0)
+				continue;
+		}
 		if (deferredArmy.producer)
 		{
 			if (deferredArmy.producer == producer)

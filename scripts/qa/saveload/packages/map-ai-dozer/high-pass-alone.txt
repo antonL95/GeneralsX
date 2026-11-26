@@ -1,0 +1,6 @@
+45 destroy Player_2 MordorPorter 1
+45 destroy Player_2 MordorPorter 0
+45 create Player_2 MapScriptDozerFactory 0 2780,3240,0
+66 map-ai-dozer-probe Player_2 MapScriptDozerFactory 0
+70 map-ai-dozer-probe Player_2 MapScriptDozerFactory 0
+105 map-ai-dozer-probe Player_2 MapScriptDozerFactory 0

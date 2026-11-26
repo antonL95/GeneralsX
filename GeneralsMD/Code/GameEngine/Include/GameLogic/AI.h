@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "Common/Snapshot.h"
 #include "Common/SubsystemInterface.h"
 #include "Common/GameMemory.h"
@@ -151,6 +153,7 @@ public:
 
 	void addSideInfo(AISideInfo *info);
 	void addFactionBuildList(AISideBuildList *buildList);
+	AsciiString getRetailDozerAssignment(AsciiString side) const;
 
 	// --------------- inherited from Snapshot interface --------------
 	virtual void crc( Xfer *xfer ) override;
@@ -254,6 +257,10 @@ public:
 	AISideBuildList *m_sideBuildLists;
 
 	TAiData *m_next;
+
+private:
+	friend class AI;
+	std::map<AsciiString, AsciiString> m_retailDozerAssignments;
 } ;
 
 //------------------------------------------------------------------------------------------------------------
@@ -305,6 +312,7 @@ public:
 	enum FormationID getNextFormationID();
 
 	static void parseAiDataDefinition( INI* ini );
+	static void parseRetailDozerAssignment(INI* ini);
 	const TAiData *getAiData() {return m_aiData;}
 
 	// Note: Does not work for things that do not have AI. (This is in AI.h, after all)
