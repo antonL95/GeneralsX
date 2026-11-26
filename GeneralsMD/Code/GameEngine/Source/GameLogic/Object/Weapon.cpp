@@ -2361,13 +2361,10 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	//CRCDEBUG_LOG(("Weapon::computeBonus() - flags are %X for %s", flags, DescribeObject(source).str()));
 	flags |= extraBonusFlags;
 
-	if( source->getContainedBy() )
-	{
-		// We may be able to add in our container's flags
-		const ContainModuleInterface *theirContain = source->getContainedBy()->getContain();
-		if( theirContain && theirContain->isWeaponBonusPassedToPassengers() )
-			flags |= theirContain->getWeaponBonusPassedToPassengers();
-	}
+	const Object* container = source->getContainedBy();
+	const ContainModuleInterface* containerModule = container ? container->getContain() : nullptr;
+	if (containerModule && containerModule->isWeaponBonusPassedToPassengers())
+		flags |= containerModule->getWeaponBonusPassedToPassengers();
 
 	if (TheGlobalData->m_weaponBonusSet)
 		TheGlobalData->m_weaponBonusSet->appendBonuses(flags, bonus);
@@ -2397,6 +2394,14 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 			bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor(useInnate));
 		bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * modifiers->rangeFactor());
 		bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * modifiers->value[AttributeModifierRules::RATE_OF_FIRE]);
+	}
+	const Real garrisonedRange = TheGlobalData->m_garrisonedRangeMultiplier;
+	if (garrisonedRange >= 0.0f)
+	{
+		const Object* garrison = containerModule && containerModule->isHordeContain() ? container->getContainedBy() : container;
+		const ContainModuleInterface* garrisonModule = garrison ? garrison->getContain() : nullptr;
+		if (source->testStatus(OBJECT_STATUS_INSIDE_GARRISON) || (garrisonModule && garrisonModule->isGarrisonable()))
+			bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * garrisonedRange);
 	}
 
 	if (hasNuggets)

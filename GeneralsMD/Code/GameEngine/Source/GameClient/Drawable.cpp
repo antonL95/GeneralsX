@@ -1184,6 +1184,24 @@ void Drawable::inheritRetailOclFadeIn(const Drawable& parent)
 	m_oclFadeOut = FALSE;
 }
 
+Real Drawable::getEffectiveOpacity() const
+{
+	Real stealthOpacity = m_effectiveStealthOpacity;
+	if (m_object && m_object->hasPowerInvisibility() && TheGameClient &&
+		(m_stealthLook == STEALTHLOOK_VISIBLE_FRIENDLY || m_stealthLook == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED))
+	{
+		const UnsignedInt cycle = std::clamp(TheGlobalData->m_invisibilityOpacityCycleFrames,
+			LOGICFRAMES_PER_SECOND / 10u, LOGICFRAMES_PER_SECOND * 360u);
+		const UnsignedInt phase = (TheGameClient->getFrame() + static_cast<UnsignedInt>(m_object->getID())) % cycle;
+		const Real weight = 0.5f + 0.5f * WWMath::SinTrig(2.0f * WWMATH_PI * phase / cycle);
+		const Real minimum = TheGlobalData->m_invisibilityOpacityMin;
+		const Real maximum = TheGlobalData->m_invisibilityOpacityMax;
+		stealthOpacity = std::clamp(minimum + (maximum - minimum) * weight, 0.0f, 1.0f);
+	}
+	const Real opacity = m_explicitOpacity * stealthOpacity;
+	return m_oclFadeIn || m_oclFadeOut ? opacity * getRetailOclFadeOpacity() : opacity;
+}
+
 Real Drawable::getRetailOclFadeOpacity() const
 {
 	if (!m_oclFadeIn && !m_oclFadeOut)

@@ -167,9 +167,17 @@ void Object::updateRotwkPowerState()
 	});
 	const Bool camouflage = !hidden && nugget && nugget->m_type == RetailInvisibilityNugget::CAMOUFLAGE;
 	hidden = hidden || nugget;
-	if (camouflage && nugget->m_detectionRange > 0.0f &&
-		RetailDetection::hasNearbyObserver(this, nugget->m_detectionRange, nugget->m_options & RetailInvisibilityNugget::DETECTED_BY_FRIENDLIES))
-		state.detectionEnd = std::max(state.detectionEnd, now + 1);
+	const UnsignedInt reinvisibilityDelay = TheGlobalData->m_reinvisibilityDelay;
+	if (wasHidden && !hidden && !isEffectivelyDead())
+		state.reinvisibilityFrame = now + reinvisibilityDelay;
+	if (now >= state.reinvisibilityFrame)
+		state.reinvisibilityFrame = 0;
+	else
+		hidden = FALSE;
+	if (hidden && camouflage && nugget->m_detectionRange > 0.0f &&
+		RetailDetection::hasNearbyObserver(this, nugget->m_detectionRange, nugget->m_options & RetailInvisibilityNugget::DETECTED_BY_FRIENDLIES,
+			&TheGlobalData->m_camouflageDetectorObjectFilter))
+		state.detectionEnd = std::max(state.detectionEnd, now + std::max(1u, reinvisibilityDelay));
 	state.powerStealthed = hidden;
 	if (hidden)
 		setStatus(stealthed);
@@ -240,7 +248,8 @@ void Object::updateRotwkPowerState()
 				attemptHealing(getBodyModule()->getMaxHealth() * state.healFraction, this);
 		}
 	}
-	if (now >= state.invisibilityEnd && state.conditionEnd == 0 && state.passenger == INVALID_ID && state.invisibilitySources.empty())
+	if (now >= state.invisibilityEnd && state.conditionEnd == 0 && state.passenger == INVALID_ID &&
+		state.invisibilitySources.empty() && state.reinvisibilityFrame == 0)
 		m_rotwkPowerState.reset();
 }
 

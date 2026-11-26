@@ -1,0 +1,60 @@
+213 create Player_1 GameDataFixtureGarrison 0 3060,2110,0
+213 create Player_1 GameDataFixtureGarrison 1 3060,1990,0
+214 create Player_1 GameDataFixtureGarrisonCaster 0 3020,2110,0
+214 create Player_1 GameDataFixtureGarrisonHorde 0 3015,1990,0
+214 create PlyrCreeps GameDataFixtureRangeTarget 0 3175,2110,0
+217 pkg61-range Player_1 GameDataFixtureGarrisonCaster 0 PlyrCreeps:GameDataFixtureRangeTarget:0
+218 create Player_1 GameDataFixtureCamouflage 0 3050,1880,0
+218 pkg08-enter Player_1 GameDataFixtureGarrisonCaster 0 Player_1:GameDataFixtureGarrison:0
+218 pkg08-enter Player_1 GameDataFixtureGarrisonHorde 0 Player_1:GameDataFixtureGarrison:1
+219 create PlyrCreeps GameDataFixtureStructure 0 3070,1880,0
+219 create PlyrCreeps GameDataFixtureRecloak 0 3230,1930,0
+220 create Player_1 GameDataFixtureRecloakCaster 0 3190,1930,0
+223 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+224 create PlyrCreeps GameDataFixtureVictim 0 3065,1870,0
+229 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+232 destroy PlyrCreeps GameDataFixtureVictim 0
+234 create Player_1 GameDataFixtureSmallCaster 0 3050,2320,0
+234 create PlyrCreeps GameDataFixtureVictim 0 3100,2320,0
+234 create PlyrCreeps GameDataFixtureVictim 1 3101,2320,0
+235 orderattack Player_1 GameDataFixtureSmallCaster 0 PlyrCreeps:GameDataFixtureVictim:0
+240 firetestweapon Player_1 GameDataFixtureRecloakCaster 0 GameDataFixtureSmallSplash,PlyrCreeps:GameDataFixtureRecloak:0
+243 hobbit-stealth PlyrCreeps GameDataFixtureRecloak 0
+243 health PlyrCreeps GameDataFixtureRecloak 0
+247 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+248 hobbit-stealth PlyrCreeps GameDataFixtureRecloak 0
+250 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+253 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+250 health PlyrCreeps GameDataFixtureVictim 0
+250 health PlyrCreeps GameDataFixtureVictim 1
+256 create Player_1 GameDataFixtureLargeCaster 0 3050,2450,0
+256 create PlyrCreeps GameDataFixtureVictim 2 3100,2450,0
+256 create PlyrCreeps GameDataFixtureVictim 3 3101,2450,0
+257 orderattack Player_1 GameDataFixtureLargeCaster 0 PlyrCreeps:GameDataFixtureVictim:2
+267 pkg08-fire-state Player_1 GameDataFixtureGarrisonCaster 0
+267 pkg61-range Player_1 GameDataFixtureGarrisonCaster 0 PlyrCreeps:GameDataFixtureRangeTarget:0
+268 pkg08-fire-state Player_1 GameDataFixtureGarrisonHorde 0
+268 pkg61-range Player_1 GameDataFixtureGarrisonMember 0 PlyrCreeps:GameDataFixtureRangeTarget:0
+274 health PlyrCreeps GameDataFixtureVictim 2
+274 health PlyrCreeps GameDataFixtureVictim 3
+276 create Player_1 GameDataFixtureFootprint 0 2550,2220,0
+277 placecheck Player_1 GameDataFixtureGarrison 0 GameDataFixtureBuildProbe 2650 2220 0
+278 destroy Player_1 GameDataFixtureFootprint 0
+280 placecheck Player_1 GameDataFixtureGarrison 0 GameDataFixtureBuildProbe 2650 2220 0
+298 hobbit-stealth Player_1 GameDataFixtureCamouflage 0
+306 hobbit-stealth PlyrCreeps GameDataFixtureRecloak 0
+301 destroy Player_1 GameDataFixtureCamouflage 0
+301 destroy Player_1 GameDataFixtureSmallCaster 0
+301 destroy Player_1 GameDataFixtureLargeCaster 0
+301 destroy PlyrCreeps GameDataFixtureStructure 0
+301 destroy PlyrCreeps GameDataFixtureVictim 3
+301 destroy PlyrCreeps GameDataFixtureVictim 2
+301 destroy PlyrCreeps GameDataFixtureVictim 1
+301 destroy PlyrCreeps GameDataFixtureVictim 0
+311 destroy Player_1 GameDataFixtureGarrisonCaster 0
+311 destroy Player_1 GameDataFixtureGarrisonHorde 0
+312 destroy Player_1 GameDataFixtureGarrison 1
+312 destroy Player_1 GameDataFixtureGarrison 0
+312 destroy PlyrCreeps GameDataFixtureRangeTarget 0
+312 destroy Player_1 GameDataFixtureRecloakCaster 0
+312 destroy PlyrCreeps GameDataFixtureRecloak 0

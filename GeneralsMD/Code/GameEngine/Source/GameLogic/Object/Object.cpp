@@ -5514,6 +5514,7 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() && m_luaGeometryOverrides.empty() &&
 		(!emotion || !emotion->hasPromotionEmotions()) &&
 		m_retailThreatValidThrough == 0 && m_retailThreatBaseOverride == 0.0f && m_retailThreatUpgradeCost == 0.0f &&
+		(!m_rotwkPowerState || m_rotwkPowerState->reinvisibilityFrame == 0) &&
 		m_disabledTillFrame[DISABLED_USER_PARALYZED] == NEVER && m_disabledTillFrame[DISABLED_USER_FROZEN] == NEVER)
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
@@ -5579,6 +5580,15 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailThreatValidThrough = 0;
 			m_retailThreatBaseOverride = 0.0f;
 			m_retailThreatUpgradeCost = 0.0f;
+		}},
+		{"reinvisibility-time", [this, loading](Xfer* x) {
+			UnsignedInt deadline = m_rotwkPowerState ? m_rotwkPowerState->reinvisibilityFrame : 0;
+			x->xferUnsignedInt(&deadline);
+			if (loading && m_rotwkPowerState)
+				m_rotwkPowerState->reinvisibilityFrame = deadline;
+		}, [this] {
+			if (m_rotwkPowerState)
+				m_rotwkPowerState->reinvisibilityFrame = 0;
 		}},
 	});
 }

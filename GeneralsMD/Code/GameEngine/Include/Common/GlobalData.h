@@ -274,6 +274,16 @@ public:
 	Real m_structureStiffness;
 	Real m_gravity;	// acceleration due to gravity, in dist/frame^2
 	Real m_stealthFriendlyOpacity;
+	Real m_garrisonedRangeMultiplier = -1.0f;
+	Real m_damageRadiusMinimumForSplash = 4.0f;
+	Int m_powerLimit = 10;
+	Int m_initialMaxRingLevel = 2;
+	Real m_maxCastleRadius = 0.0f;
+	UnsignedInt m_reinvisibilityDelay = 0;
+	SpecialPowerObjectFilter m_camouflageDetectorObjectFilter;
+	Real m_invisibilityOpacityMin = 1.0f;
+	Real m_invisibilityOpacityMax = 1.0f;
+	UnsignedInt m_invisibilityOpacityCycleFrames = 10;
 	UnsignedInt m_defaultOcclusionDelay;	///<time to delay building occlusion after object is created.
 
 	Bool m_preloadAssets;

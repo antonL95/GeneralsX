@@ -728,7 +728,23 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 	if (RetailFileLayers::enabled() && BitIsSet(options, NO_OBJECT_OVERLAP) &&
 		(!constructionSite || constructionSite->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)))
 	{
-		for (Object* obstacle = TheGameLogic->getFirstObject(); obstacle; obstacle = obstacle->getNextObject())
+		SimpleObjectIterator* nearby = nullptr;
+		const Real castleRadius = TheGlobalData->m_maxCastleRadius;
+		if (castleRadius > 0.0f)
+		{
+			Real searchRadius = castleRadius + build->getTemplateGeometryInfo().getBoundingCircleRadius();
+			const ModuleInfo& modules = build->getBehaviorModuleInfo();
+			for (Int index = 0; index < modules.getCount(); ++index)
+				if (modules.getNthName(index) == "CastleBehavior")
+				{
+					searchRadius = 2.0f * castleRadius;
+					break;
+				}
+			nearby = ThePartitionManager->iterateObjectsInRange(worldPos, searchRadius, FROM_CENTER_2D, nullptr, ITER_SORTED_BY_ID);
+		}
+		MemoryPoolObjectHolder nearbyHolder(nearby);
+		for (Object* obstacle = nearby ? nearby->first() : TheGameLogic->getFirstObject(); obstacle;
+			obstacle = nearby ? nearby->next() : obstacle->getNextObject())
 		{
 			if (!obstacle->isKindOf(KINDOF_IMMOBILE) || obstacle->isKindOf(KINDOF_INERT) ||
 				obstacle->isKindOf(KINDOF_NO_COLLIDE) || isPartOfConstructionSite(obstacle, constructionSite) ||

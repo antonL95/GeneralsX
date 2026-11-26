@@ -566,11 +566,7 @@ public:
 	void setDrawableOpacity( Real value ) { m_explicitOpacity = value; }	///< set alpha/opacity value used to override defaults when drawing.
 
 	// note that this is not the 'get' inverse of setDrawableOpacity, since stealthing can also affect the effective opacity!
-	Real getEffectiveOpacity() const
-	{
-		const Real opacity = m_explicitOpacity * m_effectiveStealthOpacity;
-		return m_oclFadeIn || m_oclFadeOut ? opacity * getRetailOclFadeOpacity() : opacity;
-	}
+	Real getEffectiveOpacity() const;
 	Real getRetailOclFadeOpacity() const;
 	void setEffectiveOpacity( Real pulseFactor, Real explicitOpacity = -1.0f );
 

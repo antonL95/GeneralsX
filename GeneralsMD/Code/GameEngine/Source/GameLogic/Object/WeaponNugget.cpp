@@ -1288,10 +1288,10 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		return {scalar, amount, player ? player->getPlayerMask() : 0, forceKill};
 	};
 
-	const auto damage = [&](Object* victim, const WeaponNuggetDamage& hit)
+	const auto damage = [&](Object* victim, const WeaponNuggetDamage& hit) -> Bool
 	{
 		if (hit.amount <= 0.0f && !hit.forceKill)
-			return;
+			return FALSE;
 
 		DamageInfo damageInfo;
 		damageInfo.in.m_damageType = nugget.m_damageType;
@@ -1326,6 +1326,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 				static_cast<unsigned>(sourceID), static_cast<unsigned>(victim->getID()), victim->getTemplate()->getName().str(),
 				nugget.m_damage, hit.scalar, hit.amount, damageInfo.out.m_actualDamageDealt, healthBefore,
 				victim->getBodyModule() ? victim->getBodyModule()->getHealth() : 0.0f);
+		return damageInfo.out.m_actualDamageClipped > 0.0f;
 	};
 
 	if (dotTick || capturedDamage)
@@ -1335,6 +1336,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	}
 
 	const Real radius = nugget.m_radius * bonus.getField(WeaponBonus::RADIUS);
+	const Bool singleHit = radius <= TheGlobalData->m_damageRadiusMinimumForSplash;
 	const Bool fullArc = WeaponNuggetRules::isFullArc(nugget.m_damageArc);
 	const std::vector<UnsignedInt> dotTicks = nugget.m_type == WEAPON_NUGGET_DOT ?
 		WeaponNuggetRules::dotTickOffsets(0, nugget.m_damageIntervalFrames, nugget.m_damageDurationFrames) : std::vector<UnsignedInt>();
@@ -1375,13 +1377,16 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		const WeaponNuggetDamage hit = capture(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
 		const UnsignedInt delay = fromQueue ? 0 : nugget.m_delayFrames;
 		const UnsignedInt damageFrame = TheGameLogic->getFrame() + delay;
+		Bool damaged = FALSE;
 		if (delay && TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), damageFrame, sourceID,
 				curVictim->getID(), bonus, nuggetIndex, FALSE, contactHit, launchTrigger, impactVelocity, launchWeapon, &hit);
 		else
-			damage(curVictim, hit);
+			damaged = damage(curVictim, hit);
 		for (size_t tick = 1; tick < dotTicks.size() && TheWeaponStore; ++tick)
 			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), damageFrame + dotTicks[tick], sourceID,
 				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity, launchWeapon, &hit);
+		if (singleHit && damaged)
+			break;
 	}
 }

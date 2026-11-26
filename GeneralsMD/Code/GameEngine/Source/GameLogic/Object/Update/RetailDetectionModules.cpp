@@ -113,7 +113,7 @@ Bool RetailDetection::hasUpgrade(const Object* object, const AsciiString& name)
 	return upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? player && player->hasUpgradeComplete(upgrade) : object->hasUpgrade(upgrade);
 }
 
-Bool RetailDetection::hasNearbyObserver(const Object* object, Real range, Bool friendliesOnly)
+Bool RetailDetection::hasNearbyObserver(const Object* object, Real range, Bool friendliesOnly, const SpecialPowerObjectFilter* filter)
 {
 	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(object, range, FROM_CENTER_2D);
 	MemoryPoolObjectHolder hold(nearby);
@@ -122,7 +122,9 @@ Bool RetailDetection::hasNearbyObserver(const Object* object, Real range, Bool f
 		if (object == other || other->isEffectivelyDead() || (other->isContained() && !other->testStatus(OBJECT_STATUS_HORDE_MEMBER)))
 			continue;
 		const Relationship relationship = object->getRelationship(other);
-		if ((friendliesOnly ? relationship == ALLIES : relationship == ENEMIES) &&
+		if (relationship != (friendliesOnly ? ALLIES : ENEMIES))
+			continue;
+		if (filter ? filter->matchesObject(object, other) :
 			(other->isKindOf(KINDOF_INFANTRY) || other->isKindOf(KINDOF_VEHICLE) ||
 				other->isKindOf(KINDOF_MONSTER) || other->isKindOf(KINDOF_HORDE) ||
 				other->isKindOf(KINDOF_CAVALRY) || other->isKindOf(KINDOF_STRUCTURE)))

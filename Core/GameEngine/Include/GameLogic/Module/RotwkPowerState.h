@@ -16,6 +16,7 @@ struct RotwkPowerState
 	};
 	std::vector<InvisibilitySource> invisibilitySources;
 	UnsignedInt detectionEnd = 0;
+	UnsignedInt reinvisibilityFrame = 0;
 	Bool hinting = FALSE;
 	ModelConditionFlags invisibilityForbidden;
 	Real detectionRange = 0.0f;

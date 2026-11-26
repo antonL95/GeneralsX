@@ -1,0 +1,6 @@
+280 create Player_1 GameDataFixtureSmallCaster 1 3050,2570,0
+280 create PlyrCreeps GameDataFixtureRankTarget 0 3100,2570,0
+282 orderattack Player_1 GameDataFixtureSmallCaster 1 PlyrCreeps:GameDataFixtureRankTarget:0
+290 powerstate Player_1 - 0
+302 destroy Player_1 GameDataFixtureSmallCaster 1
+302 destroy PlyrCreeps GameDataFixtureRankTarget 0

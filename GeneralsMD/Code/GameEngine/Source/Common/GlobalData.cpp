@@ -615,6 +615,16 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 
 	{ "VictoryConditionStructureObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( GlobalData, m_victoryStructureFilter ) },
 	{ "VictoryConditionUnitObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( GlobalData, m_victoryUnitFilter ) },
+	{ "GarrisonedRangeMultiplier", INI::parseReal, nullptr, offsetof(GlobalData, m_garrisonedRangeMultiplier) },
+	{ "DamageRadiusMinimumForSplash", INI::parseReal, nullptr, offsetof(GlobalData, m_damageRadiusMinimumForSplash) },
+	{ "PowerLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_powerLimit) },
+	{ "InitialMaxRingLevel", INI::parseInt, nullptr, offsetof(GlobalData, m_initialMaxRingLevel) },
+	{ "MaxCastleRadius", INI::parseReal, nullptr, offsetof(GlobalData, m_maxCastleRadius) },
+	{ "ReinvisibityDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(GlobalData, m_reinvisibilityDelay) },
+	{ "CamouflageDetectorObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_camouflageDetectorObjectFilter) },
+	{ "InvisibilityOpacityMin", INI::parseReal, nullptr, offsetof(GlobalData, m_invisibilityOpacityMin) },
+	{ "InvisibilityOpacityMax", INI::parseReal, nullptr, offsetof(GlobalData, m_invisibilityOpacityMax) },
+	{ "InvisibilityOpacityCycleFrames", INI::parseUnsignedInt, nullptr, offsetof(GlobalData, m_invisibilityOpacityCycleFrames) },
 
 	{ nullptr,					nullptr,						nullptr,						0 }
 

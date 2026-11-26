@@ -32,7 +32,8 @@ namespace RetailDetection
 Bool nearTrees(const Coord3D& position);
 Bool nearTrees(const Object* object);
 Bool hasUpgrade(const Object* object, const AsciiString& name);
-Bool hasNearbyObserver(const Object* object, Real range, Bool friendliesOnly = FALSE);
+Bool hasNearbyObserver(const Object* object, Real range, Bool friendliesOnly = FALSE,
+	const SpecialPowerObjectFilter* filter = nullptr);
 }
 
 struct RetailInvisibilityNugget

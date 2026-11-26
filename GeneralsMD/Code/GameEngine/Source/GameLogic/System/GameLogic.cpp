@@ -1502,6 +1502,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// before loading the map, load the map.ini file in the same directory.
 	loadMapINI( TheGlobalData->m_mapName );
+	if (!loadingSaveGame)
+		setRankLevelLimit(TheGameEngine->isMultiplayerSession() || isSkirmishOrSkirmishReplay ?
+			TheGlobalData->m_powerLimit : TheGlobalData->m_initialMaxRingLevel);
 
 	// load a map
 	TheTerrainLogic->loadMap( TheGlobalData->m_mapName, false );
