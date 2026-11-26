@@ -7,6 +7,7 @@
 #include "Common/Team.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -17,6 +18,7 @@
 namespace
 {
 const char* const guardArea = "TeamScriptOpsFixtureArea";
+const Int guardAreaID = 0x7fff0000;
 const char* const rally = "SpawnPoint_SkirmishGollum_3";
 
 class FixtureTeam
@@ -126,7 +128,7 @@ void guardAndPath(const RetailTestCommands::Context& ctx)
 	if (!unit || !unit->getAI() || !waypoint)
 		return;
 
-	auto* area = newInstance(PolygonTrigger)(4);
+	auto* area = newInstance(PolygonTrigger)(4, guardAreaID);
 	area->setTriggerName(guardArea);
 	area->addPoint({980, 3480, 0});
 	area->addPoint({1040, 3480, 0});
@@ -134,20 +136,27 @@ void guardAndPath(const RetailTestCommands::Context& ctx)
 	area->addPoint({980, 3540, 0});
 	PolygonTrigger::addPolygonTrigger(area);
 
-	FixtureTeam team(*unit);
-	const Bool reachable = canPath(team.get(), rally);
-	const Bool missing = canPath(team.get(), "TeamScriptOpsMissingWaypoint");
-	const auto* ai = unit->getAI();
-	Coord3D center;
-	area->getCenterPoint(&center);
-	const Bool fallback = guardFrom(team.get(), "TeamScriptOpsMissingWaypoint") && ai->getAreaToGuard() == area &&
-		ai->getGuardLocation()->x == center.x && ai->getGuardLocation()->y == center.y;
-	const Bool ordered = guardFrom(team.get(), rally);
-	const Coord3D& anchor = *waypoint->getLocation();
-	const Bool origin = ordered && ai->getAreaToGuard() == area &&
-		ai->getGuardLocation()->x == anchor.x && ai->getGuardLocation()->y == anchor.y;
-	std::fprintf(stderr, "TEST team-script-ops guard frame=%u reachable=%d missing=%d origin=%d fallback=%d\n",
-		ctx.frame, reachable, missing, origin, fallback);
+	Bool reachable, missing, fallback, origin;
+	{
+		FixtureTeam team(*unit);
+		reachable = canPath(team.get(), rally);
+		missing = canPath(team.get(), "TeamScriptOpsMissingWaypoint");
+		const auto* ai = unit->getAI();
+		Coord3D center;
+		area->getCenterPoint(&center);
+		fallback = guardFrom(team.get(), "TeamScriptOpsMissingWaypoint") && ai->getAreaToGuard() == area &&
+			ai->getGuardLocation()->x == center.x && ai->getGuardLocation()->y == center.y;
+		const Bool ordered = guardFrom(team.get(), rally);
+		const Coord3D& anchor = *waypoint->getLocation();
+		origin = ordered && ai->getAreaToGuard() == area &&
+			ai->getGuardLocation()->x == anchor.x && ai->getGuardLocation()->y == anchor.y;
+	}
+	unit->getAI()->aiIdle(CMD_FROM_SCRIPT);
+	TheGameLogic->destroyObject(unit);
+	PolygonTrigger::removePolygonTrigger(area);
+	deleteInstance(area);
+	std::fprintf(stderr, "TEST team-script-ops guard frame=%u reachable=%d missing=%d origin=%d fallback=%d removed=%d\n",
+		ctx.frame, reachable, missing, origin, fallback, !PolygonTrigger::findByName(guardArea, TRUE));
 }
 
 void score(const RetailTestCommands::Context& ctx)

@@ -4,6 +4,7 @@
 242 team-script-ops-path-probe Player_1 TeamScriptOpsFixtureUnit 0
 246 team-script-ops-emotion-probe Player_1 TeamScriptOpsFixtureUnit 0
 246 team-script-ops-path-probe Player_1 TeamScriptOpsFixtureUnit 0
-258 team-script-ops-guard Player_1 TeamScriptOpsFixtureUnit 0
+256 create Player_1 TeamScriptOpsFixtureUnit 1 970,3540,0
+258 team-script-ops-guard Player_1 TeamScriptOpsFixtureUnit 1
 300 team-script-ops-emotion-probe Player_1 TeamScriptOpsFixtureUnit 0
 310 destroy Player_1 TeamScriptOpsFixtureUnit 0

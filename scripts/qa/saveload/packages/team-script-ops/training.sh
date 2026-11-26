@@ -12,7 +12,7 @@ check() {
         fi
     done
     if covers 258; then
-        expect 'TEST team-script-ops guard frame=258 reachable=1 missing=0 origin=1 fallback=1'
+        expect 'TEST team-script-ops guard frame=258 reachable=1 missing=0 origin=1 fallback=1 removed=1'
     fi
     if grep -q "^TEST team-script-ops score " "$log"; then
         if covers 242; then
