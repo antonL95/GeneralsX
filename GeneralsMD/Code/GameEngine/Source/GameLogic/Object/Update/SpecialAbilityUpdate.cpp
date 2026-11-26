@@ -2468,5 +2468,5 @@ UnsignedInt SpecialAbilityUpdate::secondsToFrames( Real seconds )
 {
 	if( seconds <= 0.0f )
 		return 0;
-	return (UnsignedInt)REAL_TO_INT_CEIL( seconds * LOGICFRAMES_PER_SECOND );
+	return (UnsignedInt)REAL_TO_INT_CEIL( seconds * static_cast<Real>(LOGICFRAMES_PER_SECOND) );
 }
