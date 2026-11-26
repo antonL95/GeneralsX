@@ -14,7 +14,7 @@
 230 create Player_1 TcFadeCarrier 0 110,2575,0
 230 create Player_1 TcOrc 2 115,2575,0
 230 create Player_1 TcFadeMonster 0 120,2575,0
-230 create Player_1 HaradMumakilMatriarch 0 500,2575,0
+230 create Player_1 HaradMumakilMatriarch 0 1750,3320,0
 232 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,unmounted
 233 tc-set-mounted Player_1 TcMountedCarrier 0
 234 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,mounted
