@@ -1,0 +1,15 @@
+10 create Player_1 GondorFighterHorde 0 1300,1000,0
+10 create Player_1 GondorFighterHorde 0 1300,1150,0
+10 create Player_1 GondorArcherHorde 0 1180,1075,0
+12 camera Player_1 GondorFighterHorde 0 at 1500 1075
+20 select Player_1 GondorFighterHorde 0
+20 selectadd Player_1 GondorFighterHorde 1
+20 selectadd Player_1 GondorArcherHorde 0
+22 drag-formation-input Player_1 - 0 right 1500 1075
+23 drag-formation-selection Player_1 - 0
+26 drag-formation-input Player_1 - 0 left 1500 1075
+27 drag-formation-selection Player_1 - 0
+180 drag-formation-state Player_1 GondorFighterHorde 0
+180 drag-formation-state Player_1 GondorFighterHorde 1
+180 drag-formation-state Player_1 GondorArcherHorde 0
+185 quit - - 0

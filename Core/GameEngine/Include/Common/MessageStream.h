@@ -642,6 +642,7 @@ public:
 		MSG_OBJECT_ORIENTATION,											///< (objectID, angle) New orientation of object
 		MSG_OBJECT_JOINED_TEAM,											///< (objectID) New team affiliation of object
 
+		MSG_CLIENT_FORMATION_DRAG,
 		MSG_COUNT
 	};
 

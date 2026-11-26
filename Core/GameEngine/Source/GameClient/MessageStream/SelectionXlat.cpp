@@ -361,6 +361,8 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 
 	if(	!TheInGameUI->getInputEnabled() )
 	{
+		if (msg->getType() == GameMessage::MSG_CLIENT_FORMATION_DRAG)
+			return DESTROY_MESSAGE;
 		//Keep the message so the other translators (WindowXlat) can handle.
 		if( m_dragSelecting )
 		{
@@ -376,6 +378,19 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 	GameMessage::Type t = msg->getType();
 	switch (t)
 	{
+		case GameMessage::MSG_CLIENT_FORMATION_DRAG:
+		{
+			m_formationReleaseMask = 3;
+			m_leftMouseButtonIsDown = FALSE;
+			if (m_dragSelecting)
+			{
+				m_dragSelecting = FALSE;
+				TheTacticalView->setMouseLock(FALSE);
+				TheInGameUI->setSelecting(FALSE);
+				TheInGameUI->endAreaSelectHint(nullptr);
+			}
+			return DESTROY_MESSAGE;
+		}
 		case GameMessage::MSG_META_BEGIN_FORCEATTACK:
 		{
 			disp = onMetaBeginForceAttack(msg);
@@ -411,6 +426,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 		// MSG_MOUSE_LEFT_CLICK & MSG_MOUSE_LEFT_DOUBLE_CLICK
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN:
 		{
+			m_formationReleaseMask = 0;
 			disp = onRawMouseLeftButtonDown(msg);
 			break;
 		}
@@ -419,16 +435,27 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 		// MSG_MOUSE_LEFT_CLICK & MSG_MOUSE_LEFT_DOUBLE_CLICK
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP:
 		{
+			if (m_formationReleaseMask & 1)
+			{
+				m_formationReleaseMask &= ~1;
+				break;
+			}
 			disp = onRawMouseLeftButtonUp(msg);
 			break;
 		}
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		{
+			m_formationReleaseMask = 0;
 			disp = onRawMouseRightButtonDown(msg);
 			break;
 		}
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP:
 		{
+			if (m_formationReleaseMask & 2)
+			{
+				m_formationReleaseMask &= ~2;
+				break;
+			}
 			disp = onRawMouseRightButtonUp(msg);
 			break;
 		}

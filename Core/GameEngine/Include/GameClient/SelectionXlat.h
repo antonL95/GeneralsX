@@ -44,6 +44,7 @@ private:
 
 	Bool m_leftMouseButtonIsDown;
 	Bool m_dragSelecting;
+	Int m_formationReleaseMask = 0;
 	Bool m_displayedMaxWarning;	// did we already display a warning about selecting too many units?
 	UnsignedInt m_lastGroupSelTime;
 	Int m_lastGroupSelGroup;

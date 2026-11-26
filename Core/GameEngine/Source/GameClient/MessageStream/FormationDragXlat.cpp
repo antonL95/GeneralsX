@@ -73,6 +73,8 @@ GameMessageDisposition FormationDragTranslator::translateGameMessage(const GameM
 				return KEEP_MESSAGE;
 			}
 			begin(msg->getArgument(0)->pixel);
+			if (m_dragging)
+				TheMessageStream->insertMessage(GameMessage::MSG_CLIENT_FORMATION_DRAG, const_cast<GameMessage*>(msg));
 			return m_dragging ? DESTROY_MESSAGE : KEEP_MESSAGE;
 		}
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP:
