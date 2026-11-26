@@ -9,18 +9,31 @@ prepare() {
     samples 221 429 'pkg57-probe PlyrCreeps Pkg57DefaultControl 0 control'
     samples 221 429 'pkg57-probe PlyrCreeps Pkg57HighGravityControl 0 highgrav'
     samples 221 429 'pkg57-probe PlyrCreeps Pkg57FixedHighControl 0 fixedhigh'
-    samples 401 609 'pkg57-probe PlyrCreeps MordorDrummerTroll 0 troll'
+    samples 401 628 'pkg57-probe PlyrCreeps MordorDrummerTroll 0 troll'
     samples 401 530 'pkg57-probe PlyrCreeps HaradZigur 0 zigur'
-    samples 641 829 'pkg57-horde-probe PlyrCreeps AngmarDarkDunedainHorde 0 horde'
-    samples 861 939 'pkg57-probe Player_1 BattleWagonOilBarrelProjectile 0 barrel-3x'
-    samples 861 939 'pkg57-probe Player_1 Pkg57BarrelLowGrav 0 barrel-1x'
+    samples 641 879 'pkg57-horde-probe PlyrCreeps AngmarDarkDunedainHorde 0 horde'
+    samples 901 979 'pkg57-probe Player_1 BattleWagonOilBarrelProjectile 0 barrel-3x'
+    samples 901 979 'pkg57-probe Player_1 Pkg57BarrelLowGrav 0 barrel-1x'
 }
 
 check() {
-    if ! covers 429 || ! covers 939; then
+    if ! covers 429 || ! covers 979; then
         return 0
     fi
+    set -- "$log"
+    if [ "$first" -ne 0 ]; then
+        set -- "$out/save.log" "$log"
+    fi
     awk -v first="$first" '
+        $1 == "TEST" && $2 == "launch" {
+            split($4, victim, "=")
+            if (victim[2] in speed)
+                next
+            split($5, velocity, "=")
+            split(velocity[2], component, ",")
+            speed[victim[2]] = sqrt(component[1]^2 + component[2]^2)
+            lift[victim[2]] = component[3] + 0
+        }
         $1 == "TEST" && $2 == "pkg57" {
             for (i = 3; i <= NF; ++i) {
                 split($i, field, "=")
@@ -28,6 +41,8 @@ check() {
             }
             name = row["label"]
             frame = row["frame"] + 0
+            if ("object" in row)
+                object[name] = row["object"]
             if (row["airborne"] == 1 && !(name in air))
                 air[name] = frame
             if (row["flailing"] == 1 && !(name in flight))
@@ -42,7 +57,7 @@ check() {
                 land[name] = frame
             if (row["missing"] == 1 && !(name in gone))
                 gone[name] = frame
-            if (frame == 870)
+            if (frame == 910)
                 vz[name] = row["vz"] + 0
             if ("gravity" in row)
                 config[name] = row["gravity"] "/" row["low"] "/" row["high"] "/" row["up"]
@@ -75,9 +90,15 @@ check() {
             recovery("horde-m0", 42, 72, 42)
             if (first == 0) {
                 recovery("highgrav", 42, 42, 42)
+                control = object["control"]
+                expectedLift = speed[control]^2 / (90 * 0.5 / 30)
+                if (speed[control] < 1.25 || speed[control] > 1.75 ||
+                    lift[control] < expectedLift - 0.03 || lift[control] > expectedLift + 0.03)
+                    fail("expected the authored half radius launch with retail speed and lift scaling")
+                printf "pkg57 control launch speed=%.3f lift=%.3f\n", speed[control], lift[control]
                 if (flight["dunedain"] <= 221 || flight["dunedain"] != flight["control"] ||
-                    land["dunedain"] != land["control"] || land["highgrav"] >= land["dunedain"])
-                    fail("expected equal default trajectories and earlier landing at triple gravity")
+                    land["highgrav"] >= land["dunedain"] || land["highgrav"] >= land["control"])
+                    fail("expected a shared launch frame and earlier landing at triple gravity")
             }
             if (flight["zigur"] || flight["horde"] || !air["zigur"] || land["zigur"] <= air["zigur"])
                 fail("expected Zigur to resist shock, then fall, and impact to launch members only")
@@ -89,5 +110,5 @@ check() {
             printf "pkg57 land zigur=%d barrel-3x=%d barrel-1x=%d\n", land["zigur"], barrelEnd, lowEnd
             exit error
         }
-    ' "$log"
+    ' "$@"
 }

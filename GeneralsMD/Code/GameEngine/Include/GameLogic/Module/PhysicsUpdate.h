@@ -258,6 +258,7 @@ protected:
 
 	void applyGravitationalForces();
 	void startImpactFlight(const Coord3D& velocity, UnsignedInt frames, Real height);
+	Bool launchWithRetailVelocity(const Coord3D& velocity);
 	void applyFrictionalForces();
 	Bool handleBounce(Real oldZ, const Coord3D& landing, Real groundZ, Coord3D* bounceForce);
 	void applyYPRDamping(Real factor);

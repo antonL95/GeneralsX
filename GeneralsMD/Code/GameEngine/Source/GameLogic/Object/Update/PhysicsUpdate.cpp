@@ -28,6 +28,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cmath>
+
 // please talk to MDC (x36804) before taking this out
 #define NO_DEBUG_CRC
 
@@ -1206,20 +1208,19 @@ Bool PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Re
 	const Real flight = flightGravity > 0.0f ? 2.0f * lift / flightGravity : 0.0f;
 	const UnsignedInt frames = static_cast<UnsignedInt>(WWMath::Ceil(std::clamp(flight, 2.0f, 360.0f)));
 	startImpactFlight({direction.x * speed, direction.y * speed, lift}, frames, lift * Real(frames) * 0.25f);
-	if (RetailTestCommands::tracesCombat())
-	{
-		std::fprintf(stderr, "TEST launch frame=%u victim=%u velocity=%.3f,%.3f,%.3f\n",
-			TheGameLogic->getFrame(), unsigned(victim->getID()), m_vel.x, m_vel.y, m_vel.z);
-		std::fflush(stderr);
-	}
 	return TRUE;
 }
 
 void PhysicsBehavior::launchFromContainment(const Coord3D& velocity)
 {
+	launchWithRetailVelocity(velocity);
+}
+
+Bool PhysicsBehavior::launchWithRetailVelocity(const Coord3D& velocity)
+{
 	Object* victim = getObject();
 	if (victim->getEnclosingContainedBy())
-		return;
+		return FALSE;
 	const Coord3D& position = *victim->getPosition();
 	const Real ground = TheTerrainLogic->getLayerHeight(position.x, position.y, victim->getLayer());
 	Real remainingHeight = position.z - ground;
@@ -1229,7 +1230,7 @@ void PhysicsBehavior::launchFromContainment(const Coord3D& velocity)
 	if (!(gravity > 0.0f))
 	{
 		setAllowToFall(TRUE);
-		return;
+		return FALSE;
 	}
 	UnsignedInt fallTicks = 0;
 	while (remainingHeight > 0.0f && fallTicks < 3 * RotwkDuration::FRAMES_PER_SECOND)
@@ -1247,6 +1248,7 @@ void PhysicsBehavior::launchFromContainment(const Coord3D& velocity)
 	const UnsignedInt frames = RotwkDuration::engineFrames(ticks, LOGICFRAMES_PER_SECOND);
 	startImpactFlight({velocity.x / framesPerTick, velocity.y / framesPerTick, lift / framesPerTick},
 		frames, std::max(0.0f, lift * Real(ticks) * 0.25f));
+	return TRUE;
 }
 
 void PhysicsBehavior::startImpactFlight(const Coord3D& velocity, UnsignedInt frames, Real height)
@@ -1269,12 +1271,30 @@ void PhysicsBehavior::startImpactFlight(const Coord3D& velocity, UnsignedInt fra
 	victim->clearModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
 	victim->setModelConditionState(MODELCONDITION_STUNNED_FLAILING);
 	setWakeFrame(victim, UPDATE_SLEEP_NONE);
+	if (RetailTestCommands::tracesCombat())
+	{
+		std::fprintf(stderr, "TEST launch frame=%u victim=%u velocity=%.3f,%.3f,%.3f\n",
+			TheGameLogic->getFrame(), unsigned(victim->getID()), m_vel.x, m_vel.y, m_vel.z);
+		std::fflush(stderr);
+	}
 }
 
 void PhysicsBehavior::launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger)
 {
-	const Bool launched = launchFromImpact(direction, amount, zFactor);
-	if (Drawable* drawable = getObject()->getDrawable())
+	Object* victim = getObject();
+	Bool launched = FALSE;
+	if (amount > 0.0f && !victim->isKindOf(KINDOF_IMMOBILE) && !victim->isAirborneTarget() &&
+		!victim->getEnclosingContainedBy() && AttributeModifiers::value(victim, AttributeModifierRules::RESIST_KNOCKBACK) < 1.0f)
+	{
+		const Real variance = GameLogicRandomValueReal(0.85f, 1.15f);
+		const Real speed = amount * variance / Real(RotwkDuration::FRAMES_PER_SECOND);
+		const Coord3D impulse{direction.x * speed, direction.y * speed, direction.z * speed};
+		const Real magnitude = WWMath::SqrtfOrigin(impulse.x * impulse.x + impulse.y * impulse.y + impulse.z * impulse.z);
+		const Real lift = std::abs(magnitude * zFactor * variance);
+		if (std::isfinite(magnitude) && std::isfinite(lift))
+			launched = launchWithRetailVelocity({impulse.x, impulse.y, lift});
+	}
+	if (Drawable* drawable = victim->getDrawable())
 		drawable->setRetailImpactFXTrigger(launched ? trigger : RETAIL_DAMAGE_FX_NONE);
 }
 
@@ -1649,7 +1669,7 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 			// huh huh, he said "stiff"
 
 			Real mag = getVelocityMagnitude();
-			const Real MINBOUNCESPEED = 1.0f/(LOGICFRAMES_PER_SECOND*5.0f);
+			const Real MINBOUNCESPEED = 1.0f / (Real(LOGICFRAMES_PER_SECOND) * 5.0f);
 			if (mag < MINBOUNCESPEED)
 				mag = MINBOUNCESPEED;
 			factor = -mag * getMass() * stiffness;

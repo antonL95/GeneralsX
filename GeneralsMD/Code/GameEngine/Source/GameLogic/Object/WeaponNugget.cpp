@@ -1074,33 +1074,35 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 		const Real dy = targetPos.y - pos.y;
 		if (victim != primaryVictim && !WeaponNuggetRules::withinArc(axis.x, axis.y, dx, dy, cosHalfArc, fullArc, nugget.m_shockWaveArcInverted))
 			return;
-		const Real falloff = radius > 0.0f ?
-			std::clamp(1.0f - nugget.m_shockWaveTaperOff * WWMath::SqrtfOrigin(dx * dx + dy * dy) / radius, 0.0f, 1.0f) : 1.0f;
-		const Real amount = nugget.m_shockWaveAmount * falloff;
-		if (!(amount > victim->getTemplate()->getRotWKObjectData().shockwaveResistance))
+		const Real amount = nugget.m_shockWaveAmount;
+		if (!(amount > 0.0f && amount > victim->getTemplate()->getRotWKObjectData().shockwaveResistance))
 			return;
 
-		Coord3D direction{targetPos.x - origin.x, targetPos.y - origin.y, 0.0f};
-		const Real distance = WWMath::SqrtfOrigin(direction.x * direction.x + direction.y * direction.y);
+		Coord3D direction{targetPos.x - origin.x, targetPos.y - origin.y, targetPos.z - origin.z};
+		const Real distance = WWMath::SqrtfOrigin(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+		const Real fraction = radius > 0.0f ? std::min(distance / radius, 1.0f) : 0.0f;
+		const Real taper = 1.0f - (1.0f - nugget.m_shockWaveTaperOff) * fraction;
+
 		if (distance > 0.0f)
 		{
-			direction.x /= distance;
-			direction.y /= distance;
+			const Real scale = taper / distance;
+			direction.x *= scale;
+			direction.y *= scale;
+			direction.z *= scale;
 		}
 		else
-			direction = source ? *source->getUnitDirectionVector2D() : Coord3D{1.0f, 0.0f, 0.0f};
+			direction = {0.0f, 0.0f, taper};
 		if (nugget.m_invertShockWave != nugget.m_flipDirection)
 		{
 			direction.x = -direction.x;
 			direction.y = -direction.y;
+			direction.z = -direction.z;
 		}
 		UnsignedInt arrivalFrame = impactFrame;
-		const Real height = targetPos.z - origin.z;
-		if (TheWeaponStore && nugget.m_shockWaveSpeed > 0.0f && (distance > 0.0f || height != 0.0f))
+		if (TheWeaponStore && nugget.m_shockWaveSpeed > 0.0f && distance > 0.0f)
 		{
-			const Real pathLength = WWMath::SqrtfOrigin(distance * distance + height * height);
 			const UnsignedInt tick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
-			const Real travelTicks = WWMath::Ceil(pathLength / (nugget.m_shockWaveSpeed * tick));
+			const Real travelTicks = WWMath::Ceil(distance / (nugget.m_shockWaveSpeed * tick));
 			if (travelTicks > 0.0f)
 			{
 				const UnsignedInt baseFrame = impactFrame ? impactFrame : TheGameLogic->getFrame();

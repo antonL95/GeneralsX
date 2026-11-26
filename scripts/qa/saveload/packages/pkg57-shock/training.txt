@@ -14,17 +14,17 @@
 400 create Player_1 Pkg57ShockCaster 0 1140,2220,0
 402 orderattack Player_1 Pkg57ShockCaster 0 PlyrCreeps:MordorDrummerTroll:0
 421 pkg57-drop PlyrCreeps HaradZigur 0 80
-610 destroy PlyrCreeps MordorDrummerTroll 0
-610 destroy PlyrCreeps HaradZigur 0
-610 destroy Player_1 Pkg57ShockCaster 0
+629 destroy PlyrCreeps MordorDrummerTroll 0
+629 destroy PlyrCreeps HaradZigur 0
+629 destroy Player_1 Pkg57ShockCaster 0
 640 create PlyrCreeps AngmarDarkDunedainHorde 0 1250,2100,180
 640 create Player_1 Pkg57ShockCaster 0 1190,2100,0
 642 orderattack Player_1 Pkg57ShockCaster 0 PlyrCreeps:AngmarDarkDunedainHorde:0
-830 destroy PlyrCreeps AngmarDarkDunedainHorde 0
-830 destroy Player_1 Pkg57ShockCaster 0
-860 create Player_1 BattleWagonOilBarrelProjectile 0 1300,2100,0
-860 create Player_1 Pkg57BarrelLowGrav 0 1340,2100,0
-860 pkg57-drop Player_1 BattleWagonOilBarrelProjectile 0 80
-860 pkg57-drop Player_1 Pkg57BarrelLowGrav 0 80
-940 destroy Player_1 BattleWagonOilBarrelProjectile 0
-940 destroy Player_1 Pkg57BarrelLowGrav 0
+880 destroy PlyrCreeps AngmarDarkDunedainHorde 0
+880 destroy Player_1 Pkg57ShockCaster 0
+900 create Player_1 BattleWagonOilBarrelProjectile 0 1300,2100,0
+900 create Player_1 Pkg57BarrelLowGrav 0 1340,2100,0
+900 pkg57-drop Player_1 BattleWagonOilBarrelProjectile 0 80
+900 pkg57-drop Player_1 Pkg57BarrelLowGrav 0 80
+980 destroy Player_1 BattleWagonOilBarrelProjectile 0
+980 destroy Player_1 Pkg57BarrelLowGrav 0
