@@ -1,17 +1,25 @@
 180 create Player_1 AotREdorasWall01 0 2000,2900,0
 180 create Player_1 ScalesWallsUnit 0 1980,2980,0
 180 create Player_1 ScalesWallsControl 0 2020,2980,0
+180 create Player_1 ScalesWallsCrosser 0 1960,2980,0
 190 scales-walls-move Player_1 ScalesWallsUnit 0 - 1980 2900
 190 scales-walls-move Player_1 ScalesWallsControl 0 - 2020 2900
+190 move Player_1 ScalesWallsCrosser 0 - 1960 2820
 220 scales-walls-sample Player_1 ScalesWallsUnit 0
 220 scales-walls-sample Player_1 ScalesWallsControl 0
 244 scales-walls-sample Player_1 ScalesWallsUnit 0
+244 scales-walls-sample Player_1 ScalesWallsCrosser 0
+280 scales-walls-sample Player_1 ScalesWallsCrosser 0
 300 scales-walls-sample Player_1 ScalesWallsUnit 0
 300 scales-walls-sample Player_1 ScalesWallsControl 0
+300 scales-walls-sample Player_1 ScalesWallsCrosser 0
+350 scales-walls-sample Player_1 ScalesWallsCrosser 0
 400 move Player_1 ScalesWallsUnit 0 - 1980 2820
 400 move Player_1 ScalesWallsControl 0 - 2020 2820
 420 scales-walls-sample Player_1 ScalesWallsUnit 0
+420 scales-walls-sample Player_1 ScalesWallsCrosser 0
 460 scales-walls-sample Player_1 ScalesWallsUnit 0
 500 scales-walls-sample Player_1 ScalesWallsUnit 0
 600 scales-walls-sample Player_1 ScalesWallsUnit 0
 600 scales-walls-sample Player_1 ScalesWallsControl 0
+600 scales-walls-sample Player_1 ScalesWallsCrosser 0
