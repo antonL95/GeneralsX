@@ -347,6 +347,15 @@ GameLogic::GameLogic()
 }
 
 //-------------------------------------------------------------------------------------------------
+GameMode GameLogic::getSimulationGameMode() const
+{
+	if (rts::isReplayGame(m_gameMode) && TheRecorder && TheRecorder->isPlaybackMode())
+		return TheRecorder->getGameMode();
+
+	return m_gameMode;
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Bool GameLogic::isInSinglePlayerGame() const
 {
@@ -1397,8 +1406,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	checkForDuplicateColors( TheGameInfo );
 
-	Bool isSkirmishOrSkirmishReplay = RetailFileLayers::enabled() && (m_gameMode == GAME_SKIRMISH ||
-		(m_gameMode == GAME_REPLAY && TheGameInfo && TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0));
+	Bool isSkirmishOrSkirmishReplay = RetailFileLayers::enabled() && isSimulatingSkirmishGame();
 	if (TheGameInfo)
 	{
 		for (Int i=0; i<MAX_SLOTS; ++i)

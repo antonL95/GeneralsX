@@ -2584,7 +2584,7 @@ Bool Player::hasPrereqsForScience(ScienceType t) const
 Bool Player::usesRetailMultiplayerPowers() const
 {
 	return RetailFileLayers::enabled() && (TheGameInfo ||
-		(TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame())));
+		(TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isSimulatingSkirmishGame())));
 }
 
 Int Player::getSciencePurchaseCost(ScienceType science) const
@@ -4982,10 +4982,10 @@ Int Player::getCommandPointsTotal(Int *maximum) const
 	}
 	if (!TheGlobalData)
 		return 0;
-	const GameMode mode = TheGameLogic ? TheGameLogic->getGameMode() : GAME_NONE;
-	const Int factor = TheGameInfo && (mode == GAME_SKIRMISH || mode == GAME_REPLAY) ?
+	const GameMode mode = TheGameLogic ? TheGameLogic->getSimulationGameMode() : GAME_NONE;
+	const Int factor = TheGameInfo && mode == GAME_SKIRMISH ?
 		TheGameInfo->getRetailSkirmishRules().commandPointFactor : 0;
-	const bool isSkirmishOrMP = mode == GAME_SKIRMISH || mode == GAME_LAN || mode == GAME_INTERNET || factor > 0;
+	const bool isSkirmishOrMP = mode == GAME_SKIRMISH || mode == GAME_LAN || mode == GAME_INTERNET;
 	Int activePlayers = 0;
 	if (ThePlayerList)
 	{

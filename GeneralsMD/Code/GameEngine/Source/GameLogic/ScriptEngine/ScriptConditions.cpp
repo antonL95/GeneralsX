@@ -3188,10 +3188,7 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 
 		case Condition::IS_GAME_IN_SKIRMISH_OR_MULTIPLAYER:
 		{
-			GameMode mode = TheGameLogic->getGameMode();
-			if (RetailFileLayers::enabled() && TheGameLogic->isInReplayGame() &&
-				TheRecorder && TheRecorder->isPlaybackMode())
-				mode = TheRecorder->getGameMode();
+			const GameMode mode = TheGameLogic->getSimulationGameMode();
 			return BfmeScriptRules::skirmishOrMultiplayerIs(rts::isSkirmishGame(mode),
 				rts::isMultiplayerGame(mode), pCondition->getParameter(0)->getInt() != 0);
 		}

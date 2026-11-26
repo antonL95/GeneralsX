@@ -185,6 +185,8 @@ public:
 	Bool isInLanGame() const;
 	Bool isInSinglePlayerGame() const;
 	Bool isInSkirmishGame() const;
+	GameMode getSimulationGameMode() const;
+	Bool isSimulatingSkirmishGame() const;
 	Bool isInReplayGame() const;
 	Bool isInInternetGame() const;
 	Bool isInShellGame() const;
@@ -546,6 +548,7 @@ inline GameMode GameLogic::getGameMode() { return m_gameMode; }
 inline Bool GameLogic::isInGame() const { return rts::isGame(m_gameMode); }
 inline Bool GameLogic::isInLanGame() const { return rts::isLanGame(m_gameMode); }
 inline Bool GameLogic::isInSkirmishGame() const { return rts::isSkirmishGame(m_gameMode); }
+inline Bool GameLogic::isSimulatingSkirmishGame() const { return rts::isSkirmishGame(getSimulationGameMode()); }
 inline Bool GameLogic::isInReplayGame() const { return rts::isReplayGame(m_gameMode); }
 inline Bool GameLogic::isInInternetGame() const { return rts::isInternetGame(m_gameMode); }
 inline Bool GameLogic::isInShellGame() const { return rts::isShellGame(m_gameMode); }

@@ -58,6 +58,7 @@
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameNetwork/GameInfo.h"
 #include "GameClient/RetailMusicScripts.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/MapPlayerRoster.h"
@@ -5856,7 +5857,7 @@ Player *ScriptEngine::getPlayerFromAsciiString(const AsciiString& playerString)
 	if (playerString == LOCAL_PLAYER || (playerString == THE_PLAYER && is_GeneralsChallengeContext))
 		// Designers have built their Generals' Challenge maps, referencing "ThePlayer" meaning the local player.
 		// However, they've also built many of their single player maps with this string, where "ThePlayer" is not intended as an alias.
-		return ThePlayerList->getLocalPlayer();
+		return getRecordedLocalPlayer();
 	if (playerString == THIS_PLAYER)
 		return getCurrentPlayer();
 	else if (playerString == THIS_PLAYER_ENEMY)	{
@@ -5873,6 +5874,16 @@ Player *ScriptEngine::getPlayerFromAsciiString(const AsciiString& playerString)
 	AppendDebugMessage("***Invalid Player name:***", false);
 
 	return nullptr;
+}
+
+Player* ScriptEngine::getRecordedLocalPlayer() const
+{
+	if (TheGameLogic && TheGameLogic->isInReplayGame() && TheGameInfo)
+	{
+		if (Player* recorded = ThePlayerList->getPlayerFromSlotIndex(TheGameInfo->getLocalSlotNum()))
+			return recorded;
+	}
+	return ThePlayerList->getLocalPlayer();
 }
 
 Player* ScriptEngine::getRetailSynchronizedScriptPlayer(const AsciiString& name)
@@ -6039,7 +6050,7 @@ Team * ScriptEngine::getTeamNamed(const AsciiString& authoredName)
 	if (teamName == TEAM_THE_PLAYER && is_GeneralsChallengeContext)
 		// Designers have built their Generals' Challenge maps, referencing "teamThePlayer" meaning the local player's default (parent) team.
 		// However, they've also built many of their single player maps with this string, where "teamThePlayer" is not intended as an alias.
-		return ThePlayerList->getLocalPlayer()->getDefaultTeam();
+		return getRecordedLocalPlayer()->getDefaultTeam();
 	if (teamName == THIS_TEAM) {
 		if (m_callingTeam)
 			return m_callingTeam;

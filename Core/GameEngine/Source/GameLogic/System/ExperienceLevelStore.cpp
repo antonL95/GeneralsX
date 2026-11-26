@@ -147,7 +147,7 @@ Bool tracing()
 
 Bool isMultiplayer()
 {
-	return TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame());
+	return TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isSimulatingSkirmishGame());
 }
 
 Real multiplayerExperienceMultiplier(const Object* obj)

@@ -258,6 +258,7 @@ public:
 	virtual Player *getPlayerFromAsciiString(const AsciiString& skirmishPlayerString);
 	PlayerMaskType getRetailScriptPlayers(const AsciiString& name);
 	Player* getRetailSynchronizedScriptPlayer(const AsciiString& name);
+	Player* getRecordedLocalPlayer() const;
 
 	void setObjectsShouldReceiveDifficultyBonus(Bool receive) { m_objectsShouldReceiveDifficultyBonus = receive; }
 	Bool getObjectsShouldReceiveDifficultyBonus() const { return m_objectsShouldReceiveDifficultyBonus; }

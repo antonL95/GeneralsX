@@ -346,7 +346,7 @@ Bool FakePathfindPortalBehaviour::permits(const Object& unit) const
 	const Player* player = unit.getControllingPlayer();
 	const auto* data = getFakePathfindPortalBehaviourModuleData();
 	if (!player || (!data->m_allowNonSkirmishAI && player->getPlayerType() == PLAYER_COMPUTER &&
-		!TheGameLogic->isInSkirmishGame() && !TheGameLogic->isInMultiplayerGame()))
+		!TheGameLogic->isSimulatingSkirmishGame() && !TheGameLogic->isInMultiplayerGame()))
 		return FALSE;
 	if (player == getObject()->getControllingPlayer())
 		return TRUE;

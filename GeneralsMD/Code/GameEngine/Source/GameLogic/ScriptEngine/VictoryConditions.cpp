@@ -440,8 +440,7 @@ void VictoryConditions::cachePlayerPtrs()
 		return;
 
 	m_retailSandbox = false;
-	if (RetailFileLayers::enabled() && TheGameLogic->getGameMode() == GAME_SKIRMISH &&
-		TheGameInfo && TheGameInfo == TheSkirmishGameInfo)
+	if (RetailFileLayers::enabled() && TheGameLogic->isSimulatingSkirmishGame() && TheGameInfo)
 	{
 		const Int localSlot = TheGameInfo->getLocalSlotNum();
 		Bool solo = localSlot >= 0 && localSlot < MAX_SLOTS;
