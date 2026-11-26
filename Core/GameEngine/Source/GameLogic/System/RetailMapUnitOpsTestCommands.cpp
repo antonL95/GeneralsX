@@ -11,6 +11,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -194,6 +195,33 @@ void guardAreaProbe(const RetailTestCommands::Context& ctx)
 			goal->x == center.x && goal->y == center.y;
 	}
 	std::fprintf(stderr, "TEST map-unit-ops guard area frame=%u area=%d matched=%d\n", ctx.frame, area != nullptr, matched);
+}
+
+void forcePlayerEmotion(const RetailTestCommands::Context& ctx)
+{
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(521);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	if (!definition || definition->m_internalName != "PLAYER_FORCE_EMOTION" || definition->getNumParameters() != 3 ||
+		definition->getParameterType(0) != Parameter::SIDE || definition->getParameterType(2) != Parameter::REAL)
+		return;
+	auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+	action->getParameter(0)->friend_setString(ctx.playerName.data());
+	action->getParameter(1)->friend_setInt(EMOTION_TERROR);
+	action->getParameter(2)->friend_setReal(2.0f);
+	TheScriptEngine->friend_executeAction(action, nullptr);
+	deleteInstance(action);
+}
+
+void playerEmotionProbe(const RetailTestCommands::Context& ctx)
+{
+	const Object* first = ctx.requireObject();
+	const Object* second = ctx.findTarget(std::string_view("Player_1:MapScriptEmotionProbe:1"), true);
+	const Object* other = ctx.findTarget(std::string_view("PlyrCreeps:MapScriptEmotionProbe:0"), true);
+	const auto terror = [](const Object* unit) {
+		return unit && unit->getLogicModelConditions().test(MODELCONDITION_EMOTION_TERROR);
+	};
+	std::fprintf(stderr, "TEST map-unit-ops player emotion frame=%u allies=%d enemy=%d\n",
+		ctx.frame, terror(first) && terror(second), other ? terror(other) : -1);
 }
 
 void teamAttackPathProbe(const RetailTestCommands::Context& ctx)
@@ -572,6 +600,8 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-threat", threatProbe);
 	registerAction("map-unit-ops-named-path", namedAttackPathProbe);
 	registerAction("map-unit-ops-guard-area", guardAreaProbe);
+	registerAction("map-unit-ops-force-emotion", forcePlayerEmotion);
+	registerAction("map-unit-ops-emotion-probe", playerEmotionProbe);
 	registerAction("map-unit-ops-team-path", teamAttackPathProbe);
 	registerAction("map-unit-ops-kill", killTarget);
 	registerAction("map-unit-ops-kill-count", killCountProbe);

@@ -7543,6 +7543,21 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			return;
 		}
+		case ScriptAction::PLAYER_FORCE_EMOTION:
+		{
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(0)->getString());
+			if (!players)
+				return;
+			const Int type = pAction->getParameter(1)->getInt();
+			const Real seconds = pAction->getParameter(2)->getReal();
+			for (Object* unit = TheGameLogic->getFirstObject(); unit; unit = unit->getNextObject())
+			{
+				const Player* owner = unit->getControllingPlayer();
+				if (owner && (owner->getPlayerMask() & players))
+					EmotionTrackerUpdate::force(unit, type, seconds);
+			}
+			return;
+		}
 		case ScriptAction::TEAM_FORCE_EMOTION:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());

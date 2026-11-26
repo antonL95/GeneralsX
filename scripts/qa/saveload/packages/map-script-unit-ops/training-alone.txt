@@ -1,0 +1,9 @@
+235 create Player_1 MapScriptEmotionProbe 0 2020,150,0
+235 create Player_1 MapScriptEmotionProbe 1 2020,164,0
+235 create PlyrCreeps MapScriptEmotionProbe 0 2020,178,0
+240 map-unit-ops-force-emotion Player_1 - 0
+243 map-unit-ops-emotion-probe Player_1 MapScriptEmotionProbe 0
+245 map-unit-ops-emotion-probe Player_1 MapScriptEmotionProbe 0
+250 destroy PlyrCreeps MapScriptEmotionProbe 0
+250 destroy Player_1 MapScriptEmotionProbe 1
+250 destroy Player_1 MapScriptEmotionProbe 0

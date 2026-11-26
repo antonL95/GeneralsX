@@ -1,4 +1,11 @@
 check() {
+    if grep -q ' map-unit-ops-force-emotion ' "$out/commands.txt"; then
+        for frame in 243 245; do
+            if covers "$frame"; then
+                expect "TEST map-unit-ops player emotion frame=$frame allies=1 enemy=0"
+            fi
+        done
+    fi
     if covers 247; then
         expect "TEST map-unit-ops guard area frame=247 area=1 matched=1"
     fi
