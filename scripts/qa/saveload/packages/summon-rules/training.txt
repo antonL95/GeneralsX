@@ -17,9 +17,10 @@
 210 objupgrade Player_1 HaradWarlord 0 Upgrade_ThrallMasterOrcWarriors
 210 power-reveal Player_1 - 0
 212 objupgrade Player_1 GuldurOrcPikemanHorde 0 Upgrade_MiniHordeLvl5
-215 summon-rules-cast Player_1 - 0 - 2005 805
-216 summon-rules-cast Player_1 - 1 - 3300 800
-218 summon-rules-cast Player_1 - 2 - 3200 2960
+214 create Player_1 SummonRulesCaster 0 2400,3300,0
+215 default-cast Player_1 SummonRulesCaster 0 Command_SpellBookGuldurGreenMist 2005 805
+216 default-cast Player_1 SummonRulesCaster 0 Command_SpellBookBalrogAlly 3300 800
+218 default-cast Player_1 SummonRulesCaster 0 Command_SpellBookDragonStrike 3200 2960
 225 power Player_1 GuldurOrcPikemanHorde 0 SpecialAbilityNecromancySummonNEW
 230 orderattack Player_1 WildGiantBatInterface 0 PlyrCreeps:MordorMountainTroll:0
 230 summon-rules-census Player_1 SpellBookDragonStrikeDragon 0
