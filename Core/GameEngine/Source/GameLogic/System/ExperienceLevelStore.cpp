@@ -670,6 +670,37 @@ void ExperienceTracker::addRetailExperience(Real points, Bool scale)
 	advanceRetailLevel(m_retailExperience + points, TRUE);
 }
 
+void ExperienceTracker::addScriptRetailExperience(Real points)
+{
+	ExperienceTracker* recipient = this;
+	std::vector<ObjectID> visited;
+	while (recipient->m_experienceSink != INVALID_ID)
+	{
+		Object* next = TheGameLogic->findObjectByID(recipient->m_experienceSink);
+		if (!next)
+			break;
+		if (std::find(visited.begin(), visited.end(), next->getID()) != visited.end())
+			return;
+		visited.push_back(next->getID());
+		points *= recipient->m_experienceScalar;
+		recipient = next->getExperienceTracker();
+	}
+	if (points >= 0.0f)
+	{
+		recipient->addRetailExperience(points, TRUE);
+		return;
+	}
+	if (!recipient->isTrainable() || !std::isfinite(points))
+		return;
+	recipient->initializeRetailLevel();
+	if (!recipient->m_retailThreshold)
+		return;
+	points *= recipient->m_experienceScalar * multiplayerExperienceMultiplier(recipient->m_parent);
+	points *= ExperienceLevelStore::experienceScalar(recipient->m_parent, recipient->getRank(), recipient->m_retailStartingRank);
+	if (std::isfinite(points + recipient->m_retailExperience))
+		recipient->m_retailExperience += points;
+}
+
 void ExperienceTracker::setMinRetailRank(Int rank, Bool feedback)
 {
 	initializeRetailLevel();

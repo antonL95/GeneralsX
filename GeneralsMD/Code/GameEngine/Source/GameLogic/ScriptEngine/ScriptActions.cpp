@@ -75,6 +75,7 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/RetailTransportTeleportModules.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/CaveContain.h"
 #include "GameLogic/Module/CommandButtonHuntUpdate.h"
 #include "GameLogic/Module/CastleBehavior.h"
@@ -7167,6 +7168,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::DAMAGE_MEMBERS_OF_TEAM:
 			doDamageTeamMembers(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;
+		case ScriptAction::UNIT_GIVE_EXPERIENCE_POINTS:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (unit)
+				unit->getExperienceTracker()->addScriptRetailExperience(static_cast<Real>(pAction->getParameter(1)->getInt()));
+			return;
+		}
 		case ScriptAction::UNIT_TELEPORT_TO_WAYPOINT:
 		{
 			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());

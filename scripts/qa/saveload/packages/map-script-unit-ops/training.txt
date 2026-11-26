@@ -1,4 +1,8 @@
 234 create Player_1 MapScriptUnitOpsProbe 0 2000,150,0
+235 create Player_1 MapScriptUnitOpsXP 0 2000,170,0
+235 create Player_1 MapScriptUnitOpsXP 1 2000,180,0
+235 create Player_1 MapScriptUnitOpsXP 2 2000,190,0
+239 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 240 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
 241 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
 
@@ -6,4 +10,8 @@
 246 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
 247 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
 
+248 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 250 destroy Player_1 MapScriptUnitOpsProbe 0
+250 destroy Player_1 MapScriptUnitOpsXP 0
+250 destroy Player_1 MapScriptUnitOpsXP 0
+250 destroy Player_1 MapScriptUnitOpsXP 0

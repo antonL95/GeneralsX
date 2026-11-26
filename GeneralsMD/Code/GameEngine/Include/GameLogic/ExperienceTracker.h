@@ -51,6 +51,7 @@ public:
 	Real getLevelProgress() const;
 	void initializeRetailLevel();
 	void addRetailExperience(Real points, Bool scale = TRUE);
+	void addScriptRetailExperience(Real points);
 	void advanceRetailLevel(Real experience, Bool feedback);
 	void setMinRetailRank(Int rank, Bool feedback = FALSE);
 	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE);
