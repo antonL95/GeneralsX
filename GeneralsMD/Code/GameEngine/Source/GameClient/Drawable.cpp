@@ -2000,6 +2000,63 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static Bool getFootprintGroundNormal(const Object &object, const Coord3D &dir, Coord3D &normal)
+{
+	const Coord3D &center = *object.getPosition();
+	const Real length = object.getGeometryInfo().getMajorRadius();
+	const Real width = object.getGeometryInfo().getMinorRadius();
+	const Real halfLength = 0.5f * length;
+	const Real halfWidth = 0.5f * width;
+	const Real maxHeightStep = 0.5f * (length + width);
+	const Real alongX = halfLength * dir.x;
+	const Real alongY = halfLength * dir.y;
+	const Real acrossX = -halfWidth * dir.y;
+	const Real acrossY = halfWidth * dir.x;
+
+	Coord3D samples[3] = {
+		{ center.x - alongX + acrossX, center.y - alongY + acrossY, 0.0f },
+		{ center.x - alongX - acrossX, center.y - alongY - acrossY, 0.0f },
+		{ center.x + alongX + acrossX, center.y + alongY + acrossY, 0.0f }
+	};
+	for (Coord3D &sample : samples)
+	{
+		sample.z = TheTerrainLogic->getLayerHeight(sample.x, sample.y, object.getLayer());
+		if (fabs(sample.z - center.z) > maxHeightStep)
+			return FALSE;
+	}
+
+	Coord3D rear;
+	rear.x = samples[1].x - samples[0].x;
+	rear.y = samples[1].y - samples[0].y;
+	rear.z = samples[1].z - samples[0].z;
+	Coord3D side;
+	side.x = samples[2].x - samples[0].x;
+	side.y = samples[2].y - samples[0].y;
+	side.z = samples[2].z - samples[0].z;
+	Coord3D::crossProduct(rear, side, normal);
+	normal.normalize();
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::getWheelGroundTilt( const Locomotor &locomotor, Real &pitch, Real &roll ) const
+{
+	pitch = 0.0f;
+	roll = 0.0f;
+	const Object *obj = getObject();
+	if (obj == nullptr)
+		return;
+
+	const Coord3D &dir = *getUnitDirectionVector2D();
+	Coord3D normal;
+	if (!locomotor.usesTerrainSmoothing() || !getFootprintGroundNormal(*obj, dir, normal))
+		TheTerrainLogic->getLayerHeight(obj->getPosition()->x, obj->getPosition()->y, obj->getLayer(), &normal);
+
+	pitch = WWMath::Asin(WWMath::Clamp(normal.x * dir.x + normal.y * dir.y, -1.0f, 1.0f));
+	roll = WWMath::Asin(WWMath::Clamp(normal.y * dir.x - normal.x * dir.y, -1.0f, 1.0f));
+}
+
+//-------------------------------------------------------------------------------------------------
 void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformInfo& info )
 {
 	if (m_locoInfo == nullptr)
@@ -2041,21 +2098,10 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 	const Coord3D *dir = getUnitDirectionVector2D();
 	const Coord3D *accel = physics->getAcceleration();
 
-	// compute perpendicular (2d)
-	Coord3D perp;
-	perp.x = -dir->y;
-	perp.y = dir->x;
-	perp.z = 0.0f;
-
-	// find pitch and roll of terrain under chassis
-	Coord3D normal;
-	Real hheight = TheTerrainLogic->getLayerHeight( pos->x, pos->y, obj->getLayer(), &normal );
-
-	Real dot = normal.x * dir->x + normal.y * dir->y;
-	Real groundPitch = dot * (PI/2.0f);
-
-	dot = normal.x * perp.x + normal.y * perp.y;
-	Real groundRoll = dot * (PI/2.0f);
+	Real hheight = TheTerrainLogic->getLayerHeight( pos->x, pos->y, obj->getLayer() );
+	Real groundPitch;
+	Real groundRoll;
+	getWheelGroundTilt( *locomotor, groundPitch, groundRoll );
 
 	Bool airborne = obj->isSignificantlyAboveTerrain();
 

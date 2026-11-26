@@ -76,5 +76,24 @@ check() {
             END { exit !(fast && slow) }
         ' "$log" || status=1
     fi
+    if covers 255; then
+        awk '
+            $1 == "TEST" && $2 == "locomotor-fields-tilt" && $3 == 255 {
+                print
+                pitch[$4 SUBSEP $5] = $6
+                roll[$4 SUBSEP $5] = $7
+                count++
+            }
+            END {
+                for (i = 0; i < 3; i++) {
+                    dp = pitch["P33FieldsSmooth" SUBSEP i] - pitch["P33FieldsRough" SUBSEP i]
+                    dr = roll["P33FieldsSmooth" SUBSEP i] - roll["P33FieldsRough" SUBSEP i]
+                    if (dp * dp + dr * dr > 0.000001)
+                        smoothed++
+                }
+                exit !(count == 6 && smoothed > 0)
+            }
+        ' "$log" || status=1
+    fi
     return "$status"
 }

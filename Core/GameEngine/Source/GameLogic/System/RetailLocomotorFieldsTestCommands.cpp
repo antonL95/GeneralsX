@@ -5,6 +5,8 @@
 #include <cstdio>
 
 #include "Common/ThingTemplate.h"
+#include "GameClient/Drawable.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -17,6 +19,20 @@ void beginRetreat(const RetailTestCommands::Context& ctx)
 	Object* horde = ctx.requireObject();
 	if (horde && ctx.target && horde->getAI())
 		horde->getAI()->fleeFromFear(ctx.target, LOGICFRAMES_PER_SECOND, MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID, 1.0f, TRUE);
+}
+
+void sampleTilt(const RetailTestCommands::Context& ctx)
+{
+	const Object* object = ctx.requireObject();
+	const AIUpdateInterface* ai = object ? object->getAI() : nullptr;
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	if (!locomotor || !object->getDrawable())
+		return;
+	Real pitch = 0.0f;
+	Real roll = 0.0f;
+	object->getDrawable()->getWheelGroundTilt(*locomotor, pitch, roll);
+	std::fprintf(stderr, "TEST locomotor-fields-tilt %u %s %d %.5f %.5f\n",
+		ctx.frame, object->getTemplate()->getName().str(), ctx.ordinal, pitch, roll);
 }
 
 void sampleRetreat(const RetailTestCommands::Context& ctx)
@@ -45,6 +61,7 @@ namespace RetailTestCommands
 void registerRetailLocomotorFieldsTestCommands()
 {
 #if !RTS_GENERALS
+	registerAction("locomotor-fields-tilt", sampleTilt);
 	registerAction("locomotor-fields-back", beginRetreat);
 	registerAction("locomotor-fields-sample", sampleRetreat);
 #endif

@@ -409,6 +409,7 @@ public:
 	// an "instance" matrix defines the local transform of the Drawable, and is concatenated with the global transform
 	void setInstanceMatrix( const Matrix3D *instance );									///< set the Drawable's instance transform
 	const Matrix3D *getInstanceMatrix() const { return &m_instance; }		///< get drawable instance transform
+	void getWheelGroundTilt( const Locomotor &locomotor, Real &pitch, Real &roll ) const;
 	Bool isInstanceIdentity() const { return m_instanceIsIdentity; }
 
 	Real getInstanceScale() const { return m_instanceScale; }		///< get scale that will be applied to instance matrix

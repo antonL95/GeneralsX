@@ -8,6 +8,12 @@
 215 create Player_1 P33FieldsThreat 0 1670,2590,0
 225 create Player_1 P33FieldsForm 0 1600,2640,0
 225 create Player_1 P33FieldsSolo 0 1600,2690,0
+225 create Player_1 P33FieldsRough 0 1500,2500,0
+225 create Player_1 P33FieldsSmooth 0 1500,2500,0
+225 create Player_1 P33FieldsRough 0 1500,2620,0
+225 create Player_1 P33FieldsSmooth 0 1500,2620,0
+225 create Player_1 P33FieldsRough 0 1500,2740,0
+225 create Player_1 P33FieldsSmooth 0 1500,2740,0
 239 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
 240 locomotor-fields-back Player_1 P33FieldsHorde 0 Player_1:P33FieldsThreat:0
 240 locomotor-fields-back Player_1 P33FieldsTinyHorde 0 Player_1:P33FieldsThreat:1
@@ -20,6 +26,12 @@
 250 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
 250 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
 250 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
+255 locomotor-fields-tilt Player_1 P33FieldsRough 0
+255 locomotor-fields-tilt Player_1 P33FieldsSmooth 0
+255 locomotor-fields-tilt Player_1 P33FieldsRough 1
+255 locomotor-fields-tilt Player_1 P33FieldsSmooth 1
+255 locomotor-fields-tilt Player_1 P33FieldsRough 2
+255 locomotor-fields-tilt Player_1 P33FieldsSmooth 2
 259 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
 259 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
 259 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
