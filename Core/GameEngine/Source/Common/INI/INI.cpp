@@ -192,6 +192,7 @@ static const BlockParse theTypeTable[] =
 	{ "Bridge",                         INI::parseTerrainBridgeDefinition },
 	{ "Campaign",                       INI::parseCampaignDefinition },
 	{ "ChallengeGenerals",              INI::parseChallengeModeDefinition },
+	{ "CloudEffect",                    INI::parseCloudEffectDefinition },
 	{ "CommandButton",                  INI::parseCommandButtonDefinition },
 	{ "CommandMap",                     INI::parseMetaMapDefinition },
 	{ "CommandSet",                     INI::parseCommandSetDefinition },

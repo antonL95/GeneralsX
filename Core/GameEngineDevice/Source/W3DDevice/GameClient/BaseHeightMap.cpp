@@ -60,6 +60,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Xfer.h"
 
+#include "GameClient/Snow.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameClient/Water.h"
@@ -155,6 +156,7 @@ Int BaseHeightMapRenderObjClass::freeMapResources()
 	REF_PTR_RELEASE(m_stageZeroTexture);
 	REF_PTR_RELEASE(m_stageOneTexture);
 	REF_PTR_RELEASE(m_stageTwoTexture);
+	REF_PTR_RELEASE(m_retailDarkCloudTexture);
 	REF_PTR_RELEASE(m_stageThreeTexture);
 	REF_PTR_RELEASE(m_destAlphaTexture);
 	REF_PTR_RELEASE(m_map);
@@ -259,6 +261,7 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_stageZeroTexture=nullptr;
 	m_stageOneTexture=nullptr;
 	m_stageTwoTexture=nullptr;
+	m_retailDarkCloudTexture=nullptr;
 	m_stageThreeTexture=nullptr;
 	m_destAlphaTexture=nullptr;
 	m_map=nullptr;
@@ -1900,6 +1903,18 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 	}
 
 	return 0;
+}
+
+CloudMapTerrainTextureClass *BaseHeightMapRenderObjClass::peekCloudTexture()
+{
+	if (TheSnowManager && TheSnowManager->isRetailCloudyActive() && TheWeatherSetting &&
+		TheWeatherSetting->m_darkCloudTexture.isNotEmpty())
+	{
+		if (!m_retailDarkCloudTexture)
+			m_retailDarkCloudTexture = NEW CloudMapTerrainTextureClass(TheWeatherSetting->m_darkCloudTexture);
+		return m_retailDarkCloudTexture;
+	}
+	return m_stageTwoTexture;
 }
 
 //=============================================================================

@@ -231,6 +231,7 @@ public:
 	static void parseWaterSettingDefinition( INI *ini );
 	static void parseWaterTransparencyDefinition( INI *ini );
 	static void parseWeatherDefinition( INI *ini );
+	static void parseCloudEffectDefinition( INI *ini );
 	static void parseMappedImageDefinition( INI *ini );
 	static void parseArmorDefinition( INI *ini );
 	static void parseDamageFXDefinition( INI *ini );

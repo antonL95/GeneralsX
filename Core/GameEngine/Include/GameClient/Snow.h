@@ -71,6 +71,11 @@ class WeatherSetting : public Overridable
 		Real	m_hardwareFogEnd = 1500.0f;
 		Coord2D	m_cloudTextureSize = {};
 		Coord2D	m_cloudOffsetPerSecond = {};
+		AsciiString m_cloudEffectTexture;
+		AsciiString m_darkCloudTexture;
+		RGBColor m_cloudDarkeningFactor = {};
+		Real	m_cloudDarkeningRate = 255.0f;
+		Real	m_cloudLighteningRate = 255.0f;
 
 	public:
 		WeatherSetting()
@@ -114,13 +119,17 @@ class SnowManager : public SubsystemInterface
 	virtual void init() override;
 	virtual void reset() override;
 	virtual void updateIniSettings ();
-	void setVisible(Bool showWeather);	///<enable/disable rendering of weather - assuming it's available on map.
+	void setVisible(Bool showWeather);
+	Bool isRetailCloudyActive() const { return m_retailWeather && m_cloudyDarkness > 0.0f; }
+	Real getRetailCloudyDarkness() const { return m_retailWeather ? m_cloudyDarkness : 0.0f; }
+	RGBColor getRetailCloudyLightScale() const;
 
   protected :
 
 	Bool isPrecipitationEnabled() const;
 	Bool isRetailSpellRainActive() const { return m_spellRainActive || m_spellRainTicks > 0; }
 	void updateRetailSpellRain();
+	void updateRetailCloudy();
 
 	Bool				m_retailWeather;
 	Real				*m_startingHeights;
@@ -136,7 +145,8 @@ class SnowManager : public SubsystemInterface
 	Real				m_quadSize;			///<used to control quad size when no hardware point sprites.
 	Real				m_boxDimensions;	///<used to set dimensions of box surrounding camera.
 	Real				m_emitterSpacing;		///<used to control how many emitters are present per world unit
-	Bool				m_isVisible;		///<used to prevent map weather (if defined) from rendering.
+	Bool				m_isVisible;
+	Real				m_cloudyDarkness = 0.0f;
 
  private:
 	void resetRetailSpellRain();

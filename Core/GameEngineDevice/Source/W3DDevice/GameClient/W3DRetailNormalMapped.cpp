@@ -1,6 +1,7 @@
 #include "W3DDevice/GameClient/RetailEffectInput.h"
 
 #include "Common/RetailFileLayers.h"
+#include "GameClient/Snow.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
@@ -232,6 +233,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	std::array<Register, 6> directional{};
 	std::array<Register, 3> point{{{}, {}, {1.0f, 0.0f, 0.0f, 0.0f}}};
 	unsigned numDirectional = 0;
+	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
 	bool havePoint = false;
 	for (Int i = 0; i < lights->Get_Light_Count(); ++i)
 	{
@@ -247,7 +249,11 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		}
 		else if (numDirectional < directional.size() / 2)
 		{
-			directional[numDirectional * 2] = fromVector(lights->Get_Light_Diffuse(i));
+			auto diffuse = fromVector(lights->Get_Light_Diffuse(i));
+			diffuse[0] *= weatherScale.red;
+			diffuse[1] *= weatherScale.green;
+			diffuse[2] *= weatherScale.blue;
+			directional[numDirectional * 2] = diffuse;
 			directional[numDirectional * 2 + 1] = fromVector(lights->Get_Light_Direction(i));
 			++numDirectional;
 		}
@@ -294,7 +300,13 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		else if (name == "PointLight")
 			std::copy_n(point.begin(), std::min(point.size(), floats.size()), floats.begin());
 		else if (name == "AmbientLightColor")
-			floats[0] = fromVector(lights->Get_Equivalent_Ambient());
+		{
+			auto ambientLight = fromVector(lights->Get_Equivalent_Ambient());
+			ambientLight[0] *= weatherScale.red;
+			ambientLight[1] *= weatherScale.green;
+			ambientLight[2] *= weatherScale.blue;
+			floats[0] = ambientLight;
+		}
 		else if (name == "DiffuseColor")
 			floats[0] = diffuseColor;
 		else if (name == "ColorAmbient")

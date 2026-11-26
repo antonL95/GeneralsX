@@ -2,6 +2,7 @@
 
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/Snow.h"
 #include "GameLogic/TerrainLogic.h"
 #include "W3DDevice/GameClient/RetailEffectInput.h"
 #include "W3DDevice/GameClient/RetailTerrainShadow.h"
@@ -68,7 +69,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 		return false;
 
 	auto *baseTexture = RetailFX::nativeTexture(m_stageZeroTexture);
-	auto *cloudTexture = RetailFX::nativeTexture(m_stageTwoTexture);
+	auto *cloudTexture = RetailFX::nativeTexture(peekCloudTexture());
 	auto *macroTexture = RetailFX::nativeTexture(m_stageThreeTexture);
 	if (!baseTexture || !cloudTexture || !macroTexture)
 		return false;
@@ -85,7 +86,25 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 
 	const auto fog = RetailFX::fogBindings(device8);
 	const auto cloud = W3DShaderManager::getRetailCloudUV();
-	const auto &sun = TheGlobalData->m_terrainDiffuse[0];
+	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
+	const bool scaleWeather = weatherScale.red < 1.0f || weatherScale.green < 1.0f || weatherScale.blue < 1.0f;
+	const auto applyWeatherScale = [&](uint32_t rgba) -> uint32_t {
+		if (!scaleWeather)
+			return rgba;
+		const auto scaleChannel = [rgba](unsigned shift, float factor) {
+			const float scaled = static_cast<float>((rgba >> shift) & 255u) * factor;
+			return static_cast<uint32_t>(std::clamp(scaled, 0.0f, 255.0f) + 0.5f) << shift;
+		};
+		return (rgba & 0xff000000u) | scaleChannel(16, weatherScale.red) |
+			scaleChannel(8, weatherScale.green) | scaleChannel(0, weatherScale.blue);
+	};
+	RGBColor sun = TheGlobalData->m_terrainDiffuse[0];
+	if (scaleWeather)
+	{
+		sun.red *= weatherScale.red;
+		sun.green *= weatherScale.green;
+		sun.blue *= weatherScale.blue;
+	}
 	const auto &direction = TheGlobalData->m_terrainLightPos[0];
 	Vector3 sunRay(-direction.x, -direction.y, -direction.z);
 	sunRay.Normalize();
@@ -141,7 +160,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 				const float z = m_map->toWorldHeight(heights[px[corner] + py[corner] * m_map->getXExtent()]);
 				Coord3D normal{0.0f, 0.0f, 1.0f};
 				TheTerrainLogic->getGroundHeight(wx, wy, &normal);
-				const uint32_t color = (getStaticDiffuse(px[corner], py[corner]) & 0xffffffu) | (uint32_t(alpha[corner]) << 24);
+				const uint32_t color = applyWeatherScale((getStaticDiffuse(px[corner], py[corner]) & 0xffffffu) | (uint32_t(alpha[corner]) << 24));
 				runtime.third.push_back({{wx, wy, z}, {normal.x, normal.y, normal.z}, color, {u[corner], v[corner]},
 					encodeFill(color, normal, encodingScale)});
 			}
@@ -233,7 +252,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 						const auto &input = quad[i];
 						Coord3D normal{0.0f, 0.0f, 1.0f};
 						TheTerrainLogic->getGroundHeight(input.x, input.y, &normal);
-						const auto color = static_cast<uint32_t>(input.diffuse);
+						const auto color = applyWeatherScale(static_cast<uint32_t>(input.diffuse));
 						const auto fill = shadowReady ? encodeFill(color, normal, 1.0f) : color;
 						RetailFX::TerrainVertex vertex{{input.x, input.y, input.z}, {normal.x, normal.y, normal.z},
 							color | 0xff000000u, {input.u1, input.v1}, fill | 0xff000000u};

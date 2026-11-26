@@ -129,11 +129,46 @@ void SnowManager::resetRetailSpellRain()
 {
 	m_spellRainActive = FALSE;
 	m_spellRainTicks = 0;
+	m_cloudyDarkness = 0.0f;
 	setRetailFallParameters(TheWeatherSetting->m_snowSpacing, TheWeatherSetting->m_snowSpeed);
+}
+
+RGBColor SnowManager::getRetailCloudyLightScale() const
+{
+	RGBColor scale = { 1.0f, 1.0f, 1.0f };
+	if (!m_retailWeather || !(m_cloudyDarkness > 0.0f) || !TheWeatherSetting)
+		return scale;
+	const RGBColor &factor = TheWeatherSetting->m_cloudDarkeningFactor;
+	scale.red = std::clamp(1.0f - m_cloudyDarkness * factor.red, 0.0f, 1.0f);
+	scale.green = std::clamp(1.0f - m_cloudyDarkness * factor.green, 0.0f, 1.0f);
+	scale.blue = std::clamp(1.0f - m_cloudyDarkness * factor.blue, 0.0f, 1.0f);
+	return scale;
+}
+
+void SnowManager::updateRetailCloudy()
+{
+	const WeatherSetting &weather = **TheWeatherSetting;
+#if !RTS_GENERALS
+	const Int state = TheGameLogic ? TheGameLogic->getRetailWeather() : GameLogic::WEATHER_NONE;
+	const Bool cloudy = state == GameLogic::WEATHER_CLOUDY || state == GameLogic::WEATHER_CLOUDYRAINY;
+#else
+	const Bool cloudy = FALSE;
+#endif
+	if (cloudy)
+	{
+		const Real rate = weather.m_cloudDarkeningRate >= 1.0f ? weather.m_cloudDarkeningRate : 255.0f;
+		m_cloudyDarkness = std::min(1.0f, m_cloudyDarkness + 1.0f / rate);
+	}
+	else if (m_cloudyDarkness > 0.0f)
+	{
+		const Real rate = weather.m_cloudLighteningRate >= 1.0f ? weather.m_cloudLighteningRate : 255.0f;
+		m_cloudyDarkness = std::max(0.0f, m_cloudyDarkness - 1.0f / rate);
+	}
 }
 
 void SnowManager::updateRetailSpellRain()
 {
+	updateRetailCloudy();
 	const WeatherSetting &weather = **TheWeatherSetting;
 #if !RTS_GENERALS
 	const Bool active = weather.m_spellEnabled && TheGameLogic && TheGameLogic->getRetailWeather() == GameLogic::WEATHER_RAINY;
@@ -300,4 +335,26 @@ void INI::parseWeatherDefinition( INI *ini )
 
 	if (TheSnowManager)
 		TheSnowManager->updateIniSettings();
+}
+
+static const FieldParse retailCloudEffectFields[] =
+{
+	{ "CloudTexture", INI::parseAsciiString, nullptr, offsetof(WeatherSetting, m_cloudEffectTexture) },
+	{ "DarkCloudTexture", INI::parseAsciiString, nullptr, offsetof(WeatherSetting, m_darkCloudTexture) },
+	{ "DarkeningFactor", INI::parseRGBColor, nullptr, offsetof(WeatherSetting, m_cloudDarkeningFactor) },
+	{ "DarkeningRate", INI::parseReal, nullptr, offsetof(WeatherSetting, m_cloudDarkeningRate) },
+	{ "LighteningRate", INI::parseReal, nullptr, offsetof(WeatherSetting, m_cloudLighteningRate) },
+	{ nullptr, nullptr, nullptr, 0 },
+};
+
+void INI::parseCloudEffectDefinition( INI *ini )
+{
+	if (TheWeatherSetting == nullptr)
+		TheWeatherSetting = newInstance(WeatherSetting);
+
+	WeatherSetting *weatherSet = (WeatherSetting *)(TheWeatherSetting.getNonOverloadedPointer());
+	weatherSet = (WeatherSetting *)(weatherSet->friend_getFinalOverride());
+	MultiIniFieldParse fields;
+	fields.add(retailCloudEffectFields);
+	ini->initFromINIMulti(weatherSet, fields);
 }

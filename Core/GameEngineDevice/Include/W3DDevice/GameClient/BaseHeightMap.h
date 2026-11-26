@@ -196,7 +196,7 @@ public:
 	void removeTerrainBibHighlighting();
 
 	W3DShroud *getShroud()	{return m_shroud;}
-	CloudMapTerrainTextureClass *peekCloudTexture() const { return m_stageTwoTexture; }
+	CloudMapTerrainTextureClass *peekCloudTexture();
 	void updateShorelineTiles(Int minX, Int minY, Int maxX, Int maxY, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void updateShorelineTile(Int X, Int Y, Int Border, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void recordShoreLineSortInfos();
@@ -267,7 +267,8 @@ protected:
 	VertexMaterialClass	  	  *m_vertexMaterialClass;	///< vertex shader (lighting) for terrain
 	TextureClass *m_stageZeroTexture;	///<primary texture
 	TextureClass *m_stageOneTexture;	///<transparent edging texture
-	CloudMapTerrainTextureClass *m_stageTwoTexture;	///<Cloud map texture
+	CloudMapTerrainTextureClass *m_stageTwoTexture;
+	CloudMapTerrainTextureClass *m_retailDarkCloudTexture;
 	TextureClass *m_stageThreeTexture;	///<light/noise map texture
 	AsciiString m_macroTextureName; ///< Name for stage 3 texture.
 	TextureClass *m_destAlphaTexture;	///< Texture holding destination alpha LUT for water depth.
