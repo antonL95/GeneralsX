@@ -1293,6 +1293,13 @@ void PhysicsBehavior::launchFromWeaponImpact(const Coord3D& direction, Real amou
 		const Real lift = std::abs(magnitude * zFactor * variance);
 		if (std::isfinite(magnitude) && std::isfinite(lift))
 			launched = launchWithRetailVelocity({impulse.x, impulse.y, lift});
+		if (launched)
+		{
+			constexpr UnsignedInt minimumCurveFrames = RotwkDuration::engineFrames(3, LOGICFRAMES_PER_SECOND);
+			m_impactFlightDuration = std::max(m_impactFlightDuration, minimumCurveFrames);
+			m_impactFlightFrames = m_impactFlightDuration;
+			m_impactHeight = std::max(m_impactHeight, 0.5f);
+		}
 	}
 	if (Drawable* drawable = victim->getDrawable())
 		drawable->setRetailImpactFXTrigger(launched ? trigger : RETAIL_DAMAGE_FX_NONE);
