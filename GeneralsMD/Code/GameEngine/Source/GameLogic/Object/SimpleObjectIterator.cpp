@@ -41,7 +41,8 @@ SimpleObjectIterator::ClumpCompareProc SimpleObjectIterator::theClumpCompareProc
 	SimpleObjectIterator::sortNearToFar,
 	SimpleObjectIterator::sortFarToNear,
 	SimpleObjectIterator::sortCheapToExpensive,
-	SimpleObjectIterator::sortExpensiveToCheap
+	SimpleObjectIterator::sortExpensiveToCheap,
+	SimpleObjectIterator::sortByID
 };
 
 //=============================================================================
@@ -269,5 +270,10 @@ Real SimpleObjectIterator::sortExpensiveToCheap(Clump *a, Clump *b)
 {
 	return b->m_obj->getTemplate()->friend_getBuildCost() -
 				 a->m_obj->getTemplate()->friend_getBuildCost();
+}
+
+Real SimpleObjectIterator::sortByID(Clump *a, Clump *b)
+{
+	return Real(Int(a->m_obj->getID()) - Int(b->m_obj->getID()));
 }
 

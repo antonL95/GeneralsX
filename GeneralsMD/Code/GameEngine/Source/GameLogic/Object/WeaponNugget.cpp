@@ -745,7 +745,8 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 		axis = source ? *source->getUnitDirectionVector2D() : Coord3D{1.0f, 0.0f, 0.0f};
 	const Bool fullArc = nugget.m_shockWaveArc <= 0.0f || nugget.m_shockWaveArc >= 360.0f;
 	const Real cosHalfArc = fullArc ? -1.0f : WWMath::CosTrig(nugget.m_shockWaveArc * (PI / 360.0f));
-	SimpleObjectIterator* iter = radius > 0.0f ? ThePartitionManager->iterateObjectsInRange(&pos, radius, FROM_CENTER_2D) : nullptr;
+	SimpleObjectIterator* iter = radius > 0.0f ? ThePartitionManager->iterateObjectsInRange(&pos, radius, FROM_CENTER_2D, nullptr,
+		impactFrame ? ITER_SORTED_BY_ID : ITER_FASTEST) : nullptr;
 	MemoryPoolObjectHolder hold(iter);
 	const auto affect = [&](Object* victim)
 	{
@@ -977,7 +978,8 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	Real curVictimDistSqr = 0.0f;
 	if (radius > 0.0f)
 	{
-		iter = ThePartitionManager->iterateObjectsInRange(pos, radius, FROM_BOUNDINGSPHERE_3D);
+		iter = ThePartitionManager->iterateObjectsInRange(pos, radius, FROM_BOUNDINGSPHERE_3D, nullptr,
+			dotTicks.size() > 1 ? ITER_SORTED_BY_ID : ITER_FASTEST);
 		curVictim = iter->firstWithNumeric(&curVictimDistSqr);
 	}
 	MemoryPoolObjectHolder hold(iter);
