@@ -154,8 +154,15 @@ void SiegeEngineContain::releaseOnWall(Object* rider, const Coord3D& landing)
 {
 	removeFromContain(rider);
 	auto place = [this](Object* unit, const Coord3D& position) {
+		if (auto* ai = unit->getAI())
+		{
+			ai->destroyPath();
+			ai->setLocomotorGoalNone();
+			ai->aiIdle(CMD_FROM_AI);
+		}
 		if (auto* physics = unit->getPhysics())
 			physics->resetDynamicPhysics();
+		TheAI->pathfinder()->removeObjectFromPathfindMap(unit);
 		unit->setLayer(LAYER_WALL);
 		unit->setDestinationLayer(LAYER_WALL);
 		unit->setPosition(&position);

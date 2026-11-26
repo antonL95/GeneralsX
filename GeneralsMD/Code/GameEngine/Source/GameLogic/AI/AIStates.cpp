@@ -6661,8 +6661,8 @@ StateReturnType AIEnterState::update()
 		{
 			if (goal)
 			{
-				// we didn't enter.  See if we're close.
-				const Coord3D& entry = tunnel ? m_goalPosition : *goal->getPosition();
+				const Bool usesClimbEntry = SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
+				const Coord3D& entry = (tunnel || usesClimbEntry) ? m_goalPosition : *goal->getPosition();
 				Real dx = obj->getPosition()->x - entry.x;
 				Real dy = obj->getPosition()->y - entry.y;
 				Real radius = goal->getGeometryInfo().getMinorRadius();

@@ -306,6 +306,8 @@ void SiegeAIUpdate::setPhase(Phase phase)
 	carrier->clearModelConditionState(MODELCONDITION_PACKING);
 	carrier->clearModelConditionState(MODELCONDITION_DEPLOYED);
 	carrier->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DEPLOYED), phase == Docked);
+	carrier->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IMMOBILE),
+		phase == Lowering || phase == Docked || phase == Raising);
 	if (phase == Lowering)
 		carrier->setModelConditionState(MODELCONDITION_UNPACKING);
 	else if (phase == Raising)
@@ -367,6 +369,19 @@ void SiegeAIUpdate::aiDoCommand(const AICommandParms* parms)
 				(parms->m_cmdSource == CMD_FROM_SCRIPT ? COMMAND_FIRED_BY_SCRIPT : 0));
 			if (power->wasLastCastAccepted())
 				return;
+		}
+	}
+	if (m_phase != Idle && m_phase != Approaching && parms->m_cmdSource == CMD_FROM_AI)
+	{
+		switch (parms->m_cmd)
+		{
+			case AICMD_MOVE_TO_OBJECT:
+			case AICMD_MOVE_TO_POSITION:
+			case AICMD_MOVE_AWAY_FROM_UNIT:
+			case AICMD_ATTACKMOVE_TO_POSITION:
+				return;
+			default:
+				break;
 		}
 	}
 	if (m_phase != Idle && parms->m_cmdSource != CMD_FROM_AI)

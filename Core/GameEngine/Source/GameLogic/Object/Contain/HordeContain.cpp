@@ -1422,8 +1422,11 @@ Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
 			position.y += offset.y;
 		}
 	}
+	const PathfindLayerEnum layer = horde->getLayer();
+	if (layer == LAYER_WALL && TheAI && TheAI->pathfinder() && !TheAI->pathfinder()->isPointOnWall(&position))
+		position = *horde->getPosition();
 	if (TheTerrainLogic)
-		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		position.z = TheTerrainLogic->getLayerHeight(position.x, position.y, layer);
 	return position;
 }
 
@@ -1473,7 +1476,7 @@ void avoidBlockingRanks(const HordeContain& horde, const Object& anchor, const O
 	goal.position.x = origin.x + ahead * forward.x - side * forward.y;
 	goal.position.y = origin.y + ahead * forward.y + side * forward.x;
 	if (TheTerrainLogic)
-		goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+		goal.position.z = TheTerrainLogic->getLayerHeight(goal.position.x, goal.position.y, anchor.getLayer());
 	goal.distance = WWMath::SqrtfOrigin(sqr(ahead) + sqr(side));
 }
 }
@@ -1569,7 +1572,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		goal.position.x = anchor.x + leadX + offsetX * cosAngle - offsetY * sinAngle;
 		goal.position.y = anchor.y + leadY + offsetX * sinAngle + offsetY * cosAngle;
 		if (TheTerrainLogic)
-			goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+			goal.position.z = TheTerrainLogic->getLayerHeight(goal.position.x, goal.position.y, horde->getLayer());
 
 		const Real slotVX = velocity.x - turn * offsetY;
 		const Real slotVY = velocity.y + turn * offsetX;
@@ -1586,7 +1589,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	goal.position.x += leadX;
 	goal.position.y += leadY;
 	if (TheTerrainLogic)
-		goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+		goal.position.z = TheTerrainLogic->getLayerHeight(goal.position.x, goal.position.y, horde->getLayer());
 	const Real behind = hordeSpeed > 0.0f ? (dx * velocity.x + dy * velocity.y) / hordeSpeed : goal.error;
 	goal.speed = std::max(0.0f, hordeSpeed + behind * FORMATION_CATCH_UP_PER_FRAME);
 	goal.distance = std::max(0.0f, behind) + remaining;
