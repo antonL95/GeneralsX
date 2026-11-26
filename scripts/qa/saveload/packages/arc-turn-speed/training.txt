@@ -1,0 +1,6 @@
+238 create Player_1 ArcTurnSpeedSubject 0 1800,2050,0
+241 select Player_1 ArcTurnSpeedSubject 0
+241 movesel - - 0 - 2200 2400
+246 arc-turn-push Player_1 ArcTurnSpeedSubject 0 - 3 0 0
+246 corner-speed Player_1 ArcTurnSpeedSubject 0
+247 steering-path Player_1 ArcTurnSpeedSubject 0

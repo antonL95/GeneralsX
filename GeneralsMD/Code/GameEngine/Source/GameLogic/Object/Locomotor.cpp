@@ -1305,20 +1305,32 @@ void Locomotor::updateRetailTurnConditions(Object* obj, Real requestedTurn) cons
 
 	static const ModelConditionFlags turnMask = MAKE_MODELCONDITION_MASK4(MODELCONDITION_TURN_LEFT,
 		MODELCONDITION_TURN_RIGHT, MODELCONDITION_TURN_LEFT_HIGH_SPEED, MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
+
+	Real threshold = m_template->m_rotwk.turnThreshold;
+	if (m_retailShortTurnSegment && getAppearance() != LOCO_GIANT_BIRD)
+		threshold /= 16.0f;
+
+	ModelConditionFlags cleared = m_retailShortTurnSegment ? ModelConditionFlags{} : turnMask;
 	ModelConditionFlags conditions;
-	if (requestedTurn != 0.0f && m_retailArcTurn != 0.0f)
-		requestedTurn = m_retailArcTurn;
-	if (requestedTurn != 0.0f && fabs(requestedTurn) > m_template->m_rotwk.turnThreshold)
+	if (requestedTurn != 0.0f && fabs(requestedTurn) > threshold)
 	{
 		const Real halfSpeed = 0.5f * getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), obj);
-		const Coord3D& velocity = *obj->getPhysics()->getVelocity();
-		const Bool highSpeed = sqr(velocity.x) + sqr(velocity.y) > sqr(halfSpeed);
+		const Bool highSpeed = m_retailScalarSpeed > halfSpeed;
+		const Bool left = requestedTurn > 0.0f;
 		if (highSpeed && m_template->m_rotwk.enableHighSpeedTurnModelConditions)
-			conditions.set(requestedTurn > 0.0f ? MODELCONDITION_TURN_LEFT_HIGH_SPEED : MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
+		{
+			cleared.set(left ? MODELCONDITION_TURN_RIGHT : MODELCONDITION_TURN_LEFT);
+			cleared.set(left ? MODELCONDITION_TURN_RIGHT_HIGH_SPEED : MODELCONDITION_TURN_LEFT_HIGH_SPEED);
+			conditions.set(left ? MODELCONDITION_TURN_LEFT_HIGH_SPEED : MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
+		}
 		else if (!highSpeed)
-			conditions.set(requestedTurn > 0.0f ? MODELCONDITION_TURN_LEFT : MODELCONDITION_TURN_RIGHT);
+		{
+			cleared.set(left ? MODELCONDITION_TURN_RIGHT : MODELCONDITION_TURN_LEFT);
+			conditions.set(left ? MODELCONDITION_TURN_LEFT : MODELCONDITION_TURN_RIGHT);
+		}
 	}
-	obj->clearAndSetModelConditionFlags(turnMask, conditions);
+	if (cleared.any())
+		obj->clearAndSetModelConditionFlags(cleared, conditions);
 }
 
 Bool Locomotor::usesCavalrySteering(const Object* obj) const

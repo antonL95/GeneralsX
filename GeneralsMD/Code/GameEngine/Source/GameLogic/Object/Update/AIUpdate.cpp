@@ -2616,7 +2616,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						}
 						Coord3D goalPos;
 						Real onPathDistToGoal;
-						Real arcTurn = 0.0f;
+						Bool shortTurnSegment = FALSE;
 						PathfindLayerEnum wallScaleTargetLayer = LAYER_INVALID;
 						if (!isDoingGroundMovement())
 						{
@@ -2633,7 +2633,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 							onPathDistToGoal = info.distAlongPath;
 							goalPos = info.posOnPath;
-							arcTurn = info.arcTurn;
+							shortTurnSegment = info.shortTurnSegment;
 							wallScaleTargetLayer = info.wallScaleTargetLayer;
 							if (RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_HORDE))
 							{
@@ -2680,12 +2680,12 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 						}
 
-						m_curLocomotor->setRetailArcTurn(arcTurn);
+						m_curLocomotor->setRetailShortTurnSegment(shortTurnSegment);
 						m_curLocomotor->setRetailWallScaleTarget(wallScaleTargetLayer);
 						m_curLocomotor->locoUpdate_moveTowardsPosition(getObject(), goalPos,
 							onPathDistToGoal+getPathExtraDistance(), speed, &blocked);
 						m_curLocomotor->setRetailWallScaleTarget(LAYER_INVALID);
-						m_curLocomotor->setRetailArcTurn(0.0f);
+						m_curLocomotor->setRetailShortTurnSegment(FALSE);
 
 						m_doFinalPosition = FALSE;
 					}

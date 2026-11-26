@@ -44,7 +44,7 @@ m_cpopValid(FALSE)
 {
 	m_cpopIn.zero();
 	m_cpopOut.distAlongPath=0;
-	m_cpopOut.arcTurn = 0.0f;
+	m_cpopOut.shortTurnSegment = FALSE;
 	m_cpopOut.layer = LAYER_GROUND;
 	m_cpopOut.wallScaleTargetLayer = LAYER_INVALID;
 	m_cpopOut.posOnPath.zero();
@@ -93,8 +93,11 @@ void Path::xferRetailBlocks(Xfer* xfer, Bool present)
 			for (PathNode* node = m_path; node; node = node->getNext())
 				node->setGeneratedArc(FALSE);
 		}},
-		{"path-cached-arc-turn", [this](Xfer* transfer) { transfer->xferReal(&m_cpopOut.arcTurn); },
-			[this] { m_cpopOut.arcTurn = 0.0f; }},
+		{"path-cached-short-turn-segment", [this](Xfer* transfer) { transfer->xferBool(&m_cpopOut.shortTurnSegment); },
+			[this] {
+				m_cpopOut.shortTurnSegment = FALSE;
+				m_cpopValid = FALSE;
+			}},
 		{"path-wall-scale-target", [this](Xfer* transfer) {
 			Int layer = static_cast<Int>(m_cpopOut.wallScaleTargetLayer);
 			transfer->xferInt(&layer);
@@ -808,27 +811,6 @@ inline Bool isReallyClose(const Coord3D& a, const Coord3D& b)
  *
  * return along-path distance to the end will be returned as function result
  */
-static Real generatedArcTurn(const PathNode* node)
-{
-	if (!node || !node->isGeneratedArc())
-		return 0.0f;
-	const PathNode* first = node;
-	while (first->getPrevious() && first->getPrevious()->isGeneratedArc())
-		first = first->getPrevious();
-	const PathNode* last = node;
-	while (last->getNextOptimized() && last->getNextOptimized()->isGeneratedArc())
-		last = last->getNextOptimized();
-	const PathNode* entry = first->getPrevious();
-	const PathNode* exit = last->getNextOptimized();
-	if (!entry || !exit)
-		return 0.0f;
-	const Real inX = first->getPosition()->x - entry->getPosition()->x;
-	const Real inY = first->getPosition()->y - entry->getPosition()->y;
-	const Real outX = exit->getPosition()->x - last->getPosition()->x;
-	const Real outY = exit->getPosition()->y - last->getPosition()->y;
-	return WWMath::Atan2Origin(inX * outY - inY * outX, inX * outX + inY * outY);
-}
-
 void Path::computePointOnPath(
 	const Object* obj,
 	const LocomotorSet& locomotorSet,
@@ -843,7 +825,7 @@ void Path::computePointOnPath(
 	out.wallScaleTargetLayer = LAYER_INVALID;
 	out.posOnPath.zero();
 	out.distAlongPath = 0;
-	out.arcTurn = 0.0f;
+	out.shortTurnSegment = FALSE;
 
 	if (m_path == nullptr)
 	{
@@ -957,7 +939,7 @@ void Path::computePointOnPath(
 	{
 		// note that the seg dir and len returned by this is the dist & vec from 'closeNode' to 'closeNext'
 		const PathNode* closeNext = closeNode->getNextOptimized(&segmentDirNorm, &segmentLength);
-		out.arcTurn = generatedArcTurn(closeNode->isGeneratedArc() ? closeNode : closeNext);
+		out.shortTurnSegment = segmentLength < 10.0f;
 		const Coord3D* nextNodePos = closeNext->getPosition();
 		const Coord3D* closeNodePos = closeNode->getPosition();
 

@@ -315,7 +315,7 @@ public:
 	Real getSlowTurnRadius() const { return m_template->m_slowTurnRadius; }
 	Real getFastTurnRadius() const { return m_template->m_fastTurnRadius; }
 	Real getRetailScalarSpeed() const { return m_retailScalarSpeed; }
-	void setRetailArcTurn(Real arcTurn) { m_retailArcTurn = arcTurn; }
+	void setRetailShortTurnSegment(Bool shortTurnSegment) { m_retailShortTurnSegment = shortTurnSegment; }
 	Bool usesFloatingZ() const { return m_template->m_behaviorZ == Z_FLOATING_Z; }
 	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
 	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
@@ -570,7 +570,7 @@ private:
 	UnsignedInt m_donutTimer;				///< Frame time to keep units from doing the donut. jba.
 	Bool m_retailWasRunning = FALSE;
 	Real m_retailScalarSpeed = 0.0f;
-	Real m_retailArcTurn = 0.0f;
+	Bool m_retailShortTurnSegment = FALSE;
 	Bool m_retailScalingWall = FALSE;
 	PathfindLayerEnum m_retailWallScaleTarget = LAYER_INVALID;
 

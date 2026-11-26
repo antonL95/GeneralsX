@@ -28,7 +28,7 @@ class PathNode;
 struct ClosestPointOnPathInfo
 {
 	Real								distAlongPath;
-	Real								arcTurn;
+	Bool								shortTurnSegment;
 	Coord3D							posOnPath;
 	PathfindLayerEnum		layer;
 	PathfindLayerEnum		wallScaleTargetLayer;
