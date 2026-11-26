@@ -5059,6 +5059,65 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 
 }
 
+Bool Pathfinder::quickDoesPathExistToObject( const Object *obj, const Coord3D *from, const Object *target )
+{
+	if (!obj || !from || !target)
+		return FALSE;
+	const AIUpdateInterface *ai = obj->getAI();
+	if (!ai)
+		return FALSE;
+	const LocomotorSet &locomotorSet = ai->getLocomotorSet();
+	if (locomotorSet.getValidSurfaces() == 0)
+		return FALSE;
+	const Coord3D targetPos = *target->getPosition();
+	const PathfindLayerEnum fromLayer = TheTerrainLogic->getLayerForDestination(from);
+	const PathfindLayerEnum toLayer = TheTerrainLogic->getLayerForDestination(&targetPos);
+	PathfindCell *fromCell = getClippedCell(fromLayer, from);
+	PathfindCell *goalCell = getClippedCell(toLayer, &targetPos);
+	if (goalCell->getType() != PathfindCell::CELL_OBSTACLE)
+		return clientSafeQuickDoesPathExist(locomotorSet, from, &targetPos);
+	if (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+		(fromLayer == LAYER_WALL || toLayer == LAYER_WALL))
+		return TRUE;
+	const Int startZone = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, fromCell->getZone());
+	if (startZone == PathfindZoneManager::UNINITIALIZED_ZONE)
+		return TRUE;
+	struct PerimeterProbe
+	{
+		ObjectID obstacleID;
+		Int zone;
+	};
+	const auto exitObstacle = [](Pathfinder*, PathfindCell*, PathfindCell* to, Int, Int, void* userData) -> Int {
+		auto* probe = static_cast<PerimeterProbe*>(userData);
+		if (!to)
+			return 0;
+		if (to->getObstacleID() != probe->obstacleID)
+		{
+			probe->zone = to->getZone();
+			return 1;
+		}
+		return 0;
+	};
+	ICoord2D centerCell;
+	worldToCell(&targetPos, &centerCell);
+	const ObjectID obstacleID = goalCell->getObstacleID();
+	const Int offset = 2 + static_cast<Int>(target->getGeometryInfo().getBoundingCircleRadius() / PATHFIND_CELL_SIZE);
+	const ICoord2D deltas[] = {{offset, 0}, {-offset, 0}, {0, offset}, {0, -offset}};
+	for (const ICoord2D& delta : deltas)
+	{
+		ICoord2D endCell = {centerCell.x + delta.x, centerCell.y + delta.y};
+		PerimeterProbe probe{obstacleID, PathfindZoneManager::UNINITIALIZED_ZONE};
+		if (iterateCellsAlongLine(centerCell, endCell, toLayer, exitObstacle, &probe) &&
+			probe.zone != PathfindZoneManager::UNINITIALIZED_ZONE)
+		{
+			const Int probeZone = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, probe.zone);
+			if (probeZone == startZone)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 /**
  * Does any path exist from 'from' to 'to' given the locomotor set
  * This is the careful check, looks at whether the terrain, buindings and units are possible or
