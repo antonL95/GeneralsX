@@ -25,6 +25,8 @@ check() {
     step right-click-fortress 760 'TEST ringchain-order frame=760 target=fortress command=enter' &&
     step delivery 1300 "$(state 1300 'rings=0 holder=- upgrade=1 fortress-upgrade=1 fortress-flag=1 recruitable=1 hero=0')" &&
     step recruit-order 1310 'TEST ringchain-recruit frame=1310 queued=1' &&
+    step hero-spawn 3600 "$(state 3600 'rings=0 holder=- upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=1')" &&
+    step hero-death 3650 "$(state 3650 'rings=1 holder=- upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0')" &&
     for event in DiscoveredRing RingPickedUpLocal LocalPlayerLosesRing; do
         step "eva-$event" 730 "TEST ringchain-eva frame=730 event=$event played=1" || return 1
     done &&

@@ -19,3 +19,6 @@
 730 ringchain-eva Player_1 RingPickedUpLocal 0
 730 ringchain-eva Player_1 LocalPlayerLosesRing 0
 1320 ringchain-eva Player_1 LocalPlayerGainsRing 0
+3600 ringchain-state Player_1 - 0
+3610 ringchain-kill-hero Player_1 - 0
+3650 ringchain-state Player_1 - 0
