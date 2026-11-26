@@ -1,0 +1,20 @@
+5 create Player_1 IsengardFurnace 0 2500,1000,0
+5 create Player_1 GuldurRuinousTower 0 2850,1000,0
+5 create Player_1 GuldurCastellan 0 2930,1000,0
+6 power-reveal Player_1 - 0
+10 science Player_1 - 0 SCIENCE_IsengardTaint
+10 science Player_1 - 0 SCIENCE_Industry
+10 science Player_1 - 0 SCIENCE_FreezingRain
+10 science Player_1 - 0 SCIENCE_Avalanche
+40 power-cast Player_1 - 6 at 3150 690
+45 power-cast Player_1 - 7 at 2500 1000
+75 particle-live Player_1 - 0
+90 particle-live Player_1 - 0
+165 particle-live Player_1 - 0
+200 power-cast Player_1 - 12 at 2520 1280
+235 particle-live Player_1 - 0
+255 particle-live Player_1 - 0
+494 weatherstate Player_1 - 0
+495 power-cast Player_1 - 9
+500 weatherstate Player_1 - 0
+600 weatherstate Player_1 - 0

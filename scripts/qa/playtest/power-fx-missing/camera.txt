@@ -1,0 +1,6 @@
+25 Player_1 IsengardFurnace 3150 690 0.55
+50 Player_1 IsengardFurnace 2500 1000 0.45
+80 Player_1 GuldurRuinousTower 2850 1000 0.45
+185 Player_1 IsengardFurnace 2520 1280 0.55
+470 Player_1 IsengardFurnace 3150 690 0.55
+485 Player_1 IsengardFurnace 2520 1010 0.55
