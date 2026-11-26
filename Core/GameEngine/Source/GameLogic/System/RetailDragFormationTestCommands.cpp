@@ -96,6 +96,7 @@ void dragFormationHold(const RetailTestCommands::Context& ctx)
 		{
 			point.x += 140;
 			point.y -= 20;
+			TheMouse->setPosition(point.x, point.y);
 		}
 		GameMessage* message = TheMessageStream->appendMessage(type);
 		message->appendPixelArgument(point);

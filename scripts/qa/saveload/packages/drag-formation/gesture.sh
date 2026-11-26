@@ -12,6 +12,8 @@ export SDL_VIDEO_DRIVER=x11 SDL_AUDIO_DRIVER=dummy DXVK_LOG_PATH="$out"
 export VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp*.json' -print -quit)
 export LD_LIBRARY_PATH=$(find "$build" -name '*.so*' -printf '%h\n' | sort -u | paste -sd :)
 export GENERALSX_TEST_COMMANDS="$fixture/gesture.txt"
+export PLAYTEST_RENDER_FROM=28
+export PLAYTEST_FRAMES=35
 export PLAYTEST_PNG_35="$out/preview.png"
 mkdir -m 700 "$XDG_RUNTIME_DIR"
 cd "${PKGS1_ROTWK_DATA:-/game-install/rotwk}"
