@@ -926,6 +926,7 @@ void SpecialAbilityUpdate::startUnpacking()
   {
     applyAbilityConditions(TRUE);
     onStartWindup();
+    getObject()->applyUpgradeAnimation(data->m_customAnimAndDuration);
   }
 }
 
@@ -1107,6 +1108,8 @@ void SpecialAbilityUpdate::startPreparation()
   //Set the preparation timer
   m_prepFrames = data->m_preparationFrames;
   traceRetailWeaponAbility(*this, getObject(), spTemplate, "prepare", m_prepFrames);
+  if (usesRotwkRules() && data->m_unpackTime == 0)
+    getObject()->applyUpgradeAnimation(data->m_customAnimAndDuration);
 
   switch( spTemplate->getSpecialPowerType() )
   {
