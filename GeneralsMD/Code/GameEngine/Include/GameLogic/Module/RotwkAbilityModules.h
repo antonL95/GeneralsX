@@ -461,6 +461,7 @@ public:
 	void onDelete() override;
 	SpecialPowerModuleInterface* getSpecialPower() override { return m_power; }
 	Bool isModuleForPower(const SpecialPowerTemplate* power) const;
+	UnsignedInt getAuthoredModeDuration() const { return getWeaponModeSpecialPowerUpdateModuleData()->m_duration; }
 	WeaponSlotType getModeWeaponSlot() const { return getWeaponModeSpecialPowerUpdateModuleData()->m_lockWeaponSlot; }
 	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() override { return this; }
 	virtual Bool initiateIntentToDoSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions ) override;

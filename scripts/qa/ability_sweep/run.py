@@ -85,12 +85,13 @@ def judge(values):
         problems.append("never ends")
     reasons = {"no effect": "no observed effect", "no animation state": "no animation state observed",
                "no recharge": "authored reload did not start", "never ends": "ability state exceeded authored duration"}
+    duration_reason = ["ability duration has no observable authored bound"] if values["ended"] == "unbounded" else []
     if problems:
-        return problems[0], [reasons[problem] for problem in problems]
+        return problems[0], [reasons[problem] for problem in problems] + duration_reason
     recharge = {"n/a:zero_reload": "recharge not required (zero reload)",
                 "pending": "recharge pending while effect is active", "yes": "recharge observed",
                 "n/a": "no power recharge applies"}.get(values["recharge"], "recharge unknown")
-    return "ok", [f"effect observed; {recharge}"]
+    return "ok", [f"effect observed; {recharge}"] + duration_reason
 
 
 def kill_engine():
@@ -238,6 +239,19 @@ def main():
         return
     build = Path(sys.argv[1])
     writer.writerow(TABLE_FIELDS)
+    if len(sys.argv) > 2 and sys.argv[2] == "--single-session":
+        log, failure, timed_out, stall_reason = session(build, cases, 2900)
+        results = parse(log)
+        interrupted = False
+        for case in cases:
+            if case["id"] in results:
+                writer.writerow(result_row(case, results[case["id"]]))
+            elif not interrupted and stall_reason:
+                writer.writerow(unfinished_row(case, "hang", stall_reason))
+                interrupted = True
+            else:
+                writer.writerow(unfinished_row(case, "not run", failure or "session ended before case"))
+        return
     for faction in dict.fromkeys(case["faction"] for case in cases):
         run_faction(build, faction, [case for case in cases if case["faction"] == faction], writer)
 

@@ -24,6 +24,8 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(sweep.judge(values)[0], "ok")
         values["ended"] = "never"
         self.assertIn("ability state exceeded authored duration", sweep.judge(values)[1])
+        values["ended"] = "unbounded"
+        self.assertIn("ability duration has no observable authored bound", sweep.judge(values)[1])
 
     def test_repeated_log_stops_session(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -51,6 +53,19 @@ class VerdictTest(unittest.TestCase):
             sweep.run_faction(Path("/build"), "Wild", cases, writer)
         self.assertEqual([case["id"] for case in session.call_args_list[1].args[1]], [3])
         self.assertEqual(rows[1][7], "not run")
+
+    def test_single_session_keeps_unfinished_cases(self):
+        cases = io.StringIO("faction\tunit\thero\tcommand_set\tbutton\tcommand\ttodo\n"
+                            "Wild\tone\t1\tset\tbutton\tSPECIAL_POWER\t-\n"
+                            "Wild\ttwo\t1\tset\tbutton\tSPECIAL_POWER\t-\n")
+        output = io.StringIO()
+        with patch.object(sweep.sys, "stdin", cases), patch.object(sweep.sys, "stdout", output), \
+             patch.object(sweep.sys, "argv", ["run.py", "/build", "--single-session"]), \
+             patch.object(sweep, "session", return_value=("", "exit 137", True, "frame_stalled=90")) as session:
+            sweep.main()
+        session.assert_called_once()
+        rows = list(sweep.csv.DictReader(io.StringIO(output.getvalue()), delimiter="\t"))
+        self.assertEqual([row["verdict"] for row in rows], ["hang", "not run"])
 
 
 if __name__ == "__main__":

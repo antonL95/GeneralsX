@@ -29,6 +29,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Object.h"
@@ -36,6 +37,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <set>
 #include <string>
 #include <utility>
@@ -50,7 +52,6 @@ constexpr Int ENEMY = 2;
 constexpr Int STRUCTURE = 3;
 constexpr Int HERO = 4;
 constexpr Int CAPTURE = 5;
-const char* const ACTOR_NAMES[ACTOR_COUNT] = { "caster", "ally", "enemy", "structure", "hero", "capture" };
 
 class IdleKeyboard final : public Keyboard
 {
@@ -74,6 +75,15 @@ struct Actor
 	Bool died = FALSE;
 	Bool moved = FALSE;
 	Bool converted = FALSE;
+};
+
+struct AbilityState
+{
+	Bool observed = FALSE;
+	Bool active = FALSE;
+	UnsignedInt start = 0;
+	UnsignedInt elapsed = 0;
+	double bound = 0;
 };
 
 struct Case
@@ -101,9 +111,8 @@ struct Case
 	const SpecialPowerTemplate* powerTemplate = nullptr;
 	Bool recharged = FALSE;
 	Bool running = FALSE;
+	AbilityState abilityStates[2];
 	std::set<std::string> persisting;
-	UnsignedInt clickFrame = 0;
-	UnsignedInt lastActive = 0;
 };
 
 Case s_case;
@@ -442,7 +451,7 @@ std::string issueWithoutWindow(Object* caster, const CommandButton* button)
 	}
 }
 
-void recordBaseline(Object* caster, UnsignedInt frame)
+void recordBaseline(Object* caster)
 {
 	for (Actor& actor : s_case.actors)
 		snapshot(actor);
@@ -451,7 +460,6 @@ void recordBaseline(Object* caster, UnsignedInt frame)
 	s_case.templateAtClick = caster->getTemplate();
 	s_case.commandSet = caster->getCommandSetString();
 	s_case.previous = currentObjectIds();
-	s_case.clickFrame = frame;
 	s_case.clicked = TRUE;
 }
 
@@ -660,7 +668,7 @@ void click(const RetailTestCommands::Context& ctx)
 		s_case.noWindow = TRUE;
 		if (slot >= 6 && button->isInPalantir())
 		{
-			recordBaseline(caster, ctx.frame);
+			recordBaseline(caster);
 			s_case.result = triggerHiddenSlot(caster, button);
 			if (s_case.result != "accepted")
 				s_case.clicked = FALSE;
@@ -681,7 +689,7 @@ void click(const RetailTestCommands::Context& ctx)
 		s_case.result = "rejected:button_disabled";
 		return;
 	}
-	recordBaseline(caster, ctx.frame);
+	recordBaseline(caster);
 	TheInGameUI->setGUICommand(nullptr);
 	if (s_case.noWindow)
 	{
@@ -697,7 +705,7 @@ void click(const RetailTestCommands::Context& ctx)
 	}
 }
 
-void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame)
+void watchActor(Actor& actor, UnsignedInt frame)
 {
 	const Object* object = TheGameLogic->findObjectByID(actor.id);
 	if (!object || object->isEffectivelyDead())
@@ -712,15 +720,8 @@ void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame
 			if (!list || actor.modifiers.count(list->m_name.str()))
 				continue;
 			actor.newModifiers.insert(list->m_name.str());
-			const Bool running = !applied.endFrame || applied.endFrame > frame ||
-				frame - s_case.clickFrame < TheAttributeModifierStore->def(applied.list).durationFrames;
-			if (running)
-			{
+			if (!applied.endFrame || applied.endFrame > frame)
 				s_case.running = TRUE;
-				continue;
-			}
-			s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string(label) + ".mod." + list->m_name.str();
-			active = TRUE;
 		}
 	const ObjectStatusMaskType status = object->getStatusBits();
 	for (Int bit = 0; bit < status.size(); ++bit)
@@ -735,17 +736,28 @@ void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame
 	actor.converted = actor.converted || object->getControllingPlayer() != actor.owner;
 }
 
+void watchAbilityState(AbilityState& state, Bool active, double bound, UnsignedInt frame)
+{
+	if (active && !state.active)
+		state.start = frame;
+	state.observed = TRUE;
+	state.active = active;
+	state.bound = bound;
+	state.elapsed = active ? frame - state.start : 0;
+	s_case.running = s_case.running || active;
+}
+
 void watch(const RetailTestCommands::Context& ctx)
 {
 	if (ctx.frame % 60 == 0)
 		std::fprintf(stderr, "TEST ability-heartbeat frame=%u case=%d\n", ctx.frame, s_case.id);
 	if (!s_case.clicked || s_case.result != "accepted")
 		return;
-	Bool active = FALSE;
 	s_case.remaining.clear();
 	s_case.running = FALSE;
+	Bool abilityFound[2] = { FALSE, FALSE };
 	for (Int i = 0; i < ACTOR_COUNT; ++i)
-		watchActor(s_case.actors[i], active, ACTOR_NAMES[i], ctx.frame);
+		watchActor(s_case.actors[i], ctx.frame);
 	if (Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id))
 	{
 		const ModelConditionFlags current = conditionsOf(caster);
@@ -769,9 +781,29 @@ void watch(const RetailTestCommands::Context& ctx)
 			if (const SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(s_case.powerTemplate))
 				s_case.recharged = s_case.recharged || !module->isReady();
 			if (const SpecialAbilityUpdate* ability = caster->findSpecialAbilityUpdate(s_case.powerTemplate->getSpecialPowerType()))
-				s_case.running = s_case.running || ability->isActive();
+			{
+				const SpecialAbilityUpdateModuleData* data = ability->getAuthoredAbilityData();
+				const UnsignedInt duration = std::max({ data->m_effectDuration, data->m_attributeModifierDuration,
+					data->m_customAnimAndDuration.m_duration, data->m_grabPassengerAnimAndDuration.m_duration });
+				const Real variation = data->m_packUnpackVariationFactor < 0 ? -data->m_packUnpackVariationFactor : data->m_packUnpackVariationFactor;
+				const double bound = static_cast<double>(duration) + data->m_preparationFrames + data->m_persistentPrepFrames +
+					(static_cast<double>(data->m_packTime) + data->m_unpackTime) * (1.0 + variation);
+				watchAbilityState(s_case.abilityStates[0], ability->isActive(), bound, ctx.frame);
+				abilityFound[0] = TRUE;
+			}
+			for (BehaviorModule** module = caster->getBehaviorModules(); module && *module; ++module)
+				if (const auto* mode = dynamic_cast<const WeaponModeSpecialPowerUpdate*>(*module))
+					if (mode->isModuleForPower(s_case.powerTemplate))
+					{
+						watchAbilityState(s_case.abilityStates[1], mode->isActive(), mode->getAuthoredModeDuration(), ctx.frame);
+						abilityFound[1] = TRUE;
+						break;
+					}
 		}
 	}
+	for (Int i = 0; i < 2; ++i)
+		if (!abilityFound[i])
+			s_case.abilityStates[i].active = FALSE;
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 		if (!s_case.previous.count(object->getID()))
 		{
@@ -784,8 +816,6 @@ void watch(const RetailTestCommands::Context& ctx)
 		if (const Object* object = TheGameLogic->findObjectByID(id))
 			if (!object->isEffectivelyDead())
 				s_case.persisting.insert(object->getTemplate()->getName().str());
-	if (active)
-		s_case.lastActive = ctx.frame;
 }
 
 std::string describeActor(const Actor& actor)
@@ -822,11 +852,27 @@ void finish(const RetailTestCommands::Context& ctx)
 {
 	if (!s_case.active)
 		return;
-	std::string ended = "none";
-	if (s_case.lastActive)
-		ended = s_case.lastActive >= ctx.frame - 2 ? "never" : std::to_string(s_case.lastActive - s_case.clickFrame);
-	if (s_case.running && ended != "never")
-		ended = "running";
+	std::string ended = "unbounded";
+	Bool observed = FALSE;
+	Bool unbounded = FALSE;
+	Bool running = FALSE;
+	Bool overrun = FALSE;
+	for (Int i = 0; i < 2; ++i)
+	{
+		const AbilityState& state = s_case.abilityStates[i];
+		if (!state.observed)
+			continue;
+		observed = TRUE;
+		unbounded = unbounded || state.bound <= 0;
+		running = running || state.active;
+		overrun = overrun || (state.active && state.bound > 0 && state.elapsed > state.bound);
+		s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string(i == 0 ? "ability." : "power.") +
+			(state.active ? "active" : "inactive") + ":bound=" + std::to_string(state.bound) + ":elapsed=" + std::to_string(state.elapsed);
+	}
+	if (overrun)
+		ended = "never";
+	else if (observed && !unbounded)
+		ended = running ? "running" : "ended";
 	for (const std::string& name : s_case.persisting)
 		s_case.flags.insert("persists." + name);
 	if (const Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id))
@@ -848,7 +894,7 @@ void finish(const RetailTestCommands::Context& ctx)
 		describeActor(s_case.actors[CASTER]).c_str(), describeActor(s_case.actors[ALLY]).c_str(),
 		enemyDesc.c_str(), structureDesc.c_str(),
 		joined(s_case.flags).c_str(), !s_case.powerTemplate ? "n/a" : !s_case.powerTemplate->getReloadTime() ? "n/a:zero_reload" : s_case.recharged ? "yes" : s_case.running ? "pending" : "no", ended.c_str(),
-		ended == "never" && !s_case.remaining.empty() ? s_case.remaining.c_str() : "-", s_case.noWindow ? 1 : 0);
+		s_case.remaining.empty() ? "-" : s_case.remaining.c_str(), s_case.noWindow ? 1 : 0);
 	TheInGameUI->setGUICommand(nullptr);
 	TheControlBar->closeRetailTray();
 	TheInGameUI->deselectAllDrawables();
