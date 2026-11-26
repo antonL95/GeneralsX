@@ -6089,6 +6089,7 @@ void GameLogic::xfer( Xfer *xfer )
 void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"ai-groups", [](Xfer* block) { TheAI->xfer(block); }, {}},
 		{"weather-modifier", [this](Xfer* block)
 		{
 			block->xferObjectID(&m_weatherModifier.source);

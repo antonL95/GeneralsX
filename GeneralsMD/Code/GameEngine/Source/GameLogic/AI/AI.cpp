@@ -26,6 +26,9 @@
 // The Artificial Intelligence system
 // Author: Michael S. Booth, November 2000
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+
+#include <limits>
+
 #include "Common/RetailFileLayers.h"
 
 #include "Common/CRCDebug.h"
@@ -1113,12 +1116,70 @@ void AI::crc( Xfer *xfer )
 //-----------------------------------------------------------------------------
 void AI::xfer( Xfer *xfer )
 {
-
-	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = 1;
 	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	xfer->xferVersion(&version, currentVersion);
 
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt lastGroupID = m_nextGroupID;
+	Int nextFormationID = m_nextFormationID;
+	UnsignedInt groupCount = static_cast<UnsignedInt>(m_groupList.size());
+	xfer->xferUnsignedInt(&lastGroupID);
+	xfer->xferInt(&nextFormationID);
+	xfer->xferUnsignedInt(&groupCount);
+
+	if (!loading)
+	{
+		for (AIGroup* group : m_groupList)
+		{
+			xfer->xferUnsignedInt(&group->m_id);
+			xfer->xferUnsignedInt(&group->m_memberListSize);
+			for (const Object* member : group->m_memberList)
+			{
+				ObjectID id = member->getID();
+				xfer->xferObjectID(&id);
+			}
+			xfer->xferReal(&group->m_speed);
+			xfer->xferBool(&group->m_dirty);
+		}
+		return;
+	}
+
+	const UnsignedInt objectCount = TheGameLogic->getObjectCount();
+	if (groupCount > objectCount || !m_groupList.empty() ||
+		nextFormationID < NO_FORMATION_ID || nextFormationID == std::numeric_limits<Int>::max())
+		throw SC_INVALID_DATA;
+
+	UnsignedInt previousID = 0;
+	for (UnsignedInt i = 0; i < groupCount; ++i)
+	{
+		UnsignedInt id = 0;
+		UnsignedInt memberCount = 0;
+		xfer->xferUnsignedInt(&id);
+		xfer->xferUnsignedInt(&memberCount);
+		if (id <= previousID || id > lastGroupID || memberCount == 0 || memberCount > objectCount)
+			throw SC_INVALID_DATA;
+
+		AIGroupPtr group = createGroup();
+		group->m_id = id;
+		for (UnsignedInt memberIndex = 0; memberIndex < memberCount; ++memberIndex)
+		{
+			ObjectID memberID = INVALID_ID;
+			xfer->xferObjectID(&memberID);
+			Object* member = TheGameLogic->findObjectByID(memberID);
+			if (!member || member->getGroup())
+				throw SC_INVALID_DATA;
+			group->add(member);
+		}
+		if (group->m_memberListSize != memberCount)
+			throw SC_INVALID_DATA;
+		xfer->xferReal(&group->m_speed);
+		xfer->xferBool(&group->m_dirty);
+		previousID = id;
+	}
+
+	m_nextGroupID = lastGroupID;
+	m_nextFormationID = static_cast<FormationID>(nextFormationID);
 }
 
 //-----------------------------------------------------------------------------
