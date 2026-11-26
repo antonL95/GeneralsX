@@ -10,6 +10,7 @@
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -63,6 +64,18 @@ void handleTreeDepletion(const RetailTestCommands::Context& ctx)
 			std::fprintf(stderr, "TEST tree-depletion selectable frame=%u %s object=%d drawable=%d\n", ctx.frame,
 				object->getTemplate()->getName().str(), object->isSelectable(),
 				object->getDrawable() && object->getDrawable()->isSelectable());
+		return;
+	}
+	if (ctx.action == "tree-depletion-prime" || ctx.action == "tree-depletion-level")
+	{
+		Object* mill = ctx.requireObject();
+		if (!mill)
+			return;
+		ExperienceTracker* experience = mill->getExperienceTracker();
+		if (ctx.action == "tree-depletion-prime")
+			experience->addRetailExperience(static_cast<Real>(atoi(ctx.argument)) - experience->getRetailExperience(), FALSE);
+		std::fprintf(stderr, "TEST tree-depletion mill frame=%u rank=%d experience=%.0f\n", ctx.frame,
+			experience->getRank(), experience->getRetailExperience());
 		return;
 	}
 	Coord3D tree;

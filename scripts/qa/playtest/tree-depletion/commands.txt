@@ -4,4 +4,4 @@
 12 tree-depletion-drain PlyrCreeps - 2 0 1023 62
 12 tree-depletion-drain PlyrCreeps - 2 0 1072 81
 12 tree-depletion-drain PlyrCreeps - 2 0 1137 52
-15 create PlyrCreeps TreeDepletionMill 0 1030,200,0
+15 create PlyrCreeps MordorLumberMill 0 1030,200,0

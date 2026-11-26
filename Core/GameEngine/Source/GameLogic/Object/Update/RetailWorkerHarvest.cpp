@@ -9,6 +9,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/RetailWorldUI.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SupplyCenterProductionExitUpdate.h"
 #include "GameLogic/Module/WorkerAIUpdate.h"
@@ -215,6 +216,7 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 					const UnsignedInt amount = m_numberBoxes * player->getSupplyBoxValue();
 					player->getMoney()->deposit(amount);
 					player->getScoreKeeper()->addMoneyEarned(amount);
+					depot->getExperienceTracker()->addRetailExperience(static_cast<Real>(amount));
 					RetailWorldUI::showPayout(*depot, amount, FALSE);
 					m_numberBoxes = 0;
 					worker->clearModelConditionState(MODELCONDITION_CARRYING);

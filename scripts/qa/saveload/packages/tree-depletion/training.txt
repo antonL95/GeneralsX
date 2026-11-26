@@ -3,7 +3,7 @@
 12 tree-depletion-drain PlyrCreeps - 2 0 1023 62
 12 tree-depletion-drain PlyrCreeps - 2 0 1072 81
 12 tree-depletion-drain PlyrCreeps - 2 0 1137 52
-15 create PlyrCreeps TreeDepletionMill 0 1030,200,0
+15 create PlyrCreeps MordorLumberMill 0 1030,200,0
 30 tree-depletion-state PlyrCreeps - 0 0 916 93
 30 tree-depletion-state PlyrCreeps - 0 1 995 72
 30 tree-depletion-state PlyrCreeps - 0 2 1023 62
@@ -197,6 +197,12 @@
 300 tree-depletion-devastate PlyrCreeps TreeDepletionDevastator 0 - 1850 45
 15 create PlyrCreeps TreeLothlorienBase08 0 1850,350,0
 260 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
-260 tree-depletion-selectable PlyrCreeps TreeDepletionMill 0
+260 tree-depletion-selectable PlyrCreeps MordorLumberMill 0
 800 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
-800 tree-depletion-selectable PlyrCreeps TreeDepletionMill 0
+800 tree-depletion-selectable PlyrCreeps MordorLumberMill 0
+250 tree-depletion-prime PlyrCreeps MordorLumberMill 0 1976
+300 tree-depletion-level PlyrCreeps MordorLumberMill 0
+600 tree-depletion-level PlyrCreeps MordorLumberMill 0
+900 tree-depletion-level PlyrCreeps MordorLumberMill 0
+1200 tree-depletion-level PlyrCreeps MordorLumberMill 0
+1450 tree-depletion-level PlyrCreeps MordorLumberMill 0
