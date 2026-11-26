@@ -1042,7 +1042,6 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						// when we toss this production entry. so set it back to an innocuous value.
 						production->setExitDoor(DOOR_NONE_AVAILABLE);
 
-						// Now, play the sound associated with the new object's production.
 						if (!spawnFXSpeaks(*newObj))
 						{
 							AudioEventRTS voiceCreate = *RetailClientAudio::select(*newObj, "VoiceCreated", newObj->getTemplate()->getVoiceCreated());
