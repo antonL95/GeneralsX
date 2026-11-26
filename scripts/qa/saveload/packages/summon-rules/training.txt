@@ -1,0 +1,75 @@
+200 create Player_1 HaradWarlord 0 800,800,0
+200 create Player_1 GuldurOrcArcher 0 800,1800,0
+200 create Player_1 GuldurOrcArcher 1 800,2200,0
+200 create Player_1 GuldurOrcPikemanHorde 0 1400,2000,0
+200 create Player_1 GuldurSorceryTower 0 1600,2200,0
+200 create PlyrCreeps RohanPeasant 0 2000,800,0
+200 create PlyrCreeps RohanPeasant 1 2020,800,0
+200 create PlyrCreeps RohanPeasant 2 2000,820,0
+200 create Player_1 WildGiantBatInterface 0 2000,1800,0
+200 create PlyrCreeps MordorMountainTroll 0 2250,1850,0
+202 science Player_1 - 0 SCIENCE_GuldurGreenMist
+202 science Player_1 - 0 SCIENCE_BalrogAlly
+202 science Player_1 - 0 SCIENCE_DragonStrike
+205 summon-rules-census Player_1 GuldurOrcArcher 0
+205 summon-rules-census Player_1 GuldurOrcPikeman 0
+205 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+210 objupgrade Player_1 HaradWarlord 0 Upgrade_ThrallMasterOrcWarriors
+210 power-reveal Player_1 - 0
+212 objupgrade Player_1 GuldurOrcPikemanHorde 0 Upgrade_MiniHordeLvl5
+215 summon-rules-cast Player_1 - 0 - 2005 805
+216 summon-rules-cast Player_1 - 1 - 3300 800
+218 summon-rules-cast Player_1 - 2 - 3200 2960
+225 power Player_1 GuldurOrcPikemanHorde 0 SpecialAbilityNecromancySummonNEW
+230 orderattack Player_1 WildGiantBatInterface 0 PlyrCreeps:MordorMountainTroll:0
+230 summon-rules-census Player_1 SpellBookDragonStrikeDragon 0
+262 summon-rules-census Player_1 GuldurOrcPikeman 0
+280 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+300 summon-rules-census Player_1 SpellBookDragonStrikeDragon 0
+355 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+400 summon-rules-census Player_1 HaradWarlord 0
+400 summon-rules-census Player_1 HaradTribalAxemenHorde 0
+400 summon-rules-census Player_1 HaradWarlordBanner 0
+400 summon-rules-census Player_1 HaradTribalAxemen 0
+400 summon-rules-census Player_1 GuldurOrcPikeman 0
+400 summon-rules-census Player_1 GuldurRisenDeadHorde 0
+400 summon-rules-census PlyrCreeps RohanPeasant 0
+400 summon-rules-census Player_1 GuldurWraith 0
+400 summon-rules-census Player_1 MordorBalrog 0
+400 summon-rules-census Player_1 WildGiantBatInterface 0
+400 summon-rules-census Player_1 SpellBookDragonStrikeDragon 0
+430 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+505 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+580 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+655 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+700 summon-rules-census Player_1 HaradWarlord 0
+700 summon-rules-census Player_1 HaradTribalAxemenHorde 0
+700 summon-rules-census Player_1 HaradWarlordBanner 0
+700 summon-rules-census Player_1 HaradTribalAxemen 0
+700 summon-rules-census Player_1 GuldurRisenDeadHorde 0
+700 summon-rules-census Player_1 GuldurWraith 0
+700 summon-rules-census Player_1 MordorBalrog 0
+720 kill Player_1 HaradWarlordBanner 0
+730 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+805 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+880 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+900 summon-rules-census Player_1 HaradTribalAxemenHorde 0
+900 summon-rules-census Player_1 HaradWarlordBanner 0
+900 summon-rules-census Player_1 HaradTribalAxemen 0
+955 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+1030 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+1105 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+1180 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
+1200 summon-rules-census Player_1 HaradWarlord 0
+1200 summon-rules-census Player_1 HaradTribalAxemenHorde 0
+1200 summon-rules-census Player_1 HaradWarlordBanner 0
+1200 summon-rules-census Player_1 HaradTribalAxemen 0
+1200 summon-rules-census Player_1 GuldurOrcPikeman 0
+1200 summon-rules-census Player_1 GuldurRisenDeadHorde 0
+1200 summon-rules-census PlyrCreeps RohanPeasant 0
+1200 summon-rules-census Player_1 GuldurWraith 0
+1200 summon-rules-census Player_1 MordorBalrog 0
+1200 summon-rules-census Player_1 WildGiantBatInterface 0
+1200 summon-rules-census Player_1 SpellBookDragonStrikeDragon 0
+1200 health Player_1 GuldurOrcArcher 0
+1200 health Player_1 GuldurOrcArcher 1

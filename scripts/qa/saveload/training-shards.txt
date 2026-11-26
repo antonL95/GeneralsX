@@ -94,3 +94,4 @@
 4 spawn-angle
 3 default-states
 3 powers-fire
+3 summon-rules
