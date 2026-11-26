@@ -196,9 +196,11 @@
 790 tree-depletion-state PlyrCreeps - 0 7 1890 39
 300 tree-depletion-devastate PlyrCreeps TreeDepletionDevastator 0 - 1850 45
 15 create PlyrCreeps TreeLothlorienBase08 0 1850,350,0
+15 create PlyrCreeps ElvenWoodTreeSeed 0 1850,500,0
 260 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
 260 tree-depletion-selectable PlyrCreeps MordorLumberMill 0
 800 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
+800 tree-depletion-selectable PlyrCreeps ElvenWoodTreeOpt 0
 800 tree-depletion-selectable PlyrCreeps MordorLumberMill 0
 250 tree-depletion-prime PlyrCreeps MordorLumberMill 0 1976
 300 tree-depletion-level PlyrCreeps MordorLumberMill 0

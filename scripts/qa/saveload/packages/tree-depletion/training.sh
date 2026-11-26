@@ -22,6 +22,9 @@ check() {
             expect "TEST tree-depletion selectable frame=$frame MordorLumberMill object=1 drawable=1"
         fi
     done
+    if covers 800; then
+        expect "TEST tree-depletion selectable frame=800 ElvenWoodTreeOpt object=0 drawable=0"
+    fi
     if covers 300; then
         expect "TEST tree-depletion mill frame=300 rank=1 experience=1976"
     fi
