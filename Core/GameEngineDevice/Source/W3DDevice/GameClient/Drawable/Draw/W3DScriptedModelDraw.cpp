@@ -13,15 +13,13 @@
 #include "Common/RetailConditionMatch.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/ClientRandomValue.h"
+#include "GameClient/ClientLuaEvents.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/WeaponSet.h"
-#if !RTS_GENERALS
-#include "Common/MessageStream.h"
-#endif
 
 #include <algorithm>
 #include <cctype>
@@ -763,17 +761,7 @@ ModuleData* W3DScriptedModelDraw::friend_newModuleData(INI* ini)
 #if !RTS_GENERALS
 void W3DScriptedModelDraw::dispatchDrawScriptEvent(const AsciiString& data)
 {
-	Drawable* drawable = getDrawable();
-	const Object* object = drawable ? drawable->getObject() : nullptr;
-	if (!object)
-		return;
-
-	if (TheMessageStream)
-	{
-		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_SCRIPT_EVENT);
-		message->appendObjectIDArgument(object->getID());
-		message->appendAsciiStringArgument(data);
-	}
+	ClientLuaEvents::dispatch(getDrawable(), data);
 }
 #endif
 

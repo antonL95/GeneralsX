@@ -29,7 +29,6 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/MessageStream.h"
-#include "Common/AsciiString.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Recorder.h"
@@ -40,12 +39,6 @@
 /// The singleton message stream for messages going to TheGameLogic
 MessageStream *TheMessageStream = nullptr;
 CommandList *TheCommandList = nullptr;
-
-GameMessageArgument::~GameMessageArgument()
-{
-	if (m_type == ARGUMENTDATATYPE_ASCII_STRING)
-		delete m_data.asciiString;
-}
 
 
 
@@ -200,13 +193,6 @@ void GameMessage::appendWideCharArgument( const WideChar& arg )
 	GameMessageArgument *a = allocArg();
 	a->m_data.wChar = arg;
 	a->m_type = ARGUMENTDATATYPE_WIDECHAR;
-}
-
-void GameMessage::appendAsciiStringArgument(const AsciiString& arg)
-{
-	GameMessageArgument* argument = allocArg();
-	argument->m_data.asciiString = new AsciiString(arg);
-	argument->m_type = ARGUMENTDATATYPE_ASCII_STRING;
 }
 
 const char *GameMessage::getCommandAsString() const
@@ -645,7 +631,6 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 	CASE_LABEL(MSG_DO_MOVETO)
 	CASE_LABEL(MSG_DO_MOVETO_FORMATION)
 	CASE_LABEL(MSG_CLIENT_FORMATION_DRAG)
-	CASE_LABEL(MSG_RETAIL_SCRIPT_EVENT)
 	CASE_LABEL(MSG_DO_ATTACKMOVETO)
 	CASE_LABEL(MSG_DO_FORCEMOVETO)
 	CASE_LABEL(MSG_ADD_WAYPOINT)

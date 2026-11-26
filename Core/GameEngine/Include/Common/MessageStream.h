@@ -42,7 +42,6 @@ enum { TRANSLATOR_ID_INVALID = -1 };
 typedef UnsignedInt TranslatorID;								///< Unique identifiers for message stream translators
 
 class Drawable;
-class AsciiString;
 class GameMessageList;
 enum ObjectID CPP_11(: Int);
 enum DrawableID CPP_11(: Int);
@@ -61,7 +60,6 @@ union GameMessageArgumentType														///< Union of possible data for given
 	IRegion2D				pixelRegion;
 	UnsignedInt			timestamp;
 	WideChar				wChar;
-	const AsciiString* asciiString;
 };
 
 enum GameMessageArgumentDataType CPP_11(: Int)
@@ -77,8 +75,7 @@ enum GameMessageArgumentDataType CPP_11(: Int)
 	ARGUMENTDATATYPE_PIXELREGION,
 	ARGUMENTDATATYPE_TIMESTAMP,
 	ARGUMENTDATATYPE_WIDECHAR,
-	ARGUMENTDATATYPE_UNKNOWN,
-	ARGUMENTDATATYPE_ASCII_STRING
+	ARGUMENTDATATYPE_UNKNOWN
 };
 
 class GameMessageArgument : public MemoryPoolObject
@@ -86,8 +83,9 @@ class GameMessageArgument : public MemoryPoolObject
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(GameMessageArgument, "GameMessageArgument")
 public:
 	GameMessageArgumentType			m_data;									///< The data storage of an argument
-	GameMessageArgumentDataType m_type = ARGUMENTDATATYPE_UNKNOWN;
+	GameMessageArgumentDataType	m_type;									///< The type of the argument.
 };
+EMPTY_DTOR(GameMessageArgument)
 
 /**
  * A game message that either lives on TheMessageStream or TheCommandList.
@@ -656,7 +654,6 @@ public:
 		MSG_OBJECT_JOINED_TEAM,											///< (objectID) New team affiliation of object
 
 		MSG_CLIENT_FORMATION_DRAG,
-		MSG_RETAIL_SCRIPT_EVENT,
 		MSG_COUNT
 	};
 
@@ -685,7 +682,6 @@ public:
 	void appendPixelArgument( const ICoord2D& arg );
 	void appendPixelRegionArgument( const IRegion2D& arg );
 	void appendWideCharArgument( const WideChar& arg );
-	void appendAsciiStringArgument(const AsciiString& arg);
 
 	void appendTimestampArgument( UnsignedInt arg );
 
