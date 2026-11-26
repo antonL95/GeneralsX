@@ -1,0 +1,3 @@
+30 create Player_2 GondorFarm 0 2600,3100,0
+45 destroy Player_2 GondorFarm 0
+45 destroy Player_1 MenFortressCitadel 0
