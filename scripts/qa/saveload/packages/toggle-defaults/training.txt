@@ -12,3 +12,5 @@
 970 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
 1100 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
 1101 buttons Player_1 RohanFarm 0
+1102 weapon-upgrade-buy Player_1 RohanFarm 0 Upgrade_BuildArmySwords
+1190 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords

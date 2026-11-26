@@ -5,6 +5,7 @@
 #include <string>
 
 #include "Common/Player.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/Drawable.h"
@@ -32,10 +33,11 @@ void handleToggleState(const RetailTestCommands::Context& ctx)
 		owned += upgrade && source->hasUpgrade(upgrade) ? '1' : '0';
 	}
 	const Drawable* draw = source->getDrawable();
-	std::fprintf(stderr, "TOGGLE state frame=%u actor=%s complete=%d set=%s user7=%d money=%u%s\n", ctx.frame,
+	std::fprintf(stderr, "TOGGLE state frame=%u actor=%s complete=%d set=%s user7=%d money=%u xp=%.0f%s\n", ctx.frame,
 		ctx.targetName, !source->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION), source->getCommandSetString().str(),
 		draw && draw->getModelConditionFlags().test(MODELCONDITION_USER_7),
-		source->getControllingPlayer()->getMoney()->countMoney(), owned.c_str());
+		source->getControllingPlayer()->getMoney()->countMoney(),
+		source->getExperienceTracker()->getRetailExperience(), owned.c_str());
 }
 }
 #endif
