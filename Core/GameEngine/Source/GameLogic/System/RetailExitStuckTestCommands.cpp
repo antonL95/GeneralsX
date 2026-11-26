@@ -5,7 +5,10 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <vector>
 
+#include "Common/MessageStream.h"
+#include "Common/Player.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -38,12 +41,31 @@ Bool isProducedAnchor(const Object* anchor, const Object* producer, const char* 
 	return anchor->getProducerID() == producer->getID() && anchor->getContain() && HordeContain::get(anchor) && matchesFilter(anchor, filter);
 }
 
-void orderAnchor(Object* anchor, const Coord3D& destination)
+void selectForMessages(const std::vector<const Object*>& objects)
 {
-	s_targets[anchor->getID()] = destination;
-	++s_orders[anchor->getID()];
-	anchor->getAI()->aiMoveToPosition(&destination, CMD_FROM_PLAYER);
+	const PlayerIndex player = objects.front()->getControllingPlayer()->getPlayerIndex();
+	GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+	select->friend_setPlayerIndex(player);
+	select->appendBooleanArgument(TRUE);
+	for (const Object* object : objects)
+		select->appendObjectIDArgument(object->getID());
 }
+
+void orderAnchors(const std::vector<const Object*>& anchors, const Coord3D& destination)
+{
+	if (anchors.empty())
+		return;
+	for (const Object* anchor : anchors)
+	{
+		s_targets[anchor->getID()] = destination;
+		++s_orders[anchor->getID()];
+	}
+	selectForMessages(anchors);
+	GameMessage* move = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+	move->friend_setPlayerIndex(anchors.front()->getControllingPlayer()->getPlayerIndex());
+	move->appendLocationArgument(destination);
+}
+
 
 void sampleExitStuck(const RetailTestCommands::Context& ctx)
 {
@@ -98,12 +120,13 @@ void moveExitStuckHordes(const RetailTestCommands::Context& ctx)
 	char filter[96] = "";
 	if (std::sscanf(ctx.argument, "%f,%f,%95s", &destination.x, &destination.y, filter) < 2)
 		return;
-	for (Object* anchor = TheGameLogic->getFirstObject(); anchor; anchor = anchor->getNextObject())
+	std::vector<const Object*> anchors;
+	for (const Object* anchor = TheGameLogic->getFirstObject(); anchor; anchor = anchor->getNextObject())
 	{
-		if (!isProducedAnchor(anchor, producer, filter) || !anchor->getAI())
-			continue;
-		orderAnchor(anchor, destination);
+		if (isProducedAnchor(anchor, producer, filter))
+			anchors.push_back(anchor);
 	}
+	orderAnchors(anchors, destination);
 }
 
 void moveExitStuckLaggard(const RetailTestCommands::Context& ctx)
@@ -141,7 +164,7 @@ void moveExitStuckLaggard(const RetailTestCommands::Context& ctx)
 		std::fprintf(stderr, "TEST exit-stuck-laggard %u %s %u laggard=%u at=%.1f,%.1f order=%.1f,%.1f\n", ctx.frame,
 			anchor->getTemplate()->getName().str(), static_cast<unsigned>(anchor->getID()), static_cast<unsigned>(laggard->getID()),
 			laggard->getPosition()->x, laggard->getPosition()->y, destination.x, destination.y);
-		orderAnchor(anchor, destination);
+		orderAnchors({anchor}, destination);
 	}
 }
 }
