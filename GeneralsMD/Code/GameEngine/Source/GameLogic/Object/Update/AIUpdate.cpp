@@ -3079,7 +3079,8 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
 
   const AIUpdateModuleData *data = getAIUpdateModuleData();
 
-  Bool forbidden = data->m_forbidPlayerCommands;
+  const Bool forbidden = m_luaForbidPlayerCommands == SCRIPT_USES_INI
+	  ? data->m_forbidPlayerCommands : m_luaForbidPlayerCommands == SCRIPT_FORBID;
 
   if ( parms->m_cmdSource == CMD_FROM_PLAYER && forbidden )
     return FALSE;
@@ -6207,6 +6208,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferUnsignedInt(&m_retailEngagedUntil);
 		}, [this] {
 			m_retailEngagedUntil = 0;
+		} },
+		{ "script-forbid-player-commands", [this](Xfer* x) {
+			x->xferInt(&m_luaForbidPlayerCommands);
+		}, [this] {
+			m_luaForbidPlayerCommands = SCRIPT_USES_INI;
 		} },
 		{ "skirmish-ring-return", [this](Xfer* x) {
 			x->xferBool(&m_retailRingReturn);

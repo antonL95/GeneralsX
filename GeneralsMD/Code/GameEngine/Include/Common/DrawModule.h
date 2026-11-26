@@ -219,6 +219,7 @@ public:
 
 	virtual void updateSubObjects() = 0;
 	virtual void showSubObject( const AsciiString& name, Bool show ) = 0;
+	virtual void showSubObjectForCurrentModel(const AsciiString&, Bool) {}
 
 	/**
 		This call asks, "In the current animation (if any) how far along are you, from 0.0f to 1.0f".

@@ -26,9 +26,14 @@ Bool affectsGeometry(const GeometryUpgradeModuleData& upgrade, const AsciiString
 	return containsGeometry(upgrade.m_showGeometry, name) || containsGeometry(upgrade.m_hideGeometry, name);
 }
 
-Bool isActive(const ThingTemplate::GeometryDetails& details, const std::vector<const GeometryUpgradeModuleData*>& upgrades)
+Bool isActive(const ThingTemplate::GeometryDetails& details, const std::vector<const GeometryUpgradeModuleData*>& upgrades,
+	[[maybe_unused]] const Object* object = nullptr)
 {
 	Bool active = details.active;
+#if !RTS_GENERALS
+	if (object)
+		active = object->getLuaGeometryActive(details.name, active);
+#endif
 	for (const auto* upgrade : upgrades)
 	{
 		if (containsGeometry(upgrade->m_showGeometry, details.name))
@@ -57,6 +62,16 @@ struct GeometryBounds
 		height = std::max(height, offset.z + shape.getMaxHeightAbovePosition());
 	}
 };
+
+void setGeometryBounds(Object& object, const GeometryBounds& bounds)
+{
+	const GeometryInfo& current = object.getGeometryInfo();
+	if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
+		bounds.isSmall == current.getIsSmall() && current.getGeomType() == GEOMETRY_BOX)
+		object.setGeometryInfoZ(bounds.height);
+	else
+		object.setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
+}
 
 Bool canOccupyConstructionFootprint(const ThingTemplate& definition, const ThingTemplate::GeometryDetails& details,
 	const std::vector<const GeometryUpgradeModuleData*>& activeUpgrades, const UpgradeMaskType* completed)
@@ -193,9 +208,14 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 	const Bool upgraded = !upgrades.empty() && (hasUpgrade(primary) ||
 		std::any_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
 			[&](const auto& geometry) { return hasUpgrade(geometry.details); }));
+#if !RTS_GENERALS
+	const Bool adjusted = upgraded || object.hasLuaGeometryOverrides();
+#else
+	const Bool adjusted = upgraded;
+#endif
 	const GeometryInfo& baseShape = definition->getTemplateGeometryInfo();
 	const GeometryInfo& currentShape = object.getGeometryInfo();
-	if (!upgraded && (!hasAuthoredParts || currentShape.getGeomType() != baseShape.getGeomType() ||
+	if (!adjusted && (!hasAuthoredParts || currentShape.getGeomType() != baseShape.getGeomType() ||
 		currentShape.getMajorRadius() != baseShape.getMajorRadius() ||
 		currentShape.getMinorRadius() != baseShape.getMinorRadius()))
 		return FALSE;
@@ -206,7 +226,7 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 	const Real sinAngle = WWMath::SinTrig(angle);
 	const auto addPart = [&](const GeometryInfo& shape, const ThingTemplate::GeometryDetails& details)
 	{
-		if (!isActive(details, upgrades))
+		if (!isActive(details, upgrades, &object))
 			return;
 		const Coord3D center = {
 			position.x + details.offset.x * cosAngle - details.offset.y * sinAngle,
@@ -215,7 +235,7 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 		};
 		parts.push_back({&shape, center});
 	};
-	addPart(upgraded ? baseShape : currentShape, primary);
+	addPart(adjusted ? baseShape : currentShape, primary);
 	for (const auto& geometry : data.additionalGeometries)
 		addPart(geometry.shape, geometry.details);
 	return TRUE;
@@ -229,7 +249,7 @@ Bool GeometryUpgrade::collectLocalShapes(const Object& object, std::vector<Local
 	const Bool hasAdditional = !data.additionalGeometries.empty();
 	const Bool hasOffset = primary.offset.x != 0.0f || primary.offset.y != 0.0f || primary.offset.z != 0.0f;
 	const auto upgrades = activeUpgrades(object, nullptr);
-	if (!hasAdditional && !hasOffset && primary.active && upgrades.empty())
+	if (!hasAdditional && !hasOffset && upgrades.empty() && isActive(primary, upgrades, &object))
 	{
 		shapes.push_back({&object.getGeometryInfo(), {0.0f, 0.0f, 0.0f}});
 		return TRUE;
@@ -245,17 +265,36 @@ Bool GeometryUpgrade::collectLocalShapes(const Object& object, std::vector<Local
 			[&](const auto& geometry) { return hasUpgrade(geometry.details); }));
 	const GeometryInfo& baseShape = definition->getTemplateGeometryInfo();
 	const GeometryInfo& currentShape = object.getGeometryInfo();
-	if (isActive(primary, upgrades))
+	if (isActive(primary, upgrades, &object))
 		shapes.push_back({upgraded ? &baseShape : &currentShape, primary.offset});
 	for (const auto& geometry : data.additionalGeometries)
 	{
-		if (isActive(geometry.details, upgrades))
+		if (isActive(geometry.details, upgrades, &object))
 			shapes.push_back({&geometry.shape, geometry.details.offset});
 	}
 	if (shapes.empty())
 		shapes.push_back({&currentShape, {0.0f, 0.0f, 0.0f}});
 	return TRUE;
 }
+
+#if !RTS_GENERALS
+void GeometryUpgrade::refreshLuaBounds(Object& object)
+{
+	const ThingTemplate* definition = object.getTemplate();
+	const auto& data = definition->getRotWKObjectData();
+	const auto upgrades = activeUpgrades(object, nullptr);
+	GeometryBounds bounds;
+	const auto include = [&](const GeometryInfo& shape, const ThingTemplate::GeometryDetails& details)
+	{
+		if (isActive(details, upgrades, &object))
+			bounds.include(shape, details.offset);
+	};
+	include(definition->getTemplateGeometryInfo(), data.primaryGeometry);
+	for (const auto& geometry : data.additionalGeometries)
+		include(geometry.shape, geometry.details);
+	setGeometryBounds(object, bounds);
+}
+#endif
 
 thread_local const GeometryUpgrade::ScopedPathfindDeferral* GeometryUpgrade::ScopedPathfindDeferral::s_current = nullptr;
 
@@ -295,7 +334,7 @@ void GeometryUpgrade::upgradeImplementation()
 	{
 		if (affectsGeometry(*data, details.name))
 			affectsBounds = TRUE;
-		if (isActive(details, upgrades))
+		if (isActive(details, upgrades, object))
 			bounds.include(shape, details.offset);
 	};
 	const GeometryInfo& primary = definition->getTemplateGeometryInfo();
@@ -311,14 +350,7 @@ void GeometryUpgrade::upgradeImplementation()
 		pathfinder->removeObjectFromPathfindMap(object);
 
 	if (affectsBounds)
-	{
-		const GeometryInfo& current = object->getGeometryInfo();
-		if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
-			bounds.isSmall == current.getIsSmall() && current.getGeomType() == GEOMETRY_BOX)
-			object->setGeometryInfoZ(bounds.height);
-		else
-			object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
-	}
+		setGeometryBounds(*object, bounds);
 
 	setUpgradeExecuted(TRUE);
 	if (pathfinder)

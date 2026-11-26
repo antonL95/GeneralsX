@@ -790,6 +790,13 @@ void Drawable::showSubObject(const AsciiString& name, Bool show, Real fadeFrames
 		m_retailSubObjectFades.push_back({name, TheGameLogic->getFrame(), fadeFrames, waitFrames, show});
 }
 
+void Drawable::showSubObjectForCurrentModel(const AsciiString& name, Bool show)
+{
+	for (DrawModule** module = getDrawModules(); *module; ++module)
+		if (auto* draw = (*module)->getObjectDrawInterface())
+			draw->showSubObjectForCurrentModel(name, show);
+}
+
 #ifdef ALLOW_ANIM_INQUIRIES
 // srj sez: not sure if this is a good idea, for net sync reasons...
 //-------------------------------------------------------------------------------------------------

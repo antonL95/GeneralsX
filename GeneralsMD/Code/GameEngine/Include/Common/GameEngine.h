@@ -30,6 +30,7 @@
 
 // GeneralsX @bugfix felipebraz 16/02/2026 Need fprintf for debug logging
 #include <stdio.h>
+#include <memory>
 
 #include "Common/SubsystemInterface.h"
 #include "Common/GameType.h"
@@ -53,6 +54,7 @@ class FunctionLexicon;
 class Radar;
 class WebBrowser;
 class ParticleSystemManager;
+class LuaScriptEngine;
 
 class GameEngine : public SubsystemInterface
 {
@@ -79,6 +81,8 @@ public:
 	virtual Bool isActive() {return m_isActive;}	///< returns whether app has OS focus.
 	virtual void setIsActive(Bool isActive) { m_isActive = isActive; };
 	FormationAssistant& formationAssistant() { return m_formationAssistant; }
+	void setLuaScriptEngine(std::unique_ptr<LuaScriptEngine> engine);
+	LuaScriptEngine* luaScriptEngine() const { return m_luaScriptEngine.get(); }
 
 protected:
 
@@ -107,6 +111,7 @@ protected:
 	Bool m_quitting; ///< true when we need to quit the game
 	Bool m_isActive; ///< app has OS focus.
 	FormationAssistant m_formationAssistant;
+	std::unique_ptr<LuaScriptEngine> m_luaScriptEngine;
 };
 
 // GeneralsX @bugfix fbraz3 12/03/2026 Restore inline definitions lost during upstream merge conflict resolution

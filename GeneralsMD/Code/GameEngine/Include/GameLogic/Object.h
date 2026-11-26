@@ -283,6 +283,9 @@ public:
 
 	inline const GeometryInfo& getGeometryInfo() const { return m_geometryInfo; }
 	void setGeometryInfo(const GeometryInfo& geom);
+	void setLuaGeometryActive(const AsciiString& name, Bool active);
+	Bool getLuaGeometryActive(const AsciiString& name, Bool authored) const;
+	Bool hasLuaGeometryOverrides() const { return !m_luaGeometryOverrides.empty(); }
 	void setGeometryInfoZ( Real newZ );
 
 	void onCollide( Object *other, const Coord3D *loc, const Coord3D *normal );
@@ -513,7 +516,7 @@ public:
 
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
-	void setFiringConditionForCurrentWeapon() const;
+	void setFiringConditionForCurrentWeapon();
 	void holdForWeaponUntil(UnsignedInt frame) const;
 	Bool isHoldingMovementForReload(UnsignedInt frame) const { return m_weaponSet.isHoldingMovementForReload(frame); }
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
@@ -778,6 +781,7 @@ private:
 	UnsignedInt		m_smcUntil;
 	UnsignedInt		m_invulnerableUntil;
 	std::vector<std::pair<Int, UnsignedInt>> m_timedModelConditions;
+	std::vector<std::pair<AsciiString, Bool>> m_luaGeometryOverrides;
 	UnsignedInt nextSpecialModelConditionFrame() const;
 	void scheduleSMCHelper();
 

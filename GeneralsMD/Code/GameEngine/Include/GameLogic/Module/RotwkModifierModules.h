@@ -22,6 +22,7 @@ class EnragedBehavior final : public UpdateModule
 public:
 	EnragedBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	void setEnraged(Bool enabled);
+	static void setScriptEnraged(Object& object, Bool enabled);
 	UpdateSleepTime update() override;
 
 private:
@@ -175,6 +176,7 @@ public:
 	static void queuePromotionEmotion(Object* object, const AsciiString& name);
 	static void force(Object* victim, Int type, Real seconds);
 	static Bool signalWeaponEmotion(Object* victim, EmotionType type, const Object* source, UnsignedInt duration);
+	static Bool canSufferFear(const Object* object);
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;

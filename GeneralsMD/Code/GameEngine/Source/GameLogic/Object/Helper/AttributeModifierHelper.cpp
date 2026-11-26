@@ -22,6 +22,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/WeaponNugget.h"
 
 using namespace AttributeModifierRules;
@@ -338,7 +339,7 @@ void AttributeModifierHelper::refreshDerived()
 			obj->setModelConditionState((ModelConditionFlagType)condition);
 	}
 	m_appliedConditions = conditions;
-	if (previousConditions != obj->getLogicModelConditions())
+	if (!LuaScriptEngine::active() && previousConditions != obj->getLogicModelConditions())
 		RetailBuildingEvents::modelConditionsChanged(*obj, previousConditions);
 }
 

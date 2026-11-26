@@ -56,6 +56,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -288,6 +289,16 @@ void ActiveBody::onDelete()
 void ActiveBody::setCorrectDamageState()
 {
 	m_curDamageState = calcDamageState(m_currentHealth, m_maxHealth, getActiveBodyModuleData());
+	if (LuaScriptEngine::active())
+	{
+		ModelConditionFlags clear;
+		ModelConditionFlags set;
+		clear.set(MODELCONDITION_DAMAGED);
+		clear.set(MODELCONDITION_REALLY_DAMAGED);
+		set.set(MODELCONDITION_DAMAGED, m_curDamageState == BODY_DAMAGED);
+		set.set(MODELCONDITION_REALLY_DAMAGED, m_curDamageState == BODY_REALLYDAMAGED);
+		getObject()->clearAndSetModelConditionFlags(clear, set);
+	}
 
 	/// @todo srj -- bleah, this is an icky way to do it. oh well.
 	if (m_curDamageState == BODY_RUBBLE && getObject()->isKindOf(KINDOF_STRUCTURE))
@@ -772,7 +783,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 			}
 			else if (m_curDamageState == BODY_REALLYDAMAGED)
 			{
-				if (RetailFileLayers::enabled())
+				if (RetailFileLayers::enabled() && !LuaScriptEngine::active())
 					RetailBuildingEvents::reallyDamaged(*obj);
 				AudioEventRTS reallyDamaged = *obj->getTemplate()->getSoundOnReallyDamaged();
 				reallyDamaged.setObjectID(obj->getID());

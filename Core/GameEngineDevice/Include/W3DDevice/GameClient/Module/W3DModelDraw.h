@@ -494,6 +494,13 @@ public:
 
 	virtual void updateSubObjects() override;
 	virtual void showSubObject( const AsciiString& name, Bool show ) override;
+#if !RTS_GENERALS
+	void showSubObjectForCurrentModel(const AsciiString& name, Bool show) override
+	{
+		if (m_renderObject)
+			setSubObjectHidden(name, !show);
+	}
+#endif
 	Bool getSubObjectHidden(const AsciiString& name, Bool& hidden) const
 	{
 		for (const auto& entry : m_subObjectVec)

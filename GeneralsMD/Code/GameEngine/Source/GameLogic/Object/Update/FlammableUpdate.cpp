@@ -47,6 +47,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -245,6 +246,8 @@ UpdateSleepTime FlammableUpdate::update()
 		me->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_AFLAME ) );
 		me->getBodyModule()->setAflame( FALSE );
 		me->clearModelConditionState( MODELCONDITION_AFLAME );
+		if (auto* lua = LuaScriptEngine::active())
+			lua->dispatch(*me, "OnQuenched");
 	}
 
 	return calcSleepTime();
@@ -303,7 +306,10 @@ void FlammableUpdate::tryToIgnite()
 		{
 			startRetailBurn();
 			setWakeFrame(me, UPDATE_SLEEP(retailTick));
-			RetailBuildingEvents::aflame(*me);
+			if (auto* lua = LuaScriptEngine::active())
+				lua->dispatch(*me, "OnAflame");
+			else
+				RetailBuildingEvents::aflame(*me);
 		}
 		else
 			setWakeFrame(me, calcSleepTime());
@@ -576,6 +582,8 @@ void FlammableUpdate::finishRetailBurn()
 	}
 	m_previousLocomotorSet = LOCOMOTORSET_INVALID;
 	m_runningToWater = FALSE;
+	if (auto* lua = LuaScriptEngine::active())
+		lua->dispatch(*me, "OnQuenched");
 }
 
 UpdateSleepTime FlammableUpdate::updateRetailBurn()

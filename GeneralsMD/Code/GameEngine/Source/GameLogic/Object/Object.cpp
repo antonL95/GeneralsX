@@ -91,11 +91,13 @@
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -1003,6 +1005,45 @@ void Object::setGeometryInfo(const GeometryInfo& geom)
 		m_drawable->reactToGeometryChange();
 }
 
+Bool Object::getLuaGeometryActive(const AsciiString& name, Bool authored) const
+{
+	const auto found = std::find_if(m_luaGeometryOverrides.begin(), m_luaGeometryOverrides.end(),
+		[&](const auto& entry) { return entry.first == name; });
+	return found == m_luaGeometryOverrides.end() ? authored : found->second;
+}
+
+void Object::setLuaGeometryActive(const AsciiString& name, Bool active)
+{
+	if (name.isEmpty() || isEffectivelyDead())
+		return;
+	const auto& data = getTemplate()->getRotWKObjectData();
+	const auto matches = [&](const ThingTemplate::GeometryDetails& details) { return details.name.compareNoCase(name) == 0; };
+	const auto* details = matches(data.primaryGeometry) ? &data.primaryGeometry : nullptr;
+	if (!details)
+	{
+		const auto geometry = std::find_if(data.additionalGeometries.begin(), data.additionalGeometries.end(),
+			[&](const auto& entry) { return matches(entry.details); });
+		if (geometry == data.additionalGeometries.end())
+			return;
+		details = &geometry->details;
+	}
+	if (getLuaGeometryActive(details->name, details->active) == active)
+		return;
+
+	auto* pathfinder = TheAI && !GeometryUpgrade::ScopedPathfindDeferral::contains(this) ? TheAI->pathfinder() : nullptr;
+	if (pathfinder)
+		pathfinder->removeObjectFromPathfindMap(this);
+	const auto found = std::find_if(m_luaGeometryOverrides.begin(), m_luaGeometryOverrides.end(),
+		[&](const auto& entry) { return entry.first == details->name; });
+	if (found == m_luaGeometryOverrides.end())
+		m_luaGeometryOverrides.emplace_back(details->name, active);
+	else
+		found->second = active;
+	GeometryUpgrade::refreshLuaBounds(*this);
+	if (pathfinder)
+		pathfinder->addObjectToPathfindMap(this);
+}
+
 //=============================================================================
 //=============================================================================
 void Object::setGeometryInfoZ( Real newZ )
@@ -1547,15 +1588,13 @@ void Object::holdForWeaponUntil(UnsignedInt frame) const
 		m_ai->holdForWeaponUntil(frame);
 }
 
-void Object::setFiringConditionForCurrentWeapon() const
+void Object::setFiringConditionForCurrentWeapon()
 {
 	WeaponSlotType wslot = m_weaponSet.getCurWeaponSlot();
 	if (RetailFileLayers::enabled())
 	{
 		ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot(wslot, WSF_FIRING);
-		m_logicModelConditions.clearAndSet(weaponFireFlags(wslot), c);
-		if (m_drawable)
-			m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(wslot), c);
+		clearAndSetModelConditionFlags(weaponFireFlags(wslot), c);
 		return;
 	}
 	if (m_drawable)
@@ -1579,10 +1618,15 @@ void Object::setModelConditionState( ModelConditionFlagType a )
 	{
 		m_drawable->setModelConditionState(a);
 	}
-	if (userSixStarted && (!TheGameState || !TheGameState->isInLoadGame()))
-		RetailBuildingEvents::trollEatingChanged(*this, true);
-	if (constructionStarted)
-		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
+	if (auto* lua = LuaScriptEngine::active())
+		lua->modelConditionsChanged(*this, previousConditions);
+	else
+	{
+		if (userSixStarted && (!TheGameState || !TheGameState->isInLoadGame()))
+			RetailBuildingEvents::trollEatingChanged(*this, true);
+		if (constructionStarted)
+			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
+	}
 }
 
 void Object::clearModelConditionState( ModelConditionFlagType a )
@@ -1598,10 +1642,15 @@ void Object::clearModelConditionState( ModelConditionFlagType a )
 	{
 		m_drawable->clearModelConditionState(a);
 	}
-	if (userSixStopped && (!TheGameState || !TheGameState->isInLoadGame()))
-		RetailBuildingEvents::trollEatingChanged(*this, false);
-	if (constructionStopped)
-		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
+	if (auto* lua = LuaScriptEngine::active())
+		lua->modelConditionsChanged(*this, previousConditions);
+	else
+	{
+		if (userSixStopped && (!TheGameState || !TheGameState->isInLoadGame()))
+			RetailBuildingEvents::trollEatingChanged(*this, false);
+		if (constructionStopped)
+			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
+	}
 }
 
 void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelConditionFlagType set )
@@ -1623,7 +1672,9 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 
 void Object::notifyConstructionConditionChange( const ModelConditionFlags& previous )
 {
-	if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) ||
+	if (auto* lua = LuaScriptEngine::active())
+		lua->modelConditionsChanged(*this, previous);
+	else if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) ||
 		previous.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED))
 		RetailBuildingEvents::modelConditionsChanged(*this, previous);
 }
@@ -2426,7 +2477,12 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	}
 
 	if (retail && body && damageInfo->out.m_actualDamageClipped > 0.0f)
-		RetailBuildingEvents::damaged(*this);
+	{
+		if (auto* lua = LuaScriptEngine::active())
+			lua->dispatch(*this, "OnDamaged", TheGameLogic->findObjectByID(damageInfo->in.m_sourceID));
+		else
+			RetailBuildingEvents::damaged(*this);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3176,12 +3232,16 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 		if (trigger && (!refresh || trigger->isCastleArea()) &&
 			!trigger->pointInTrigger(trigger->isCastleArea() ? iPos : m_iPos))
 		{
+			const Bool exited = m_triggerInfo[i].isInside;
 			m_triggerInfo[i].isInside = false;
 			m_triggerInfo[i].exited = true;
 			m_enteredOrExitedFrame = now;
 			if (m_team)
 				m_team->setEnteredExited();
 			TheGameLogic->updateObjectsChangedTriggerAreas();
+			if (exited && !refresh)
+				if (auto* lua = LuaScriptEngine::active())
+					lua->dispatch(*this, "OnUnitExited", std::string_view(trigger->getTriggerName().str()));
 #ifdef RTS_DEBUG
 			//TheScriptEngine->AppendDebugMessage("Object exited.", false);
 #endif
@@ -3220,6 +3280,9 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 					m_team->setEnteredExited();
 				TheGameLogic->updateObjectsChangedTriggerAreas();
 				++m_numTriggerAreasActive;
+				if (!refresh)
+					if (auto* lua = LuaScriptEngine::active())
+						lua->dispatch(*this, "OnUnitEntered", std::string_view(pTrig->getTriggerName().str()));
 #ifdef RTS_DEBUG
 				//TheScriptEngine->AppendDebugMessage("Object entered.", false);
 #endif
@@ -3666,7 +3729,7 @@ void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 	if (changed)
 	{
 		m_weaponSet.updateWeaponSet(this);
-		if (RetailFileLayers::enabled() && previousConditions != m_logicModelConditions)
+		if (RetailFileLayers::enabled() && !LuaScriptEngine::active() && previousConditions != m_logicModelConditions)
 			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
 	}
 }
@@ -5440,7 +5503,7 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
 	static const NameKeyType emotionKey = NAMEKEY("EmotionTrackerUpdate");
 	auto* emotion = static_cast<EmotionTrackerUpdate*>(findUpdateModule(emotionKey));
-	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() &&
+	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() && m_luaGeometryOverrides.empty() &&
 		(!emotion || !emotion->hasPromotionEmotions()) &&
 		m_retailThreatValidThrough == 0 && m_retailThreatBaseOverride == 0.0f && m_retailThreatUpgradeCost == 0.0f &&
 		m_disabledTillFrame[DISABLED_USER_PARALYZED] == NEVER && m_disabledTillFrame[DISABLED_USER_FROZEN] == NEVER)
@@ -5466,6 +5529,21 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 				x->xferUnsignedInt(&expiry);
 			}
 		}, [this] { m_timedModelConditions.clear(); }},
+		{"script-geometry", [this, loading](Xfer* x) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_luaGeometryOverrides.size());
+			x->xferUnsignedInt(&count);
+			if (loading)
+			{
+				if (count > getTemplate()->getRotWKObjectData().additionalGeometries.size() + 1)
+					throw SC_INVALID_DATA;
+				m_luaGeometryOverrides.resize(count);
+			}
+			for (auto& [name, active] : m_luaGeometryOverrides)
+			{
+				x->xferAsciiString(&name);
+				x->xferBool(&active);
+			}
+		}, [this] { m_luaGeometryOverrides.clear(); }},
 		{"promotion-emotions", [emotion](Xfer* x) {
 			UnsignedInt empty = 0;
 			if (emotion)
@@ -5812,6 +5890,9 @@ void Object::onDie( DamageInfo *damageInfo )
 	if (RetailFileLayers::enabled())
 	{
 		Object* killer = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+		if (damageInfo->in.m_deathType == DEATH_SLAUGHTERED)
+			if (auto* lua = LuaScriptEngine::active())
+				lua->dispatch(*this, "OnSlaughtered", killer);
 #if !RTS_GENERALS
 		if (damageInfo->in.m_sourceID != INVALID_ID)
 			if (const auto* body = dynamic_cast<const ActiveBody*>(getBodyModule()))
@@ -6061,6 +6142,7 @@ void Object::adjustModelConditionForWeaponStatus()
 		{
 			m_lastWeaponCondition[i] = conditionToSet;
 			ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot((WeaponSlotType)i, conditionToSet);
+			const ModelConditionFlags previous = m_logicModelConditions;
 			m_logicModelConditions.clearAndSet(weaponFireFlags(i), c);
 			if (m_drawable)
 			{
@@ -6072,6 +6154,8 @@ void Object::adjustModelConditionForWeaponStatus()
 					m_drawable->setWeaponTimingDuration(timed ? weaponTimingFrames(w, conditionToSet, now) : 0);
 				}
 			}
+			if (auto* lua = LuaScriptEngine::active())
+				lua->modelConditionsChanged(*this, previous);
 		}
 		else if (m_drawable)
 		{

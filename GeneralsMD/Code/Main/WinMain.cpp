@@ -44,6 +44,7 @@
 #include "Common/CriticalSection.h"
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "Common/GameSounds.h"
 #include "Common/Debug.h"
 #include "Common/GameMemory.h"
@@ -956,6 +957,7 @@ GameEngine *CreateGameEngine()
 	Win32GameEngine *engine;
 
 	engine = NEW Win32GameEngine;
+	engine->setLuaScriptEngine(createLuaScriptEngine());
 	//game engine may not have existed when app got focus so make sure it
 	//knows about current focus state.
 	engine->setIsActive(isWinMainActive);

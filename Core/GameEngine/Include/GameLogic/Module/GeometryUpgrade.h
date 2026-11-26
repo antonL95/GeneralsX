@@ -50,6 +50,7 @@ public:
 
 	private:
 		friend class GeometryUpgrade;
+		friend class Object;
 		static Bool contains(const Object* object);
 		static thread_local const ScopedPathfindDeferral* s_current;
 		const Object* m_object;
@@ -61,6 +62,9 @@ public:
 		Bool includeAuthored = FALSE);
 	static Bool collectLocalShapes(const Object& object, std::vector<LocalShape>& shapes);
 	const GeometryUpgradeModuleData* getWallRampData() const { return getGeometryUpgradeModuleData(); }
+#if !RTS_GENERALS
+	static void refreshLuaBounds(Object& object);
+#endif
 
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 	Bool resetUpgrade(const UpgradeMaskType& mask) override;

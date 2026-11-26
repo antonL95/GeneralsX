@@ -43,6 +43,7 @@
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "Common/Player.h"
@@ -365,12 +366,19 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	ThePartitionManager->registerObject( obj );
 
 	obj->initObject();
+	auto* lua = LuaScriptEngine::active();
 	if (!TheGameState || !TheGameState->isInLoadGame())
 	{
+		if (lua)
+			lua->registerObject(*obj);
 		ExperienceLevelStore::onObjectCreated(obj);
-		RetailCreationUpgrades::onObjectCreated(obj);
+		if (!lua)
+			RetailCreationUpgrades::onObjectCreated(obj);
 		TheGameLogic->applyRetailWeatherModifier(*obj);
-		RetailBuildingEvents::created(*obj);
+		if (lua)
+			lua->dispatch(*obj, "OnCreated");
+		else
+			RetailBuildingEvents::created(*obj);
 		CreateAHeroSystem::applyToHero(obj);
 	}
 

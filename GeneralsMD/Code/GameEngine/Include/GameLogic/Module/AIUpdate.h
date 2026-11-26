@@ -355,6 +355,7 @@ public:
 	virtual void joinTeam();			///< This unit just got added to a team & needs to catch up.
 
 	virtual const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	void setLuaForbidPlayerCommands(Bool forbidden) { m_luaForbidPlayerCommands = forbidden ? SCRIPT_FORBID : SCRIPT_ALLOW; }
 	Bool areTurretsLinked() const { return getAIUpdateModuleData()->m_turretsLinked; }
 
 	// this is present solely for some transports to override, so that they can land before
@@ -888,6 +889,8 @@ private:
 	UnsignedInt m_rampageUntil = 0;
 	UnsignedInt m_rampageEjectFrame = 0;
 	Bool m_rampageWeaponPrimed = FALSE;
+	enum ScriptCommandPolicy { SCRIPT_USES_INI, SCRIPT_ALLOW, SCRIPT_FORBID };
+	Int m_luaForbidPlayerCommands = SCRIPT_USES_INI;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

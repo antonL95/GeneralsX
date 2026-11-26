@@ -62,6 +62,7 @@
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -983,7 +984,10 @@ void GameEngine::init()
 		TheNameKeyGenerator->dumpIfRequested("thingFactory");
 		if (!retailINI)
 			initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
-		RetailCreationUpgrades::load(&xferCRC);
+		if (m_luaScriptEngine && !m_luaScriptEngine->load(xferCRC))
+			m_luaScriptEngine.reset();
+		if (!m_luaScriptEngine)
+			RetailCreationUpgrades::load(&xferCRC);
 		if (retailINI || INIAudit::isEnabled())
 		{
 			if (!retailINI)
@@ -1325,6 +1329,16 @@ void GameEngine::reset()
 }
 
 /// -----------------------------------------------------------------------------------------------
+void GameEngine::setLuaScriptEngine(std::unique_ptr<LuaScriptEngine> engine)
+{
+	m_luaScriptEngine = std::move(engine);
+}
+
+LuaScriptEngine* LuaScriptEngine::active()
+{
+	return TheGameEngine ? TheGameEngine->luaScriptEngine() : nullptr;
+}
+
 void GameEngine::resetSubsystems()
 {
 	// TheSuperHackers @fix xezon 09/06/2025 Reset GameLogic first to purge all world objects early.

@@ -57,6 +57,7 @@
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -1856,7 +1857,8 @@ UpdateSleepTime DozerAIUpdate::update()
 		if (state != m_riderEventState)
 		{
 			m_riderEventState = state;
-			RetailBuildingEvents::riderChanged(*getObject(), mounted);
+			if (!LuaScriptEngine::active())
+				RetailBuildingEvents::riderChanged(*getObject(), mounted);
 		}
 	}
 

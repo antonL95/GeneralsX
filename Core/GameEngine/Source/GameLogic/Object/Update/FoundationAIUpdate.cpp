@@ -22,6 +22,9 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
+#if !RTS_GENERALS
+#include "GameLogic/LuaScriptEngine.h"
+#endif
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CastleBehavior.h"
@@ -174,6 +177,11 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 		structure->setModelConditionState(MODELCONDITION_BUILD_VARIATION_ONE);
 	else if (variation == 2)
 		structure->setModelConditionState(MODELCONDITION_BUILD_VARIATION_TWO);
+#if !RTS_GENERALS
+	if (variation == 1 || variation == 2)
+		if (auto* lua = LuaScriptEngine::active())
+			lua->dispatch(*structure, "OnBuildVariation", static_cast<Real>(variation));
+#endif
 
 	m_structure = structure->getID();
 	linkStructureToCastle(*structure);

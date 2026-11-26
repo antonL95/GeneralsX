@@ -5,8 +5,12 @@ find_package(EXPAT REQUIRED)
 target_link_libraries(z_generals PRIVATE EXPAT::EXPAT z_lua)
 target_sources(z_generals PRIVATE
     ../GameEngine/Include/GameLogic/LuaEventTables.h
+    ../GameEngine/Include/GameLogic/LuaLogicBindings.h
+    ../GameEngine/Include/GameLogic/LuaScriptEngine.h
     ../GameEngine/Include/GameLogic/LuaState.h
     ../GameEngine/Source/GameLogic/ScriptEngine/LuaEventTables.cpp
+    ../GameEngine/Source/GameLogic/ScriptEngine/LuaLogicBindings.cpp
+    ../GameEngine/Source/GameLogic/ScriptEngine/LuaScriptEngine.cpp
     ../GameEngine/Source/GameLogic/ScriptEngine/LuaState.cpp
 )
 

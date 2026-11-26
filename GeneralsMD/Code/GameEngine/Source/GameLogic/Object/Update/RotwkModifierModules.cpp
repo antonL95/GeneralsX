@@ -34,6 +34,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/WeaponNugget.h"
@@ -271,6 +272,17 @@ void EnragedBehavior::setEnraged(Bool enabled)
 		setEnragedState(self, enabled);
 }
 
+void EnragedBehavior::setScriptEnraged(Object& object, Bool enabled)
+{
+	if (object.isEffectivelyDead())
+		return;
+	auto* module = static_cast<EnragedBehavior*>(object.findUpdateModule(NAMEKEY("EnragedBehavior")));
+	if (module)
+		module->setEnraged(enabled);
+	else if (object.testStatus(OBJECT_STATUS_ENRAGED) != enabled)
+		setEnragedState(&object, enabled);
+}
+
 UpdateSleepTime EnragedBehavior::update()
 {
 	const Object* self = getObject();
@@ -278,14 +290,14 @@ UpdateSleepTime EnragedBehavior::update()
 		return UPDATE_SLEEP_FOREVER;
 	const Bool user45 = self->getLogicModelConditions().test(MODELCONDITION_USER_45);
 	const Bool aflame = self->testStatus(OBJECT_STATUS_AFLAME);
-	if (user45 != m_user45)
+	if (user45 != m_user45 && !LuaScriptEngine::active())
 	{
 		m_user45 = user45;
 		const Int action = RetailBuildingEvents::enrageAction(*self, user45 ? "User45IsActive" : "User45IsNotActive");
 		if (action >= 0)
 			setEnraged(action != 0);
 	}
-	if (aflame != m_aflame)
+	if (aflame != m_aflame && !LuaScriptEngine::active())
 	{
 		m_aflame = aflame;
 		const Int action = RetailBuildingEvents::enrageAction(*self, aflame ? "OnAflame" : "OnQuenched");
@@ -976,6 +988,26 @@ Bool EmotionTrackerUpdate::signalWeaponEmotion(Object* victim, EmotionType type,
 	return FALSE;
 }
 
+Bool EmotionTrackerUpdate::canSufferFear(const Object* object)
+{
+	for (; object && !object->isEffectivelyDead() && !object->isDestroyed(); object = object->getContainedBy())
+	{
+		const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+		if (!tracker)
+			continue;
+		const auto& emotions = tracker->getEmotionTrackerUpdateModuleData()->m_emotions;
+		return std::any_of(emotions.begin(), emotions.end(), [](const auto& entry)
+		{
+			const auto* nugget = findEmotionNugget(entry.m_name);
+			if (!nugget)
+				return false;
+			const Int type = configuredEmotionType(entry, nugget);
+			return type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR;
+		});
+	}
+	return FALSE;
+}
+
 Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
 {
 	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
@@ -1358,6 +1390,9 @@ UpdateSleepTime RadiateFearUpdate::update()
 		(data->m_generateUncontrollableFear ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID);
 	const Int kind = data->m_generateTerror ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
 	const UnsignedInt interval = data->m_pulseInterval ? data->m_pulseInterval : LOGICFRAMES_PER_SECOND;
+	if (auto* lua = LuaScriptEngine::active();
+		lua && lua->dispatch(*self, "BeScary", {}, data->m_pulseRadius))
+		return UPDATE_SLEEP(interval + self->getID() % 5);
 	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_pulseRadius, FROM_CENTER_2D);
 	MemoryPoolObjectHolder holder(iter);
 	std::vector<Object*> targets;

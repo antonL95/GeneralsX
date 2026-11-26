@@ -47,6 +47,7 @@
 #include "Common/GameMemory.h"
 #include "Common/Debug.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "Common/version.h"  // GeneralsX @bugfix BenderAI 14/02/2026 Version class + TheVersion extern
 #include "SDL3GameEngine.h"
 
@@ -222,6 +223,7 @@ GameEngine *CreateGameEngine(void)
 {
 	fprintf(stderr, "INFO: CreateGameEngine() - Creating SDL3GameEngine for Linux\n");
 	SDL3GameEngine *engine = NEW SDL3GameEngine();
+	engine->setLuaScriptEngine(createLuaScriptEngine());
 	return engine;
 }
 

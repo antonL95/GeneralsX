@@ -535,6 +535,7 @@ public:
 	};
 
 	void showSubObject(const AsciiString& name, Bool show, Real fadeFrames = 0.0f, Real waitFrames = 0.0f);
+	void showSubObjectForCurrentModel(const AsciiString& name, Bool show);
 	const std::vector<RetailSubObjectFade>& getRetailSubObjectFades() const { return m_retailSubObjectFades; }
 
 #ifdef ALLOW_ANIM_INQUIRIES

@@ -62,6 +62,7 @@
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
@@ -1692,7 +1693,12 @@ void Player::onStructureCreated( Object *builder, Object *structure )
 void Player::onStructureConstructionComplete( Object *builder, Object *structure, Bool isRebuild )
 {
 	if (RetailFileLayers::enabled() && !isRebuild)
-		RetailBuildingEvents::complete(*structure);
+	{
+		if (auto* lua = LuaScriptEngine::active())
+			lua->dispatch(*structure, "OnBuildingComplete");
+		else
+			RetailBuildingEvents::complete(*structure);
+	}
 
 	if (RetailFileLayers::enabled() && !isRebuild)
 		RetailEva::queue(this, "GenericBuildingComplete-Builder", structure->getPosition(),

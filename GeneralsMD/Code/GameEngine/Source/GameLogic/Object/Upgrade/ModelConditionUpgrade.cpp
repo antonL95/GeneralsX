@@ -37,6 +37,7 @@
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 
 namespace
 {
@@ -125,7 +126,8 @@ void ModelConditionUpgrade::upgradeImplementation()
 		if (frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()))
 			me->setTimedModelCondition(static_cast<ModelConditionFlagType>(data->m_tempCondition), static_cast<UnsignedInt>(frames));
 	}
-	RetailBuildingEvents::modelConditionsChanged(*me, previousConditions);
+	if (!LuaScriptEngine::active())
+		RetailBuildingEvents::modelConditionsChanged(*me, previousConditions);
 }
 
 Bool ModelConditionUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)

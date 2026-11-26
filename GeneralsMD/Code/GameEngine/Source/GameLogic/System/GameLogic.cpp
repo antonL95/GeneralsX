@@ -118,6 +118,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -373,6 +374,8 @@ Bool GameLogic::isInSinglePlayerGame() const
 //-------------------------------------------------------------------------------------------------
 void GameLogic::destroyAllObjectsImmediate()
 {
+	if (auto* lua = LuaScriptEngine::active())
+		lua->clearObjects();
 	m_mountedTemplateSwaps.clear();
 	Object *obj;
 	Object *nextObj;
@@ -514,6 +517,9 @@ void GameLogic::reset()
 
 	// destroy all objects
 	destroyAllObjectsImmediate();
+
+	if (auto* lua = LuaScriptEngine::active())
+		lua->reset();
 
 	// set the hash to be rather large. We need to optimize this value later.
 #if USING_STLPORT
@@ -4696,6 +4702,13 @@ void GameLogic::destroyObject( Object *obj )
 	if (!obj || obj->isDestroyed())
 		return;
 
+	if (auto* lua = LuaScriptEngine::active())
+	{
+		lua->onDestroyed(*obj);
+		if (obj->isDestroyed())
+			return;
+	}
+
 	if (obj->isKindOf(KINDOF_TAINT))
 		TheTerrainLogic->removeRetailTaint(obj->getID());
 
@@ -5801,6 +5814,8 @@ void GameLogic::xfer( Xfer *xfer )
 
 			// xfer the rest of the object data
 			xfer->xferSnapshot( obj );
+			if (auto* lua = LuaScriptEngine::active())
+				lua->registerObject(*obj);
 
 			// end of block of data (not necessary in a load, but looks symettrically nice)
 			xfer->endBlock();
