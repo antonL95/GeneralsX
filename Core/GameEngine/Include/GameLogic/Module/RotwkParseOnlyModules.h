@@ -204,6 +204,7 @@ public:
 	const AsciiString& getCampDestroyedAttackerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedAttackerEvaEvent; }
 	const AsciiString& getCampDestroyedOwnerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedOwnerEvaEvent; }
 	UnsignedInt getStoredUpgradePrice() const { return m_storedUpgradePrice; }
+	AudioHandle getBeingBuiltHandle() const { return m_beingBuiltHandle; }
 	void onModelConditionChanged(const ModelConditionFlags& previous, const ModelConditionFlags& current);
 
 private:
