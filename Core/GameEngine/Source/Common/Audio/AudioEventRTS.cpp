@@ -345,7 +345,8 @@ void AudioEventRTS::generateFilename(Bool randomByDefault, Bool forTiming)
 	Int which = 0;
 
 	if (m_eventInfo->m_soundType == AT_Music || m_eventInfo->m_soundType == AT_Streaming ||
-		m_eventInfo->m_soundType == AT_AmbientStream) {
+		m_eventInfo->m_soundType == AT_AmbientStream ||
+		(m_eventInfo->m_sounds.empty() && m_eventInfo->m_filename.isNotEmpty())) {
 		m_filenameToLoad.concat(m_eventInfo->m_filename);
 		adjustForLocalization(m_filenameToLoad);
 		return;
