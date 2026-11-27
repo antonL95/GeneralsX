@@ -214,21 +214,22 @@ struct RetailCombatChain
 	std::vector<Real> modifiers;
 };
 
-struct RetailBaseOpening
+struct RetailBaseLayout
 {
 	AsciiString side;
+	AsciiString camp;
 	AsciiString mapFilter;
 	std::vector<Int> playerPositions;
 	Bool rotate = TRUE;
-	std::map<AsciiString, CastleTemplates::Member> structures;
 };
 
 struct RetailAITuning
 {
 	std::vector<RetailDifficulty> difficulties;
-	std::vector<RetailBaseOpening> baseOpenings;
+	std::vector<RetailBaseLayout> baseLayouts;
 	std::array<RetailCombatChain, std::size(RetailAIKindOf::names) - 1> combatChains;
 	RetailBrutalCheats brutal;
+	std::vector<Int> disableAnyBasePositions;
 	Bool disableBaseBuilding = FALSE;
 	Bool disableEconomyBuilding = FALSE;
 	Bool disableUnitBuilding = FALSE;
@@ -276,29 +277,37 @@ RetailSkirmishPolicy retailPolicy(const Player& player)
 	return policy;
 }
 
-Int selectRetailBaseOpening(Player& player)
+Int selectRetailBaseLayout(Player& player)
 {
-	const AsciiString path = TheTerrainLogic->getSourceFilename();
-	const std::string_view fullPath(path.str());
-	const auto separator = fullPath.find_last_of("/\\");
-	const AsciiString map(fullPath.substr(separator == std::string_view::npos ? 0 : separator + 1).data());
+	const std::string_view path(TheGlobalData->m_mapName.str());
+	const auto separator = path.find_last_of("/\\");
+	const char* map = path.data() + (separator == std::string_view::npos ? 0 : separator + 1);
 	const Int position = player.getMpStartIndex() + 1;
-	std::vector<Int> matching, fallback;
-	for (Int index = 0; index < static_cast<Int>(retailTuning.baseOpenings.size()); ++index)
+	const auto& disabled = retailTuning.disableAnyBasePositions;
+	const Bool allowWildcard = std::find(disabled.begin(), disabled.end(), position) == disabled.end();
+	std::vector<Int> choices;
+	for (Int index = 0; index < static_cast<Int>(retailTuning.baseLayouts.size()); ++index)
 	{
-		const RetailBaseOpening& opening = retailTuning.baseOpenings[index];
-		if (opening.side.compareNoCase(player.getSide()) != 0 || (!opening.playerPositions.empty() &&
-			std::find(opening.playerPositions.begin(), opening.playerPositions.end(), position) == opening.playerPositions.end()))
+		const RetailBaseLayout& layout = retailTuning.baseLayouts[index];
+		const Bool wildcard = layout.mapFilter.isEmpty() || layout.mapFilter.compareNoCase("<ANY>") == 0;
+		if (layout.side.compareNoCase(player.getSide()) != 0 ||
+			(wildcard ? !allowWildcard : layout.mapFilter.compareNoCase(map) != 0) ||
+			(!layout.playerPositions.empty() &&
+				std::find(layout.playerPositions.begin(), layout.playerPositions.end(), position) == layout.playerPositions.end()))
 			continue;
-		if (opening.mapFilter.compareNoCase(map) == 0)
-			matching.push_back(index);
-		else if (opening.mapFilter.isEmpty() || opening.mapFilter.compareNoCase("<ANY>") == 0)
-			fallback.push_back(index);
+		if (CastleTemplates::find(layout.camp, false))
+			choices.push_back(index);
 	}
-	const auto& choices = matching.empty() ? fallback : matching;
 	if (choices.empty())
 		return -2;
 	return choices.size() == 1 ? choices.front() : choices[GameLogicRandomValue(0, static_cast<Int>(choices.size()) - 1)];
+}
+
+void parseRetailBasePositions(INI* ini, void*, void* store, const void*)
+{
+	auto& positions = *static_cast<std::vector<Int>*>(store);
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		positions.push_back(INI::scanInt(token));
 }
 
 void parseCombatChainTargets(INI* ini, void*, void* store, const void*)
@@ -716,6 +725,14 @@ Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Co
 	return constructRetailBuildingAt(builder, type, point, type.getPlacementViewAngle());
 }
 
+Coord3D retailLayoutSite(const CastleTemplates::Member& member, const Coord3D& origin, Real rotation)
+{
+	const Real cosine = WWMath::CosTrig(rotation);
+	const Real sine = WWMath::SinTrig(rotation);
+	return {origin.x + member.offsetX * cosine - member.offsetY * sine,
+		origin.y + member.offsetX * sine + member.offsetY * cosine, origin.z};
+}
+
 struct RetailLumberGrove
 {
 	Coord3D anchor;
@@ -993,54 +1010,19 @@ Bool AISkirmishPlayer::rollRetailSpecialPowerActivation(const Player& player)
 
 void AISkirmishPlayer::parseRetailBase(INI* ini)
 {
-	struct BaseDefinition
-	{
-		AsciiString side;
-		AsciiString map;
-		AsciiString mapFilter;
-		std::vector<Int> playerPositions;
-		Bool rotate = TRUE;
-	};
-	ini->getNextToken();
-	BaseDefinition definition;
 	static const FieldParse fields[] = {
-		{ "Side", INI::parseAsciiString, nullptr, offsetof(BaseDefinition, side) },
-		{ "Map", INI::parseQuotedAsciiString, nullptr, offsetof(BaseDefinition, map) },
-		{ "GameMapToUseOn", INI::parseQuotedAsciiString, nullptr, offsetof(BaseDefinition, mapFilter) },
-		{ "PlayerPositions", [](INI* reader, void* instance, void*, const void*) {
-			auto& positions = static_cast<BaseDefinition*>(instance)->playerPositions;
-			for (const char* token = reader->getNextTokenOrNull(); token; token = reader->getNextTokenOrNull())
-				positions.push_back(INI::scanInt(token));
-		}, nullptr, 0 },
-		{ "AllowsArbirtaryRotation", INI::parseBool, nullptr, offsetof(BaseDefinition, rotate) },
+		{ "Side", INI::parseAsciiString, nullptr, offsetof(RetailBaseLayout, side) },
+		{ "Map", INI::parseQuotedAsciiString, nullptr, offsetof(RetailBaseLayout, camp) },
+		{ "GameMapToUseOn", INI::parseQuotedAsciiString, nullptr, offsetof(RetailBaseLayout, mapFilter) },
+		{ "PlayerPositions", parseRetailBasePositions, nullptr, offsetof(RetailBaseLayout, playerPositions) },
+		{ "AllowsArbirtaryRotation", INI::parseBool, nullptr, offsetof(RetailBaseLayout, rotate) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
-	ini->initFromINI(&definition, fields);
-	if (definition.map.isEmpty())
-		return;
-	try
-	{
-		const CastleTemplates::Camp* camp = CastleTemplates::find(definition.map);
-		if (!camp)
-			return;
-		RetailBaseOpening opening{definition.side, definition.mapFilter, std::move(definition.playerPositions), definition.rotate, {}};
-		auto& structures = opening.structures;
-		for (const CastleTemplates::Member& member : camp->members)
-		{
-			if (member.phase != 1 || member.templateName.empty() || member.templateName.size() >= AsciiString::MAX_LEN)
-				continue;
-			const AsciiString name(member.templateName.c_str());
-			const auto placed = structures.find(name);
-			if (placed == structures.end() || member.priority > placed->second.priority)
-				structures.insert_or_assign(name, member);
-		}
-		if (!structures.empty())
-			retailTuning.baseOpenings.push_back(std::move(opening));
-	}
-	catch (ErrorCode)
-	{
-		ini->recordSkipped("base", definition.map.str());
-	}
+	ini->getNextToken();
+	RetailBaseLayout layout;
+	ini->initFromINI(&layout, fields);
+	if (layout.side.isNotEmpty() && layout.camp.isNotEmpty())
+		retailTuning.baseLayouts.push_back(std::move(layout));
 }
 
 void AISkirmishPlayer::parseRetailArmy(INI* ini)
@@ -1124,6 +1106,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "DisableTeamBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTeamBuilding) },
 		{ "DisableWallBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableWallBuilding) },
 		{ "MakeAllSkirmishSidesAIControlled", INI::parseBool, nullptr, offsetof(RetailAITuning, controlHumanSkirmishSides) },
+		{ "AnyTypeTemplateDisabledSlots", parseRetailBasePositions, nullptr, offsetof(RetailAITuning, disableAnyBasePositions) },
 		{ "TeamIdleCheckRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, teamIdleCheckRadius) },
 		{ "TeamTimeUntilConsideredIdle", INI::parseReal, nullptr, offsetof(RetailAITuning, teamTimeUntilConsideredIdle) },
 		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
@@ -2908,14 +2891,31 @@ void AISkirmishPlayer::updateRetail()
 			std::vector<BuildOffer> offers;
 		};
 		std::vector<BuildRequest> requests;
-		const RetailBaseOpening* opening = nullptr;
-		if (phase == 0 && keep)
+		const Waypoint* start = retailPlayerStart(*m_player);
+		const CastleTemplates::Camp* base = nullptr;
+		Coord3D baseOrigin{};
+		Real baseRotation = 0.0f;
+		if (keep || start)
 		{
-			if (m_retailOpeningBase == -1)
-				m_retailOpeningBase = selectRetailBaseOpening(*m_player);
-			if (m_retailOpeningBase >= 0 && static_cast<size_t>(m_retailOpeningBase) < retailTuning.baseOpenings.size())
-				opening = &retailTuning.baseOpenings[m_retailOpeningBase];
+			if (m_retailBaseLayout == -1)
+				m_retailBaseLayout = selectRetailBaseLayout(*m_player);
+			if (m_retailBaseLayout >= 0 && static_cast<size_t>(m_retailBaseLayout) < retailTuning.baseLayouts.size())
+			{
+				const RetailBaseLayout& layout = retailTuning.baseLayouts[m_retailBaseLayout];
+				base = CastleTemplates::find(layout.camp, false);
+				baseOrigin = start ? *start->getLocation() : *keep->getPosition();
+				if (base && layout.rotate)
+				{
+					Region3D extent;
+					TheTerrainLogic->getExtent(&extent);
+					const Real x = (extent.lo.x + extent.hi.x) * 0.5f - baseOrigin.x;
+					const Real y = (extent.lo.y + extent.hi.y) * 0.5f - baseOrigin.y;
+					if (x != 0.0f || y != 0.0f)
+						baseRotation = normalizeAngle(WWMath::Atan2Origin(y, x) - PI * 0.5f);
+				}
+			}
 		}
+		const Bool useOpeningPriorities = base && keep && phase == 0;
 		const auto collectOffers = [&](Object& builder, FoundationAIUpdate* plot) {
 			const CommandSet* set = retailCommands(builder);
 			if (!set)
@@ -2958,14 +2958,16 @@ void AISkirmishPlayer::updateRetail()
 						if (producesArmy(*type) || (replacement && countType(replacement) == 0 && producesArmy(*replacement)) ||
 							(plot && farms >= 2 && soldiers.size() >= 2 && type->isKindOf(KINDOF_FS_BASE_DEFENSE)))
 							score = rules->defaultPriority;
-						if (opening)
+						if (useOpeningPriorities)
 						{
-							const auto planned = opening->structures.find(type->getName());
-							if (planned != opening->structures.end())
+							for (const auto& member : base->members)
 							{
-								layout = &planned->second;
-								score = static_cast<Real>(layout->priority);
+								if (member.phase == 1 && member.templateName == type->getName().str() &&
+									(!layout || member.priority > layout->priority))
+									layout = &member;
 							}
+							if (layout)
+								score = static_cast<Real>(layout->priority);
 						}
 						if (m_retailBuiltStructures.contains(type->getName()))
 						{
@@ -3010,15 +3012,7 @@ void AISkirmishPlayer::updateRetail()
 				return a.priority > b.priority;
 			return a.layout && !b.layout;
 		});
-		Real baseRotation = 0.0f;
-		if (opening && opening->rotate)
-		{
-			Region3D terrain{};
-			TheTerrainLogic->getExtent(&terrain);
-			const auto& home = *keep->getPosition();
-			baseRotation = PI / 2.0f - WWMath::Atan2(terrain.height() * 0.5f - home.y, terrain.width() * 0.5f - home.x);
-		}
-		const auto farmSites = opening && seekFarm && m_retailLastFarmFrame == 0
+		const auto farmSites = useOpeningPriorities && seekFarm && m_retailLastFarmFrame == 0
 			? findRetailFarmSites(*keep->getPosition()) : std::vector<const MapObject*>{};
 		for (BuildRequest& request : requests)
 		{
@@ -3034,13 +3028,8 @@ void AISkirmishPlayer::updateRetail()
 			Coord3D position = keep ? *keep->getPosition() : Coord3D{};
 			if (useFarmSites)
 				position = *farmSites.front()->getLocation();
-			if (const auto* member = request.layout)
-			{
-				const Real cosine = WWMath::CosTrig(baseRotation);
-				const Real sine = WWMath::SinTrig(baseRotation);
-				position.x += member->offsetX * cosine - member->offsetY * sine;
-				position.y += member->offsetX * sine + member->offsetY * cosine;
-			}
+			if (request.layout)
+				position = retailLayoutSite(*request.layout, baseOrigin, baseRotation);
 			if (keep)
 			{
 				const auto preference = [&](const BuildOffer& offer) {
@@ -3054,12 +3043,27 @@ void AISkirmishPlayer::updateRetail()
 				const auto construct = [&]() {
 					if (offer.plot)
 						return offer.plot->construct(type, m_player) != nullptr;
-					if (request.layout && constructRetailBuildingAt(*offer.builder, *type, position, request.layout->angle + baseRotation))
+					const auto constructAtSite = [&](const CastleTemplates::Member& site) {
+						return constructRetailBuildingAt(*offer.builder, *type, retailLayoutSite(site, baseOrigin, baseRotation),
+							normalizeAngle(site.angle + baseRotation)) != nullptr;
+					};
+					if (request.layout && constructAtSite(*request.layout))
 						return true;
 					if (useFarmSites)
 						for (const MapObject* site : farmSites)
 							if (constructRetailBuildingAt(*offer.builder, *type, *site->getLocation(), site->getAngle()))
 								return true;
+					if (base)
+					{
+						for (const auto& site : base->members)
+						{
+							if (&site == request.layout || site.templateName.empty() || site.templateName.size() >= AsciiString::MAX_LEN)
+								continue;
+							const ThingTemplate* authored = TheThingFactory->findTemplate(site.templateName.c_str(), FALSE);
+							if (authored && type->isEquivalentTo(authored) && constructAtSite(site))
+								return true;
+						}
+					}
 					return placeRetailBuilding(*offer.builder, *type, keep ? *keep->getPosition() : *offer.builder->getPosition()) != FALSE;
 				};
 				return offer.usesSavings ? spendWithSavings(type->calcCostToBuild(m_player), construct) : construct();
@@ -4154,7 +4158,7 @@ void AISkirmishPlayer::newMap()
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
-	m_retailOpeningBase = -1;
+	m_retailBaseLayout = -1;
 	m_retailFarmPriority = 0.0f;
 	m_retailBuiltStructures.clear();
 	m_retailUnitPriorities.clear();
@@ -4495,8 +4499,8 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailUpgradePlans.clear();
 		}},
 		{"skirmish-opening-base", [this](Xfer* x) {
-			x->xferInt(&m_retailOpeningBase);
-		}, [this] { m_retailOpeningBase = -1; }}
+			x->xferInt(&m_retailBaseLayout);
+		}, [this] { m_retailBaseLayout = -1; }}
 	});
 }
 

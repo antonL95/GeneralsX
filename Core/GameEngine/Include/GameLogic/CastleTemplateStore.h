@@ -165,6 +165,6 @@ inline std::optional<Camp> parse(std::span<const std::uint8_t> bytes, unsigned v
 	return std::nullopt;
 }
 
-const Camp* find(const AsciiString& camp);
+const Camp* find(const AsciiString& camp, bool required = true);
 void reset();
 }

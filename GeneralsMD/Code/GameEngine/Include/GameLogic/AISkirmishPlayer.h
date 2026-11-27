@@ -195,7 +195,7 @@ protected:
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;
 	Int m_retailScavengedBuilding = -1;
-	Int m_retailOpeningBase = -1;
+	Int m_retailBaseLayout = -1;
 	Real m_retailFarmPriority = 0.0f;
 	std::set<AsciiString> m_retailBuiltStructures;
 	std::map<AsciiString, Real> m_retailUnitPriorities;

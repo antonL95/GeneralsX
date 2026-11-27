@@ -56,12 +56,12 @@ const Camp* reportFailure(const AsciiString& path)
 }
 }
 
-const Camp* find(const AsciiString& camp)
+const Camp* find(const AsciiString& camp, bool required)
 {
 	std::string key(camp.str());
 	if (key.empty() || key == "." || key == ".." || key.size() > 255 ||
 		key.find_first_of("/\\:") != std::string::npos)
-		return reportFailure(camp);
+		return required ? reportFailure(camp) : nullptr;
 
 	for (char& ch : key)
 		if (ch >= 'A' && ch <= 'Z')
@@ -80,11 +80,11 @@ const Camp* find(const AsciiString& camp)
 	}
 	catch (ErrorCode)
 	{
-		return reportFailure(path);
+		return required ? reportFailure(path) : nullptr;
 	}
 
 	if (!result)
-		return reportFailure(path);
+		return required ? reportFailure(path) : nullptr;
 	return &s_camps.emplace(std::move(key), std::move(*result)).first->second;
 }
 
