@@ -1,11 +1,11 @@
-150 create PlyrCivilian SiegePortalWall 0 1150,2600,0
-150 create Player_1 SiegePortalLadder 0 1020,2520,60
-152 power Player_1 SiegePortalLadder 0 SpecialAbilitySiegeDeploy
-153 aim Player_1 SiegePortalLadder 0 PlyrCivilian:SiegePortalWall:0
+125 create PlyrCivilian SiegePortalWall 0 1150,2600,0
+125 create Player_1 SiegePortalLadder 0 1020,2520,60
+126 power Player_1 SiegePortalLadder 0 SpecialAbilitySiegeDeploy
+127 aim Player_1 SiegePortalLadder 0 PlyrCivilian:SiegePortalWall:0
 220 siege-portal-probe Player_1 SiegePortalLadder 0 -
 220 create Player_1 SiegePortalHorde 0 1040,2520,60
-222 power Player_1 SiegePortalHorde 0 SpecialAbilitySiegeDeploy
-223 aim Player_1 SiegePortalHorde 0 PlyrCivilian:SiegePortalWall:0
+221 power Player_1 SiegePortalHorde 0 SpecialAbilitySiegeDeploy
+221 aim Player_1 SiegePortalHorde 0 PlyrCivilian:SiegePortalWall:0
 238 siege-portal-probe Player_1 SiegePortalHorde 0 -
 250 siege-portal-probe Player_1 SiegePortalHorde 0 -
 270 siege-portal-probe Player_1 SiegePortalHorde 0 -
