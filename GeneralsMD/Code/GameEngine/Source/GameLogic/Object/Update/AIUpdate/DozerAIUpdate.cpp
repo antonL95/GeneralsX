@@ -722,7 +722,11 @@ StateReturnType DozerActionDoActionState::update()
 				if (m_builderInside && RetailFileLayers::enabled())
 				{
 					if (!goalObject->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
-						return STATE_SUCCESS;
+					{
+						leaveStructure();
+						complete = TRUE;
+						break;
+					}
 					const auto* building = GettingBuiltBehavior::find(*goalObject);
 					if (building && building->managesConstruction() && !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
 					{
