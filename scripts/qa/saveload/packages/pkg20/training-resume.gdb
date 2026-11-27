@@ -7,7 +7,7 @@ commands
   continue
 end
 
-break *'FXList::doFXPos(Coord3D const*, Matrix3D const*, float, Coord3D const*, float, Object const*, Object const*, bool) const' if TheGameLogic && TheGameLogic->m_frame == 890
+break *'FXList::doFXPos(Coord3D const*, Matrix3D const*, float, Coord3D const*, float, Object const*, Object const*) const' if TheGameLogic && TheGameLogic->m_frame == 890
 commands
   silent
   if primary != 0
