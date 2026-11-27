@@ -125,3 +125,4 @@
 3 lua-bulk-effects
 3 lua-bulk-edges
 3 lua-fear
+3 lua-handler-effects

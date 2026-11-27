@@ -1,0 +1,45 @@
+218 create Player_1 LuaHandlerActor 0 3180,2740,0
+219 create PlyrCreeps LuaHandlerActor 0 3190,2770,0
+220 create Player_1 LastAllianceTower 0 3210,2770,0
+221 lua-handler-power Player_1 LastAllianceTower 0 SpecialAbilityCellarDoorSummon
+222 lua-handler-power Player_1 LastAllianceTower 0 SpecialAbilityDwarvenMineshaftTunnelCollapse
+222 lua-handler-present * DurinROPPing 0
+222 lua-handler-present PlyrCreeps TreasureChest1000 0
+223 lua-handler-condition Player_1 LastAllianceTower 0 USER_31
+225 lua-handler-power Player_1 LastAllianceTower 0 SpecialAbilityCellarDoorSummon
+226 lua-handler-present * DurinROPPing 0
+226 lua-handler-present PlyrCreeps TreasureChest1000 0
+227 create PlyrCreeps NeutralGollum_RingStealer 0 3200,2690,0
+228 grant Player_1 - 0 Upgrade_RingHero
+229 lua-handler-hit Player_1 LuaHandlerActor 0 PlyrCreeps:NeutralGollum_RingStealer:0
+231 create Player_1 AngmarFortress 0 3090,2530,0
+232 lua-handler-geometry Player_1 AngmarFortress 0 HighTowerGeom
+233 lua-handler-appearance Player_1 AngmarFortress 0 DBFBANNER
+235 create Player_1 LuaHandlerPlotOne 0 3170,2500,0
+236 create Player_1 LuaHandlerPlotTwo 0 3240,2500,0
+237 lua-handler-build Player_1 LuaHandlerPlotOne 0 ArnorGarrisonTowerExpansion
+238 lua-handler-build Player_1 LuaHandlerPlotTwo 0 ArnorGarrisonTowerExpansion
+241 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 0 VersionOne
+241 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 0 VersionTwo
+242 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 1 VersionOne
+242 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 1 VersionTwo
+260 lua-handler-remove-upgrade Player_1 - 0 Upgrade_RingHero
+261 lua-handler-hit Player_1 LuaHandlerActor 0 PlyrCreeps:NeutralGollum_RingStealer:0
+263 lua-handler-present Player_1 NeutralGollum_RingStealer 0
+262 lua-handler-geometry Player_1 AngmarFortress 0 HighTowerGeom
+263 lua-handler-appearance Player_1 AngmarFortress 0 DBFBANNER
+264 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 0 VersionOne
+264 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 0 VersionTwo
+265 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 1 VersionOne
+265 lua-handler-geometry Player_1 ArnorGarrisonTowerExpansion 1 VersionTwo
+266 lua-bulk-model-condition PlyrCreeps LuaHandlerActor 0 EMOTION_UNCONTROLLABLY_AFRAID
+267 lua-bulk-model-condition Player_1 LuaHandlerActor 0 EMOTION_UNCONTROLLABLY_AFRAID
+268 lua-handler-present * DurinROPPing 0
+268 lua-handler-power Player_1 LastAllianceTower 0 SpecialAbilityDwarvenMineshaftTunnelCollapse
+285 create PlyrCreeps GoblinCaveTroll 0 3370,2690,0
+286 create Player_1 LuaHandlerActor 1 3400,2690,0
+287 lua-bulk-model-condition PlyrCreeps GoblinCaveTroll 0 WEAPONSET_RAMPAGE
+288 lua-handler-condition PlyrCreeps GoblinCaveTroll 0 REALLYDAMAGED
+289 lua-bulk-model-condition PlyrCreeps GoblinCaveTroll 0 WEAPONSET_RAMPAGE
+290 lua-handler-scripted Player_1 LuaHandlerActor 1 BeAfraidOfRampage
+291 lua-bulk-model-condition Player_1 LuaHandlerActor 1 EMOTION_AFRAID

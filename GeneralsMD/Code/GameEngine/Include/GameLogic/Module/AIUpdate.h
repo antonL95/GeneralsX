@@ -356,6 +356,8 @@ public:
 
 	virtual const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	void setLuaForbidPlayerCommands(Bool forbidden) { m_luaForbidPlayerCommands = forbidden ? SCRIPT_FORBID : SCRIPT_ALLOW; }
+	void queueLuaAllegiance(const Team& team);
+	UnsignedInt getLuaPendingTeam() const { return m_luaPendingTeam; }
 	Bool areTurretsLinked() const { return getAIUpdateModuleData()->m_turretsLinked; }
 
 	// this is present solely for some transports to override, so that they can land before
@@ -895,6 +897,7 @@ private:
 	Bool m_rampageWeaponPrimed = FALSE;
 	enum ScriptCommandPolicy { SCRIPT_USES_INI, SCRIPT_ALLOW, SCRIPT_FORBID };
 	Int m_luaForbidPlayerCommands = SCRIPT_USES_INI;
+	UnsignedInt m_luaPendingTeam = 0;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

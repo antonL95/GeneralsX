@@ -1141,6 +1141,12 @@ void AIUpdateInterface::setQueueForPathTime(Int frames)
 }
 
 //-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::queueLuaAllegiance(const Team& team)
+{
+	m_luaPendingTeam = team.getID();
+	wakeUpNow();
+}
+
 void AIUpdateInterface::wakeUpNow()
 {
 #ifdef SLEEPY_AI
@@ -1472,7 +1478,14 @@ UpdateSleepTime AIUpdateInterface::update()
 	doSurrenderUpdateStuff();
 #endif
 
+	if (const auto pendingTeam = std::exchange(m_luaPendingTeam, TEAM_ID_INVALID); pendingTeam != TEAM_ID_INVALID)
+		if (Team* team = TheTeamFactory->findTeamByID(pendingTeam))
+			getObject()->defect(team, 0);
+
 	m_isInUpdate = FALSE;
+
+	if (m_luaPendingTeam != TEAM_ID_INVALID)
+		return UPDATE_SLEEP_NONE;
 
 	if (m_completedWaypoint != nullptr)
 	{
@@ -2724,8 +2737,9 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							{
 								Real dist = WWMath::SqrtfOrigin(dSqr);
 								if (dist<1) dist = 1;
-								pos.x += 2*PATHFIND_CELL_SIZE_F*dx/(dist*LOGICFRAMES_PER_SECOND);
-								pos.y += 2*PATHFIND_CELL_SIZE_F*dy/(dist*LOGICFRAMES_PER_SECOND);
+								const Real framesPerSecond = static_cast<Real>(LOGICFRAMES_PER_SECOND);
+								pos.x += 2*PATHFIND_CELL_SIZE_F*dx/(dist*framesPerSecond);
+								pos.y += 2*PATHFIND_CELL_SIZE_F*dy/(dist*framesPerSecond);
 								if (onGround)
 									pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 								getObject()->setPosition(&pos);
@@ -6208,6 +6222,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferInt(&m_luaForbidPlayerCommands);
 		}, [this] {
 			m_luaForbidPlayerCommands = SCRIPT_USES_INI;
+		} },
+		{ "script-allegiance", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_luaPendingTeam);
+		}, [this] {
+			m_luaPendingTeam = TEAM_ID_INVALID;
 		} },
 		{ "skirmish-ring-return", [this](Xfer* x) {
 			x->xferBool(&m_retailRingReturn);

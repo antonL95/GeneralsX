@@ -4763,6 +4763,8 @@ void Object::crc( Xfer *xfer )
 			xfer->xferUnsignedInt(&burningDeathUntil);
 			UnsignedInt fearUntil = ai->getRetailFearDeadline();
 			xfer->xferUnsignedInt(&fearUntil);
+			UnsignedInt pendingTeam = ai->getLuaPendingTeam();
+			xfer->xferUnsignedInt(&pendingTeam);
 			UnsignedInt rampageUntil = ai->getRetailRampageDeadline();
 			xfer->xferUnsignedInt(&rampageUntil);
 			Coord3D pursuitOrigin = ai->getRetailPursuitOrigin();

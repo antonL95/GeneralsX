@@ -297,16 +297,20 @@ void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 
+	const Bool ready = isReady();
 	Coord3D creationCoord;
 	creationCoord.set( *getObject()->getPosition() );
 
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
 
-	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !canCastWhilePaused(commandOptions)))
+	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !canCastWhilePaused(commandOptions) && !ready))
 		return;
 
-	const ObjectCreationList* ocl = findOCL();
-	ObjectCreationList::create( ocl, getObject(), &creationCoord, &creationCoord, false );
+	if (const ObjectCreationList* ocl = findOCL())
+	{
+		m_lastCastAccepted = TRUE;
+		ObjectCreationList::create(ocl, getObject(), &creationCoord, nullptr, false);
+	}
 }
 
 Bool OCLSpecialPower::canCastWhilePaused(UnsignedInt commandOptions) const

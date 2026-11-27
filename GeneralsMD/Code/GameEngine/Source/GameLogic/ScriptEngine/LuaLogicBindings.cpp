@@ -259,9 +259,11 @@ int changeAllegianceFromNonPlayablePlayer(lua_State* state)
 {
 	Object* object = getObject(state, 1);
 	const auto* current = getPlayer(object);
-	auto* owner = getPlayer(getObject(state, 2));
-	if (current && owner && !current->isPlayableSide() && owner->isPlayableSide())
-		object->setTeam(owner->getDefaultTeam());
+	const auto* attacker = getObject(state, 2);
+	const auto* team = attacker ? attacker->getTeam() : nullptr;
+	if (current && team && !current->isPlayableSide())
+		if (auto* ai = object->getAIUpdateInterface())
+			ai->queueLuaAllegiance(*team);
 	return 0;
 }
 

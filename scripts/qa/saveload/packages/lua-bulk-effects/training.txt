@@ -11,7 +11,9 @@
 1120 create Player_1 LuaBulkFearRecipient 0 3315,2895,0
 1121 create PlyrCreeps LuaBulkFearRecipient 0 3305,2895,0
 1122 lua-bulk-model-condition PlyrCreeps LuaBulkFearRecipient 0 EMOTION_UNCONTROLLABLY_AFRAID
-1123 lua-bulk Player_1 MirkwoodThranduil 0 ThranduilFunctions:UserTwoIsActive 3310 2900
+1122 create Player_1 MirkwoodThranduil 0 3310,2900,0
+1123 lua-handler-condition Player_1 MirkwoodThranduil 0 USER_2
 1124 lua-bulk-model-condition PlyrCreeps LuaBulkFearRecipient 0 EMOTION_UNCONTROLLABLY_AFRAID
-1125 lua-bulk-model-condition Player_1 LuaBulkFearRecipient 0 EMOTION_UNCONTROLLABLY_AFRAID
+1125 lua-bulk-model-condition PlyrCreeps LuaBulkFearRecipient 0 EMOTION_UNCONTROLLABLY_AFRAID
+1126 lua-bulk-model-condition Player_1 LuaBulkFearRecipient 0 EMOTION_UNCONTROLLABLY_AFRAID
 1130 lua-bulk Player_1 LuaBulkForcedRegistration 0 BaseScriptFunctions:ReallyDamaged 3310 2900
