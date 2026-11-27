@@ -30,6 +30,7 @@
 #include "WWMath/vector4.h"
 
 #include <array>
+#include <optional>
 
 class INI;
 
@@ -84,6 +85,8 @@ class WeatherSetting : public Overridable
 		Coord2D	m_cloudOffsetPerSecond = {};
 		AsciiString m_cloudEffectTexture;
 		AsciiString m_darkCloudTexture;
+		Real m_cloudEffectAngle = 0.0f;
+		std::optional<Real> m_cloudScrollSpeed;
 		RGBColor m_cloudDarkeningFactor = {};
 		Real	m_cloudDarkeningRate = 255.0f;
 		Real	m_cloudLighteningRate = 255.0f;
@@ -92,6 +95,7 @@ class WeatherSetting : public Overridable
 		GameClientRandomVariable m_cloudLightningDuration{};
 		GameClientRandomVariable m_cloudLightningIntensity{};
 		Bool m_jitterCloudLightningIntensity = FALSE;
+		AsciiString m_cloudLightningFX;
 
 		static void parseRetailPreset(INI* ini);
 

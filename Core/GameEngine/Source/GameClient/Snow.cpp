@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the Game
+#include "GameClient/FXList.h"
 #include "GameClient/Snow.h"
 #include "GameClient/View.h"
 #include "Common/AudioEventRTS.h"
@@ -36,6 +37,7 @@
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailINIStartup.h"
+#include "GameLogic/TerrainLogic.h"
 #if !RTS_GENERALS
 #include "GameLogic/GameLogic.h"
 #endif
@@ -45,6 +47,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <string>
 
@@ -116,6 +119,18 @@ static void loadRetailCloudEffect(WeatherSetting &weather)
 				if (row >> value)
 					weather.m_darkCloudTexture = value.c_str();
 			}
+			else if (stricmp(name.c_str(), "Angle") == 0)
+			{
+				Real angle;
+				if ((row >> angle) && std::isfinite(angle))
+					weather.m_cloudEffectAngle = angle;
+			}
+			else if (stricmp(name.c_str(), "CloudScrollSpeed") == 0)
+			{
+				Real speed;
+				if ((row >> speed) && std::isfinite(speed))
+					weather.m_cloudScrollSpeed = speed;
+			}
 			else if (stricmp(name.c_str(), "DarkeningFactor") == 0)
 			{
 				RGBColor color = weather.m_cloudDarkeningFactor;
@@ -177,8 +192,23 @@ static void loadRetailCloudEffect(WeatherSetting &weather)
 				if (row >> value)
 					weather.m_jitterCloudLightningIntensity = stricmp(value.c_str(), "Yes") == 0;
 			}
+			else if (stricmp(name.c_str(), "LightningFX") == 0)
+			{
+				std::string value;
+				if (row >> value)
+					weather.m_cloudLightningFX = value.c_str();
+			}
 		}
 	}
+}
+
+static void createWeatherOverride(WeatherSetting& source)
+{
+	WeatherSetting* overrideSetting = newInstance(WeatherSetting);
+	*overrideSetting = source;
+	overrideSetting->setNextOverride(nullptr);
+	overrideSetting->markAsOverride();
+	source.friend_getFinalOverride()->setNextOverride(overrideSetting);
 }
 
 void SnowManager::updateIniSettings()
@@ -327,6 +357,18 @@ void SnowManager::updateRetailWeatherPresentation(Int state, UnsignedInt frame)
 	if (traceWeather)
 		std::fprintf(stderr, "TEST weather-lightning frame=%u duration=%u intensity=%.3f\n",
 			frame, m_lightningTicks, m_lightningIntensity);
+
+	if (TheFXListStore && TheTerrainLogic && weather.m_cloudLightningFX.isNotEmpty() &&
+		weather.m_cloudLightningFX.isNotNone())
+	{
+		if (const FXList* effect = TheFXListStore->findFXList(weather.m_cloudLightningFX.str()))
+		{
+			Region3D extent{};
+			TheTerrainLogic->getExtent(&extent);
+			const Coord3D position{std::midpoint(extent.lo.x, extent.hi.x), std::midpoint(extent.lo.y, extent.hi.y), 0.0f};
+			FXList::doFXPos(effect, &position);
+		}
+	}
 }
 
 RGBColor SnowManager::getRetailCloudyLightScale() const
@@ -519,14 +561,7 @@ void INI::parseWeatherDefinition( INI *ini )
 		TheWeatherSetting = newInstance(WeatherSetting);
 	} else if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
 		WeatherSetting* ws = (WeatherSetting*) (TheWeatherSetting.getNonOverloadedPointer());
-		WeatherSetting* wsOverride = newInstance(WeatherSetting);
-		*wsOverride = retail ? *static_cast<WeatherSetting *>(ws->friend_getFinalOverride()) : *ws;
-		wsOverride->setNextOverride(nullptr);
-
-		// Mark that it is an override.
-		wsOverride->markAsOverride();
-
-		ws->friend_getFinalOverride()->setNextOverride(wsOverride);
+		createWeatherOverride(retail ? *static_cast<WeatherSetting *>(ws->friend_getFinalOverride()) : *ws);
 	} else {
 		throw INI_INVALID_DATA;
 	}
@@ -550,10 +585,20 @@ static void parseCloudEffectField(INI* ini, void* instance, void*, const void*)
 	Parse(ini, instance, &(weather->*Member), nullptr);
 }
 
+static void parseCloudScrollSpeed(INI* ini, void* instance, void*, const void*)
+{
+	Real speed = 0.0f;
+	INI::parseReal(ini, instance, &speed, nullptr);
+	if (std::isfinite(speed))
+		static_cast<WeatherSetting*>(instance)->m_cloudScrollSpeed = speed;
+}
+
 static const FieldParse retailCloudEffectFields[] =
 {
 	{ "CloudTexture", parseCloudEffectField<&WeatherSetting::m_cloudEffectTexture, INI::parseAsciiString>, nullptr, 0 },
 	{ "DarkCloudTexture", parseCloudEffectField<&WeatherSetting::m_darkCloudTexture, INI::parseAsciiString>, nullptr, 0 },
+	{ "Angle", parseCloudEffectField<&WeatherSetting::m_cloudEffectAngle, INI::parseReal>, nullptr, 0 },
+	{ "CloudScrollSpeed", parseCloudScrollSpeed, nullptr, 0 },
 	{ "DarkeningFactor", parseCloudEffectField<&WeatherSetting::m_cloudDarkeningFactor, INI::parseRGBColor>, nullptr, 0 },
 	{ "DarkeningRate", parseCloudEffectField<&WeatherSetting::m_cloudDarkeningRate, INI::parseReal>, nullptr, 0 },
 	{ "LighteningRate", parseCloudEffectField<&WeatherSetting::m_cloudLighteningRate, INI::parseReal>, nullptr, 0 },
@@ -561,6 +606,7 @@ static const FieldParse retailCloudEffectFields[] =
 	{ "LightningDuration", parseCloudEffectField<&WeatherSetting::m_cloudLightningDuration, INI::parseGameClientRandomVariable>, nullptr, 0 },
 	{ "LightningIntensity", parseCloudEffectField<&WeatherSetting::m_cloudLightningIntensity, INI::parseGameClientRandomVariable>, nullptr, 0 },
 	{ "JitterLightningLightIntensity", parseCloudEffectField<&WeatherSetting::m_jitterCloudLightningIntensity, INI::parseBool>, nullptr, 0 },
+	{ "LightningFX", parseCloudEffectField<&WeatherSetting::m_cloudLightningFX, INI::parseAsciiString>, nullptr, 0 },
 	{ nullptr, nullptr, nullptr, 0 },
 };
 
@@ -569,8 +615,10 @@ void INI::parseCloudEffectDefinition( INI *ini )
 	if (TheWeatherSetting == nullptr)
 		TheWeatherSetting = newInstance(WeatherSetting);
 
-	WeatherSetting *weatherSet = (WeatherSetting *)(TheWeatherSetting.getNonOverloadedPointer());
-	weatherSet = (WeatherSetting *)(weatherSet->friend_getFinalOverride());
+	auto* base = const_cast<WeatherSetting*>(TheWeatherSetting.getNonOverloadedPointer());
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES && !base->getNextOverride())
+		createWeatherOverride(*base);
+	auto* weatherSet = static_cast<WeatherSetting*>(base->friend_getFinalOverride());
 	MultiIniFieldParse fields;
 	fields.add(retailCloudEffectFields);
 	ini->initFromINIMulti(weatherSet, fields);

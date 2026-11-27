@@ -1,0 +1,5 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+20 create Player_1 MordorSpellBook 0 2520,1010,0
+23 reveal Player_1 GondorGandalf 0
+36 pkg35-cast Player_1 MordorSpellBook 0 SpellBookDarkness 2520 1010
+38 weatherstate - - 0

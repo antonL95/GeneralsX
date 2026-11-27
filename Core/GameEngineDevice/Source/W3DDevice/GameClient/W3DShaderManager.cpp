@@ -78,6 +78,9 @@
 #include "d3dx8tex.h"
 #include "WW3D2/dx8caps.h"
 
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
 #define do_not_DISABLE_PIXEL_SHADERS 1
@@ -1638,14 +1641,28 @@ void TerrainShader2Stage::updateCloud()
 	const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
 	const auto *weather = map && map->hasRetailEnvironment() && TheWeatherSetting
 		? TheWeatherSetting.operator->() : nullptr;
-	const auto speed = weather && weather->m_cloudTextureSize.x > 0 && weather->m_cloudTextureSize.y > 0
+	auto speed = weather && weather->m_cloudTextureSize.x > 0 && weather->m_cloudTextureSize.y > 0
 		? weather->m_cloudOffsetPerSecond : Coord2D{m_xSlidePerSecond, m_ySlidePerSecond};
-	m_xOffset += speed.x * frame_time;
-	m_yOffset += speed.y * frame_time;
-
-	// This moves offsets towards zero when smaller -1.0 or larger 1.0
-	m_xOffset -= (Int)m_xOffset;
-	m_yOffset -= (Int)m_yOffset;
+	const bool scrollDarkCloud = weather && weather->m_cloudScrollSpeed &&
+		std::isfinite(weather->m_cloudEffectAngle) && weather->m_darkCloudTexture.isNotEmpty() &&
+		TheSnowManager && TheSnowManager->isRetailCloudyActive();
+	if (scrollDarkCloud)
+	{
+		const Real angle = DEG_TO_RADF(std::remainder(weather->m_cloudEffectAngle, 360.0f));
+		const Real uvPerSecond = *weather->m_cloudScrollSpeed * 0.01f * 0.002f * 1000.0f;
+		speed = {-WWMath::Cos(angle) * uvPerSecond, WWMath::Sin(angle) * uvPerSecond};
+	}
+	const auto wrapOffset = [frame_time](Real offset, Real velocity)
+	{
+		const Real updated = offset + velocity * frame_time;
+		return std::isfinite(updated) ? std::fmod(updated, 1.0f) : 0.0f;
+	};
+	m_xOffset = wrapOffset(m_xOffset, speed.x);
+	m_yOffset = wrapOffset(m_yOffset, speed.y);
+	static const bool traceWeather = std::getenv("GENERALSX_TEST_WEATHER_DRAW") != nullptr;
+	if (traceWeather && scrollDarkCloud)
+		std::fprintf(stderr, "TEST weather-cloud-motion speed=%.6f,%.6f uv=%.6f,%.6f\n",
+			speed.x, speed.y, m_xOffset, m_yOffset);
 }
 
 void TerrainShader2Stage::updateNoise1(D3DXMATRIX *destMatrix,D3DXMATRIX *curViewInverse, Bool doUpdate)
