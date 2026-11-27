@@ -95,6 +95,7 @@ public:
 private:
 	void unpack(Bool charge = FALSE);
 	void checkKeep();
+	Bool hasOccupiedPlots() const;
 	void killEverything();
 	void repack();
 	void scanForCapture();

@@ -156,8 +156,6 @@ UpdateSleepTime CastleBehavior::update()
 		scanForCapture();
 		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 	}
-	if (m_keep == INVALID_ID)
-		return UPDATE_SLEEP_FOREVER;
 	if (m_keepLost)
 	{
 		if (getCastleBehaviorModuleData()->m_keepDeathKillsEverything)
@@ -165,7 +163,8 @@ UpdateSleepTime CastleBehavior::update()
 		const UnsignedInt frame = TheGameLogic->getFrame();
 		if (frame < m_unpackFrame)
 			return UPDATE_SLEEP(m_unpackFrame - frame);
-		repack();
+		if (!hasOccupiedPlots())
+			repack();
 		return UPDATE_SLEEP_NONE;
 	}
 
@@ -175,14 +174,16 @@ UpdateSleepTime CastleBehavior::update()
 
 void CastleBehavior::checkKeep()
 {
-	const Object* keep = TheGameLogic->findObjectByID(m_keep);
-	switch (CastleRules::keepAction(keep != nullptr, keep && keep->isEffectivelyDead(),
+	const Object* keep = m_keep == INVALID_ID ? nullptr : TheGameLogic->findObjectByID(m_keep);
+	switch (CastleRules::keepAction(keep != nullptr, keep && (keep->isEffectivelyDead() || keep->isDestroyed()),
 		getCastleBehaviorModuleData()->m_keepDeathKillsEverything))
 	{
 	case CastleRules::KeepAction::None:
 		return;
 	case CastleRules::KeepAction::Lost:
 	{
+		if (hasOccupiedPlots())
+			return;
 		m_keepLost = TRUE;
 		RetailEva::castleDestroyed(*getObject(), keep);
 		const Real time = getCastleBehaviorModuleData()->m_fadeTime;
@@ -196,6 +197,21 @@ void CastleBehavior::checkKeep()
 		killEverything();
 		return;
 	}
+}
+
+Bool CastleBehavior::hasOccupiedPlots() const
+{
+	for (ObjectID id : m_members)
+	{
+		const Object* member = TheGameLogic->findObjectByID(id);
+		if (!member || member->isDestroyed() || member->isKindOf(KINDOF_WALL_UPGRADE) ||
+			(!member->isKindOf(KINDOF_BASE_FOUNDATION) && !member->isKindOf(KINDOF_BASE_DEFENSE_FOUNDATION)))
+			continue;
+		const auto* plot = FoundationAIUpdate::find(*member);
+		if (plot && plot->getStructure())
+			return TRUE;
+	}
+	return FALSE;
 }
 
 CastleBehavior* CastleBehavior::find(const Object* object)
@@ -680,6 +696,8 @@ void CastleBehavior::loadPostProcess()
 	UpdateModule::loadPostProcess();
 	if (m_unpacked)
 	{
+		if (m_keep == INVALID_ID && friend_getNextCallFrame() == UPDATE_SLEEP_FOREVER)
+			friend_setNextCallFrame(TheGameLogic->getFrame());
 		if (Drawable* drawable = getObject()->getDrawable())
 			drawable->setDrawableHidden(TRUE);
 	}

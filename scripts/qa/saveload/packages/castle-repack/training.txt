@@ -1,0 +1,25 @@
+225 create Player_1 CastleRepackEmpty 0 3040,2050,0
+225 create Player_1 CastleRepackCamp 0 1300,1300,0
+225 create Player_1 CastleRepackFortress 0 3500,1580,0
+226 castle-repack-unpack Player_1 CastleRepackEmpty 0 CastleRepackEmptyRef
+226 castle-repack-unpack Player_1 CastleRepackCamp 0 CastleRepackCampRef
+226 castle-repack-unpack Player_1 CastleRepackFortress 0 CastleRepackFortressRef
+229 castle-repack-probe * CastleRepackFortress 0
+231 castle-repack-remove-keep Player_1 CastleRepackFortress 0
+243 castle-repack-probe * CastleRepackEmpty 0
+243 castle-repack-probe * CastleRepackCamp 0
+243 castle-repack-probe * CastleRepackFortress 0
+305 castle-repack-probe * CastleRepackEmpty 0
+305 castle-repack-probe * CastleRepackCamp 0
+305 castle-repack-probe * CastleRepackFortress 0
+306 destroy Player_1 CastleRepackCampOccupant 0
+309 castle-repack-probe * CastleRepackCamp 0
+310 destroy Player_1 CastleRepackDefenseOccupant 0
+310 destroy Player_1 CastleRepackFortressOccupant 0
+340 castle-repack-probe * CastleRepackCamp 0
+340 castle-repack-probe * CastleRepackFortress 0
+390 castle-repack-probe * CastleRepackCamp 0
+390 castle-repack-probe * CastleRepackFortress 0
+391 destroy * CastleRepackEmpty 0
+391 destroy * CastleRepackCamp 0
+391 destroy * CastleRepackFortress 0

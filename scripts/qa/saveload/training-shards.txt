@@ -109,3 +109,4 @@
 3 power-targets
 3 smaug-levels
 3 combat-leftovers
+4 castle-repack
