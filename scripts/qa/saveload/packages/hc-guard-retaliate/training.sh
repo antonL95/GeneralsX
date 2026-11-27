@@ -1,0 +1,19 @@
+check() {
+    if covers 244; then
+        expect 'TEST guard-retaliate frame=244 name=GuardRetaliateRanged retaliating=1 attacking=1 melee=0 stdRange=250.00 exitRadius=690.00 chaseFrames=150'
+        grep -E '^TEST guard-retaliate frame=244 name=GuardRetaliateMelee retaliating=1 attacking=1 melee=1 stdRange=287\.50 exitRadius=[0-9]+\.[0-9]+ chaseFrames=150$' "$log" >/dev/null
+    fi
+    if covers 245; then
+        expect 'TEST guard-retaliate frame=245 name=GuardRetaliateRanged retaliating=1 attacking=1 melee=0 stdRange=250.00 exitRadius=690.00 chaseFrames=150'
+        grep -E '^TEST guard-retaliate frame=245 name=GuardRetaliateMelee retaliating=1 attacking=1 melee=1 stdRange=287\.50 exitRadius=[0-9]+\.[0-9]+ chaseFrames=150$' "$log" >/dev/null
+    fi
+    if covers 265; then
+        grep -E '^TEST guard-retaliate frame=265 name=GuardRetaliateRanged retaliating=[01] attacking=0 melee=0 stdRange=250\.00 exitRadius=690\.00 chaseFrames=150$' "$log" >/dev/null
+    fi
+    if covers 410; then
+        grep -E '^TEST guard-retaliate frame=410 name=GuardRetaliateMelee retaliating=1 attacking=1 melee=1 stdRange=287\.50 exitRadius=[0-9]+\.[0-9]+ chaseFrames=150$' "$log" >/dev/null
+    fi
+    if covers 475; then
+        grep -E '^TEST guard-retaliate frame=475 name=GuardRetaliateMelee retaliating=[01] attacking=0 melee=1 stdRange=287\.50 exitRadius=[0-9]+\.[0-9]+ chaseFrames=150$' "$log" >/dev/null
+    fi
+}
