@@ -50,9 +50,10 @@
 450 destroy Player_1 PausedOclGuldurFortress 0
 450 destroy Player_1 PausedOclRazari 1
 450 destroy Player_1 PausedOclRazari 0
-450 destroy PlyrCreeps PausedOclEnemy 2
-450 destroy PlyrCreeps PausedOclEnemy 1
-450 destroy PlyrCreeps PausedOclEnemy 0
+450 destroy * PausedOclEnemy 2
+450 destroy * PausedOclEnemy 1
+450 destroy * PausedOclEnemy 0
+452 paused-ocl-state * PausedOclEnemy 0
 189 paused-ocl-probe Player_1 PausedOclRazari 0 Command_SpecialAbilityWrathoftheBalchoth 3080 800
 209 paused-ocl-probe Player_1 PausedOclGuldurFortress 0 Command_SpecialAbilityGuldurEnsnareCaster 2780 800
 234 paused-ocl-probe Player_1 PausedOclRazari 1 Command_SpecialAbilityWrathoftheBalchoth 3080 1100

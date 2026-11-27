@@ -66,4 +66,7 @@ check() {
     if covers 288; then
         expect "TEST paused-ocl frame=288 object=PausedOclDurinMarker alive=1"
     fi
+    if covers 452; then
+        expect "TEST paused-ocl frame=452 object=PausedOclEnemy alive=0"
+    fi
 }
