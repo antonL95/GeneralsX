@@ -706,6 +706,7 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 	defineState( AI_FOLLOW_WAYPOINT_PATH_AS_TEAM_EXACT,		newInstance(AIFollowWaypointPathExactState)( this, true ), AI_IDLE, AI_IDLE );
 	defineState( AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS_EXACT,newInstance(AIFollowWaypointPathExactState)( this, false ), AI_IDLE, AI_IDLE );
 	defineState( AI_FOLLOW_PATH,													newInstance(AIFollowPathState)( this ), AI_IDLE, AI_IDLE );
+	defineState(AI_FOLLOW_FORMATION_PATH, newInstance(AIFollowPathState)(this), AI_IDLE, AI_IDLE);
 	defineState( AI_FOLLOW_EXITPRODUCTION_PATH,						newInstance(AIFollowPathState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_AND_EVACUATE,					newInstance(AIMoveAndEvacuateState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_AND_EVACUATE_AND_EXIT,	newInstance(AIMoveAndEvacuateState)( this ), AI_MOVE_AND_DELETE, AI_MOVE_AND_DELETE );
@@ -3310,6 +3311,8 @@ void AIFollowPathState::xfer( Xfer *xfer )
 	xfer->xferInt(&m_index);
 	xfer->xferBool(&m_adjustFinal);
 	xfer->xferBool(&m_adjustFinalOverride);
+	if (getID() == AI_FOLLOW_FORMATION_PATH && xfer->getXferMode() == XFER_LOAD)
+		getMachineOwner()->getAI()->friend_setCurrentGoalPathIndex(m_index);
 	if (RetailFileLayers::enabled())
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, version >= 2, {
@@ -3338,6 +3341,19 @@ StateReturnType AIFollowPathState::onEnter()
 
 	if (pos == nullptr)
 		return STATE_FAILURE;
+
+	if (getID() == AI_FOLLOW_FORMATION_PATH)
+	{
+		while (const Coord3D* next = ai->friend_getGoalPathPosition(m_index + 1))
+		{
+			const Coord3D toWaypoint = *pos - *obj->getPosition();
+			const Coord3D outgoing = *next - *pos;
+			if (toWaypoint.x * outgoing.x + toWaypoint.y * outgoing.y >= 0.0f)
+				break;
+			++m_index;
+			pos = next;
+		}
+	}
 
 	// set initial movement goal
 	m_goalPosition = *pos;
@@ -3402,6 +3418,8 @@ void AIFollowPathState::onExit( StateExitType status )
 	// turn off precision-z-pos when we exit, just in case.
 	AIUpdateInterface *ai = getMachineOwner()->getAI();
 	if (!ai) return;
+	if (getID() == AI_FOLLOW_FORMATION_PATH)
+		ai->setWaitingForFormationWaypoint(FALSE);
 	ai->endRetailGroupRoute(status == EXIT_NORMAL && ai->friend_getGoalPathPosition(m_index) == nullptr);
 	ai->setCanPathThroughUnits(false);
 	if (ai->getCurLocomotor())
@@ -3419,12 +3437,14 @@ StateReturnType AIFollowPathState::update()
 	Object *obj = getMachineOwner();
 	AIUpdateInterface *ai = obj->getAI();
 	const Bool groupRoute = ai->isFollowingRetailGroupRoute();
-	// do movement
-	StateReturnType status = AIInternalMoveToState::update();
+	const Bool releasing = ai->isWaitingForFormationWaypoint();
+	if (releasing && !ai->canAdvanceFormationWaypoint())
+		return STATE_CONTINUE;
+	const StateReturnType status = releasing ? STATE_SUCCESS : AIInternalMoveToState::update();
 	// if move to has finished, move to next point on path
 	if (status == STATE_SUCCESS || status == STATE_FAILURE)
 	{
-		if (groupRoute &&
+		if (groupRoute && !releasing &&
 			(status == STATE_FAILURE || sqr(obj->getPosition()->x - m_goalPosition.x) +
 				sqr(obj->getPosition()->y - m_goalPosition.y) >= sqr(PATHFIND_CELL_SIZE_F)))
 		{
@@ -3434,11 +3454,28 @@ StateReturnType AIFollowPathState::update()
 			computePath();
 			return STATE_CONTINUE;
 		}
-		if (status == STATE_FAILURE && m_retryCount>0) {
-			// If we failed, & haven't reached retry limit, try again.  jba.
-			m_retryCount--;
-		}	else {
+		if (releasing)
+			ai->setWaitingForFormationWaypoint(FALSE);
+		else if (status == STATE_FAILURE && m_retryCount > 0)
+			--m_retryCount;
+		else
+		{
 			++m_index;
+			if (getID() == AI_FOLLOW_FORMATION_PATH && m_index == 1)
+			{
+				ai->friend_setCurrentGoalPathIndex(m_index);
+				const Coord3D* waypoint = ai->friend_getGoalPathPosition(m_index);
+				if (waypoint && !ai->canAdvanceFormationWaypoint())
+				{
+					const Coord3D direction = *waypoint - *obj->getPosition();
+					if (direction.x != 0.0f || direction.y != 0.0f)
+						ai->setLocomotorGoalOrientation(WWMath::Atan2Origin(direction.y, direction.x));
+					else
+						ai->setLocomotorGoalNone();
+					ai->setWaitingForFormationWaypoint(TRUE);
+					return STATE_CONTINUE;
+				}
+			}
 		}
 		const Coord3D *pos = ai->friend_getGoalPathPosition( m_index );
 

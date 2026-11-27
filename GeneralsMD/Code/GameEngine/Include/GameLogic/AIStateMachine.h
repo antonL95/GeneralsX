@@ -103,6 +103,7 @@ enum AIStateType CPP_11(: Int)
 	AI_BUSY,																	///< This is a state that things will be in when they are busy doing random stuff that doesn't require AI interaction.
 	AI_EXIT_INSTANTLY,												///< exit this obj, without waiting -- do it in the onEnter! This frame!
 	AI_GUARD_RETALIATE,												///< attacks attacker but with restrictions (hybrid of attack and guard).
+	AI_FOLLOW_FORMATION_PATH = 0x36,
 };
 
 //-----------------------------------------------------------------------------------------------------------

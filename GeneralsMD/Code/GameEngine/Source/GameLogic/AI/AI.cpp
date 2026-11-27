@@ -193,6 +193,7 @@ static const FieldParse TheAIFieldParseTable[] =
  	{ "VehiclePathfindDiameter",		INI::parseInt,nullptr,			offsetof( TAiData, m_vehiclePathfindDiameter ) },
 	{ "WadeWaterDepth",					INI::parseReal,nullptr,			offsetof( TAiData, m_wadeWaterDepth ) },
 	{ "DeepWaterDepth",					INI::parseReal,nullptr,			offsetof( TAiData, m_deepWaterDepth ) },
+	{ "WaitForOthers",					INI::parseBool,nullptr,			offsetof( TAiData, m_waitForOthers ) },
  	{ "RebuildDelayTimeSeconds",		INI::parseInt,nullptr,			offsetof( TAiData, m_rebuildDelaySeconds ) },
  	{ "SupplyCenterSafeRadius",			INI::parseReal,nullptr,			offsetof( TAiData, m_supplyCenterSafeRadius ) },
 

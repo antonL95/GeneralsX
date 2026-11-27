@@ -1875,14 +1875,17 @@ Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType c
 	}
 
 	Object* leader = sharedRoute ? representative->object : movers.front().object;
+	const Bool waitForOthers = TheAI->getAiData()->m_waitForOthers;
 
 	for (RotwkGroupMove& move : movers)
 	{
 		Object* obj = move.object;
 		AIUpdateInterface* ai = obj->getAIUpdateInterface();
 		obj->setFormationID(NO_FORMATION_ID);
-		if (sharedRoute && move.waypoints.size() > 1)
+		if (waitForOthers || (sharedRoute && move.waypoints.size() > 1))
 		{
+			if (!sharedRoute || move.waypoints.empty())
+				move.waypoints.assign(1, move.destination);
 			ai->aiFollowRetailGroupPath(&move.waypoints, leader, cmdSource);
 			if (ai->isFollowingRetailGroupRoute())
 				pathfinder->updateGoal(obj, &move.destination, layer);

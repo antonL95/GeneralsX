@@ -722,6 +722,9 @@ public:
 	void friend_setCurrentGoalPathIndex( Int index ) { m_nextGoalPathIndex = index; }
 	Bool isFollowingRetailGroupRoute() const;
 	Bool isMovingWithRetailGroup() const;
+	Bool canAdvanceFormationWaypoint() const;
+	Bool isWaitingForFormationWaypoint() const;
+	void setWaitingForFormationWaypoint(Bool waiting) { m_waitingForFormationWaypoint = waiting; }
 	void clearRetailGroupIdentity();
 	void endRetailGroupRoute(Bool arrived);
 #ifdef DEBUG_LOGGING
@@ -873,6 +876,7 @@ private:
 	Bool m_retailRingReturn = FALSE;
 	ObjectID m_retailGroupRouteLeader = INVALID_ID;
 	UnsignedInt m_retailGroupRouteFrame = 0;
+	Bool m_waitingForFormationWaypoint = FALSE;
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;

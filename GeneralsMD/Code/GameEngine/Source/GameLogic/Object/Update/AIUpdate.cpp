@@ -2582,6 +2582,13 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 				m_doFinalPosition = FALSE;
 			}
 		}
+		else if (isWaitingForFormationWaypoint())
+		{
+			m_curLocomotor->locoUpdate_maintainCurrentPosition(getObject());
+			if (m_locomotorGoalType == ANGLE && m_curLocomotor->getMinSpeed() == 0.0f)
+				m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x);
+			m_doFinalPosition = FALSE;
+		}
 		else
 		{
 			switch (m_locomotorGoalType)
@@ -3891,7 +3898,9 @@ void AIUpdateInterface::privateFollowPathAppend( const Coord3D *pos, CommandSour
 	// We're adding a dynamic waypoint!
 	Bool effectivelyMoving = isMoving() || isWaitingForPath();
 
-	if (getAIStateType() == AI_FOLLOW_PATH && getStateMachine()->getGoalPathSize() > 0 && effectivelyMoving)
+	const AIStateType state = getAIStateType();
+	if ((state == AI_FOLLOW_PATH || state == AI_FOLLOW_FORMATION_PATH) &&
+		getStateMachine()->getGoalPathSize() > 0 && effectivelyMoving)
 	{
 		//We already have a path, so simply add the point to the end of it!
 		getStateMachine()->addToGoalPath(pos);
@@ -3954,25 +3963,96 @@ void AIUpdateInterface::startFollowPath(std::vector<Coord3D>* path, Object* igno
 	ignoreObstacle(ignoreObject);
 
 	// start us following
-	getStateMachine()->setState( exitProduction ? AI_FOLLOW_EXITPRODUCTION_PATH : AI_FOLLOW_PATH );
+	StateID state = AI_FOLLOW_PATH;
+	if (exitProduction)
+		state = AI_FOLLOW_EXITPRODUCTION_PATH;
+	else if (retailGroupLeader != INVALID_ID && TheAI->getAiData()->m_waitForOthers)
+		state = AI_FOLLOW_FORMATION_PATH;
+	getStateMachine()->setState(state);
 
 }
 
 Bool AIUpdateInterface::isFollowingRetailGroupRoute() const
 {
-	return m_retailGroupRouteLeader != INVALID_ID && getStateMachine()->getCurrentStateID() == AI_FOLLOW_PATH;
+	const StateID state = getStateMachine()->getCurrentStateID();
+	return m_retailGroupRouteLeader != INVALID_ID && (state == AI_FOLLOW_PATH || state == AI_FOLLOW_FORMATION_PATH);
 }
 
 Bool AIUpdateInterface::isMovingWithRetailGroup() const
 {
-	const StateID state = getStateMachine()->getCurrentStateID();
-	return m_retailGroupRouteLeader != INVALID_ID && (state == AI_MOVE_TO || state == AI_FOLLOW_PATH);
+	return isFollowingRetailGroupRoute() ||
+		(m_retailGroupRouteLeader != INVALID_ID && getStateMachine()->getCurrentStateID() == AI_MOVE_TO);
+}
+
+Bool AIUpdateInterface::isWaitingForFormationWaypoint() const
+{
+	return m_waitingForFormationWaypoint && getStateMachine()->getCurrentStateID() == AI_FOLLOW_FORMATION_PATH &&
+		getStateMachine()->getTemporaryState() == INVALID_STATE_ID;
+}
+
+namespace
+{
+Bool wasDamagedWithinFormationWait(const Object& object)
+{
+	UnsignedInt damageFrame;
+	if (const HordeContain* horde = HordeContain::get(&object))
+	{
+		damageFrame = horde->getLastMemberDamageFrame();
+		if (damageFrame == 0)
+			return FALSE;
+	}
+	else
+	{
+		const BodyModuleInterface* body = object.getBodyModule();
+		const UnsignedInt* lastDamage = body ? body->getLastDamageTimestamp() : nullptr;
+		if (!lastDamage)
+			return FALSE;
+		damageFrame = *lastDamage;
+	}
+	const UnsignedInt now = TheGameLogic->getFrame();
+	return damageFrame <= now && now - damageFrame <= 4 * LOGICFRAMES_PER_SECOND;
+}
+}
+
+Bool AIUpdateInterface::canAdvanceFormationWaypoint() const
+{
+	const Object* mover = getObject();
+	const Player* player = mover->getControllingPlayer();
+	if (!TheAI->getAiData()->m_waitForOthers || !player ||
+		(m_curLocomotor && !m_curLocomotor->getWaitForFormation()) || wasDamagedWithinFormationWait(*mover))
+		return TRUE;
+
+	struct FormationWait
+	{
+		const Object* mover;
+		Int waypoint;
+		Bool waiting = FALSE;
+		Bool damaged = FALSE;
+	} wait{ mover, m_nextGoalPathIndex };
+	player->iterateObjects([](Object* peer, void* data) {
+		auto& group = *static_cast<FormationWait*>(data);
+		if (group.damaged || peer == group.mover || peer->getFormationID() != group.mover->getFormationID())
+			return;
+		if (wasDamagedWithinFormationWait(*peer))
+		{
+			group.damaged = TRUE;
+			return;
+		}
+		const AIUpdateInterface* ai = peer->getAI();
+		if (!ai || ai->getStateMachine()->getCurrentStateID() != AI_FOLLOW_FORMATION_PATH)
+			return;
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		if ((!locomotor || locomotor->getWaitForFormation()) && ai->m_nextGoalPathIndex != group.waypoint)
+			group.waiting = TRUE;
+	}, &wait);
+	return wait.damaged || !wait.waiting;
 }
 
 void AIUpdateInterface::clearRetailGroupIdentity()
 {
 	m_retailGroupRouteLeader = INVALID_ID;
 	m_retailGroupRouteFrame = 0;
+	m_waitingForFormationWaypoint = FALSE;
 }
 
 Bool AIUpdateInterface::ignoreRetailGroupAnchorContact(const Object* other) const
@@ -6113,6 +6193,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailGroupRouteLeader = INVALID_ID;
 			m_retailGroupRouteFrame = 0;
 		} },
+		{ "group-formation-handoff", [this](Xfer* x) {
+			x->xferBool(&m_waitingForFormationWaypoint);
+		}, [this] {
+			m_waitingForFormationWaypoint = FALSE;
+		} },
 		{ "rampage-weapon", [this](Xfer* x) {
 			x->xferBool(&m_rampageWeaponPrimed);
 		}, [this] {
@@ -6469,7 +6554,8 @@ Int AIUpdateInterface::friend_getWaypointGoalPathSize() const
 			// the goalpath should really be completely private, but at this point, this ugly scheme
 			// has to be lived with. (srj)
 			//
-	if (getAIStateType() != AI_FOLLOW_PATH)
+	const AIStateType state = getAIStateType();
+	if (state != AI_FOLLOW_PATH && state != AI_FOLLOW_FORMATION_PATH)
 		return 0;
 
 	return getStateMachine()->getGoalPathSize();

@@ -1,0 +1,12 @@
+25 create Player_1 WaitFormationNear 0 2830,180,-90
+25 create Player_1 WaitFormationFar 0 2700,180,-90
+25 create Player_1 WaitFormationHero 0 2770,335,-90
+25 create Player_1 WaitFormationBarracks 0 2950,190,0
+90 select Player_1 WaitFormationNear 0
+90 selectadd Player_1 WaitFormationFar 0
+90 selectadd Player_1 WaitFormationHero 0
+90 movesel - - 0 - 3150 260
+501 destroy Player_1 WaitFormationNear 0
+501 destroy Player_1 WaitFormationFar 0
+501 destroy Player_1 WaitFormationHero 0
+501 destroy Player_1 WaitFormationBarracks 0
