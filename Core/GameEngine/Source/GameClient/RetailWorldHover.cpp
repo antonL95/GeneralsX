@@ -4,8 +4,10 @@
 #include <cmath>
 #include <vector>
 
+#include "Common/GlobalData.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "GameClient/Drawable.h"
 #include "GameClient/GameText.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
@@ -14,12 +16,15 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/TooltipUpgrade.h"
 #include "GameLogic/Object.h"
 
 namespace
 {
 Bool hasHelpBox(const Object &object)
 {
+	if (TheGlobalData && !TheGlobalData->m_useHelpTextSystem)
+		return FALSE;
 	if (object.isKindOf(KINDOF_LINKED_TO_FLAG))
 		return TRUE;
 	return object.isLocallyControlled() && (object.isKindOf(KINDOF_STRUCTURE) || object.isKindOf(KINDOF_INFANTRY)
@@ -47,6 +52,26 @@ void addValue(UnicodeString &body, const char *label, const WideChar *fallback, 
 	UnicodeString line;
 	line.format(TheGameText->fetchOrSubstitute(label, fallback), value);
 	addLine(body, line);
+}
+
+UnicodeString helpBoxName(const Object &object, const UnicodeString &defaultName)
+{
+	if (const auto* labels = TooltipUpgrade::activeLabels(object);
+		labels && labels->displayName.isNotEmpty())
+		return defaultName;
+	const Drawable* drawable = object.getDrawable();
+	const UnicodeString& name = drawable && !drawable->getVeteranHoverName().isEmpty()
+		? drawable->getVeteranHoverName() : defaultName;
+	const Object* parent = object.getContainedBy();
+	if (!parent || !parent->isKindOf(KINDOF_HORDE))
+		return name;
+	const Drawable* parentDrawable = parent->getDrawable();
+	if (!parentDrawable || parentDrawable->getVeteranHoverName().isEmpty())
+		return name;
+	UnicodeString title;
+	title.format(TheGameText->fetchOrSubstitute("TOOLTIP:VerteranHordeMemberName", L"%s of %s"),
+		name.str(), parentDrawable->getVeteranHoverName().str());
+	return title;
 }
 
 Int modifiedDamage(const Object &object, Int authored)
@@ -103,11 +128,13 @@ Bool showHelpBox(const Object &object, const UnicodeString &name, const AsciiStr
 	if (!hasHelpBox(object))
 		return FALSE;
 	Mouse::RetailTooltip tooltip;
-	tooltip.title = name;
+	tooltip.title = helpBoxName(object, name);
 	addRank(tooltip.body, object);
 	if (showsCombatStats(object))
 		addCombatStats(tooltip.body, object);
 	addUpgrades(tooltip.body, object);
+	if (const Drawable* drawable = object.getDrawable(); drawable && drawable->getBattlesFought() > 0)
+		addValue(tooltip.body, "TOOLTIP:BattlesFought", L"Battles Fought: %d", drawable->getBattlesFought());
 	const AsciiString &description = descriptionLabel.isEmpty() ? object.getTemplate()->getRotWKObjectData().description : descriptionLabel;
 	if (!description.isEmpty())
 		addLine(tooltip.body, TheGameText->fetch(description));

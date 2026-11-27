@@ -396,6 +396,9 @@ public:
 	void colorFlash( const RGBColor *color, UnsignedInt decayFrames = DEF_DECAY_FRAMES, UnsignedInt attackFrames = 0, UnsignedInt sustainAtPeak = 0 );  ///< flash a drawable in the color specified for a short time
 	void playFXTint(const RGBColor& color, UnsignedInt attackFrames, UnsignedInt holdFrames, UnsignedInt decayFrames);
 	void playPromotionTint(const RGBColor& color, Int attackMs, Int holdMs, Int decayMs, Real frequency, Real amplitude);
+	void setVeteranHoverDetails(const UnicodeString& name, Int battlesFought);
+	const UnicodeString& getVeteranHoverName() const { return m_veteranHoverName; }
+	Int getBattlesFought() const { return m_battlesFought; }
 	void colorTint( const RGBColor *color );	 ///< tint this drawable the color specified
 	void setTintEnvelope( const RGBColor *color, Real attack, Real decay );	 ///< how to transition color
 	void flashAsSelected( const RGBColor *color = nullptr ); ///< drawable takes care of the details if you spec no color
@@ -714,6 +717,8 @@ private:
 
 	struct PromotionTint;
 	std::unique_ptr<PromotionTint> m_promotionTint;
+	UnicodeString m_veteranHoverName;
+	Int m_battlesFought = 0;
 
 	TerrainDecalType m_terrainDecalType; ///<current decal in use by m_terrainDecal
 

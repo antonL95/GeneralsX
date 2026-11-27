@@ -1327,6 +1327,10 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 		{ "ScreenEdgeScrollSpeedFactor", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollSpeedFactor) },
 		{ "ScreenEdgeScrollRampTime", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollRampTime) },
 		{ "DefaultCameraScrollSpeedScalar", INI::parseReal, nullptr, offsetof(GlobalData, m_retailDefaultCameraScrollSpeedScalar) },
+		{ "UseHelpTextSystem", [](INI* ini, void* instance, void*, const void*) {
+			auto* global = static_cast<GlobalData*>(instance);
+			INI::parseBool(ini, global, &global->m_useHelpTextSystem, nullptr);
+		}, nullptr, 0 },
 		{ "NumMinutesBeforePlayersCanTransferMoney", INI::parseUnsignedInt, nullptr, offsetof(GlobalData, m_tributeDelayMinutes) },
 		{ "VeterancyPipDrawObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_veterancyPipDrawFilter) },
 		{ "ObjectsThatScore", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_objectsThatScore) },

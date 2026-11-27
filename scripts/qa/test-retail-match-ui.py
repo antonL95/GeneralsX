@@ -1127,7 +1127,7 @@ def roster_at(frame):
     return heroes, builders
 
 
-def hover_world(frame, expected, kind, image=None):
+def hover_world(frame, expected, kind, image=None, sample_delay=120):
     wait_for(f"camera moves for hover {frame}", lambda: log_count(f"TEST frame {frame}: look ") >= 1, 100)
     wait_for(f"screen position {frame + 30}", lambda: log_count(f"TEST frame {frame + 30}: screenpos ") >= 1, 100)
     x, y = map(int, re.search(rf"TEST frame {frame + 30}: screenpos (\d+) (\d+)", (out / "game.log").read_text(errors="replace")).groups())
@@ -1136,11 +1136,12 @@ def hover_world(frame, expected, kind, image=None):
     time.sleep(0.3)
     motion(display, 0, x, y, 0)
     sync(display, 0)
-    dumped = frame + 120
+    dumped = frame + sample_delay
     wait_for(f"tooltip dump {dumped}", lambda: log_count(f"TEST tooltip {dumped} ") >= 1, 100)
     text = (out / "game.log").read_text(errors="replace")
     line = re.search(rf"TEST tooltip {dumped} shown=(\d) kind=(\w+) text=(.*)", text)
-    if line.group(1) != "1" or line.group(2) != kind or expected not in line.group(3):
+    expected_text = (expected,) if isinstance(expected, str) else expected
+    if line.group(1) != "1" or line.group(2) != kind or any(text not in line.group(3) for text in expected_text):
         sys.exit(f"FAIL hover {frame}: expected {kind} with {expected!r}, got {line.group(0)}")
     print(f"PASS hover {line.group(0)}", flush=True)
     if image:
@@ -1177,6 +1178,12 @@ def check_hero_roster_filter():
         sys.exit(f"FAIL hero roster image filter expected={expected} actual={after}")
     print(f"PASS hero roster image filter entries={after}", flush=True)
     capture("hero-roster-filter", 360, 680, 220, 88)
+
+
+def check_veteran_hover():
+    hover_world(12, ("Soldier of Minas Tirith of VeteranGuard", "Battles Fought: 4"), "box", "veteran-hover",
+                sample_delay=90)
+    hover_world(110, "Soldier of Minas Tirith", "label", sample_delay=90)
 
 
 def launch_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
@@ -1310,7 +1317,8 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-if any(option in sys.argv for option in ("--create-a-hero", "--hover-roster", "--promotion-tint", "--hero-roster-filter")):
+if any(option in sys.argv for option in (
+        "--create-a-hero", "--hover-roster", "--promotion-tint", "--hero-roster-filter", "--veteran-hover")):
     map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
     map_dir.mkdir(parents=True)
     source = Path("/game/UserData/Maps/AotR Training Grounds")
@@ -1346,6 +1354,20 @@ if "--hero-roster-filter" in sys.argv:
         "22 create Player_1 RosterFixtureUnselectable 0 900,2450,0\n"
         "23 create Player_1 RosterFixtureUnmappedEquivalent 0 1000,2450,0\n"
         "35 hud - - 0\n"
+    )
+if "--veteran-hover" in sys.argv:
+    help_off = out / "help-off.ini"
+    help_off.write_text("GameData\n    UseHelpTextSystem = No\nEnd\n")
+    commands.write_text(
+        "10 create Player_1 GondorFighterHorde 0 700,2450,0\n"
+        "12 look Player_1 GondorFighter 0\n"
+        "30 world-hover-veteran Player_1 GondorFighterHorde 0 VeteranGuard\n"
+        "42 screenpos Player_1 GondorFighter 0\n"
+        "102 hud - - 0\n"
+        f"106 combatini - - 0 {help_off}\n"
+        "110 look Player_1 GondorFighter 0\n"
+        "140 screenpos Player_1 GondorFighter 0\n"
+        "200 hud - - 0\n"
     )
 if "--create-a-hero" in sys.argv:
     commands.write_text(
@@ -1386,6 +1408,8 @@ elif "--promotion-tint" in sys.argv:
     run(check_promotion_tint, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--hero-roster-filter" in sys.argv:
     run(check_hero_roster_filter, "-file", str(map_dir / "aotr training grounds.map"))
+elif "--veteran-hover" in sys.argv:
+    run(check_veteran_hover, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--multi-select" in sys.argv:
     run(check_multi_select)
 elif "--dolguldur-buttons" in sys.argv:

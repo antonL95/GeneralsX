@@ -4162,6 +4162,24 @@ void Object::updateObjValuesFromMapProperties(Dict* properties)
 	Int valInt = 0;
 	Real valReal = 0.0f;
 
+	if (Drawable* drawable = getDrawable())
+	{
+		Bool hasName;
+		Bool hasBattles;
+		const NameKeyType nameKey = NAMEKEY("objectVeteranName");
+		UnicodeString name = properties->getUnicodeString(nameKey, &hasName);
+		if (!hasName)
+		{
+			const AsciiString rawName = properties->getAsciiString(nameKey, &hasName);
+			if (hasName)
+				name.translate(rawName);
+		}
+		const Int battles = properties->getInt(NAMEKEY("objectBattlesFought"), &hasBattles);
+		if (hasName || hasBattles)
+			drawable->setVeteranHoverDetails(hasName ? name : drawable->getVeteranHoverName(),
+				hasBattles ? battles : drawable->getBattlesFought());
+	}
+
 	valStr = properties->getAsciiString(TheKey_objectName, &exists);
 	if (exists) {
 		setName(valStr);

@@ -1111,6 +1111,12 @@ void Drawable::playPromotionTint(const RGBColor& color, Int attackMs, Int holdMs
 	});
 }
 
+void Drawable::setVeteranHoverDetails(const UnicodeString& name, Int battlesFought)
+{
+	m_veteranHoverName = name;
+	m_battlesFought = std::max(0, battlesFought);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Tint a drawable a specified color */
 // ------------------------------------------------------------------------------------------------
@@ -5839,6 +5845,10 @@ void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 				m_promotionTint = std::make_unique<PromotionTint>();
 			m_promotionTint->xfer(block);
 		}, [this] { m_promotionTint.reset(); }},
+		{"veteran-hover", [this](Xfer* block) {
+			block->xferUnicodeString(&m_veteranHoverName);
+			block->xferInt(&m_battlesFought);
+		}, [this] { setVeteranHoverDetails(UnicodeString::TheEmptyString, 0); }},
 		{"ocl-fade", [this](Xfer* block) {
 			block->xferUnsignedInt(&m_oclFadeStartFrame);
 			block->xferUnsignedInt(&m_oclFadeFrames);
