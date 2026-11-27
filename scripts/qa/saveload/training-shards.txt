@@ -140,3 +140,4 @@
 3 map-script-victory-screen
 3 map-script-deselect
 3 map-script-world-lights
+3 pkg-ini-ui-misc

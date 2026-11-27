@@ -35,6 +35,7 @@
 
 #include "Common/MultiplayerSettings.h"
 #include "Common/INI.h"
+#include "Common/GlobalData.h"
 #include "GameNetwork/GameInfo.h" // for PLAYERTEMPLATE_*
 #include <algorithm>
 
@@ -56,6 +57,11 @@ const FieldParse MultiplayerColorDefinition::m_colorFieldParseTable[] =
 
 const FieldParse MultiplayerSettings::m_multiplayerSettingsFieldParseTable[] =
 {
+	{ "InitialCreditsVeryLow", INI::parseInt, nullptr, offsetof(MultiplayerSettings, m_initialCredits[VeryLow]) },
+	{ "InitialCreditsLow", INI::parseInt, nullptr, offsetof(MultiplayerSettings, m_initialCredits[Low]) },
+	{ "InitialCreditsMedium", INI::parseInt, nullptr, offsetof(MultiplayerSettings, m_initialCredits[Medium]) },
+	{ "InitialCreditsHigh", INI::parseInt, nullptr, offsetof(MultiplayerSettings, m_initialCredits[High]) },
+	{ "InitialCreditsVeryHigh", INI::parseInt, nullptr, offsetof(MultiplayerSettings, m_initialCredits[VeryHigh]) },
 
 	{ "StartCountdownTimer",			INI::parseInt,	nullptr,	offsetof( MultiplayerSettings, m_startCountdownTimerSeconds ) },
 	{ "MaxBeaconsPerPlayer",			INI::parseInt,	nullptr,	offsetof( MultiplayerSettings, m_maxBeaconsPerPlayer ) },
@@ -72,6 +78,7 @@ const FieldParse MultiplayerSettings::m_multiplayerSettingsFieldParseTable[] =
 //-------------------------------------------------------------------------------------------------
 MultiplayerSettings::MultiplayerSettings()
 {
+	std::fill_n(m_initialCredits, NumStartingMoneyPresets, -1);
 	m_maxBeaconsPerPlayer = 3;
 	//
 
@@ -170,6 +177,32 @@ MultiplayerColorDefinition * MultiplayerSettings::newMultiplayerColorDefinition(
 	m_numColors = m_colorList.size();
 
 	return &m_colorList[numColors];
+}
+
+const Money &MultiplayerSettings::getDefaultStartingMoney() const
+{
+	if (!m_authoredStartingMoneyList.empty())
+		return TheGlobalData->m_defaultStartingCash;
+	DEBUG_ASSERTCRASH(m_gotDefaultStartingMoney, ("You must specify a default starting money amount in multiplayer.ini"));
+	return m_defaultStartingMoney;
+}
+
+const MultiplayerStartingMoneyList &MultiplayerSettings::getStartingMoneyList() const
+{
+	return m_authoredStartingMoneyList.empty() ? m_startingMoneyList : m_authoredStartingMoneyList;
+}
+
+void MultiplayerSettings::updateStartingMoneyPresets()
+{
+	m_authoredStartingMoneyList.clear();
+	for (Int credits : m_initialCredits)
+	{
+		if (credits < 0)
+			continue;
+		Money amount;
+		amount.setStartingCash(credits);
+		m_authoredStartingMoneyList.push_back(amount);
+	}
 }
 
 void MultiplayerSettings::addStartingMoneyChoice( const Money & money, Bool isDefault )

@@ -54,6 +54,9 @@ void INI::parseMultiplayerSettingsDefinition( INI* ini )
 
 	// parse the ini definition
 	ini->initFromINI( TheMultiplayerSettings, TheMultiplayerSettings->getFieldParse() );
+#if RTS_ZEROHOUR
+	TheMultiplayerSettings->updateStartingMoneyPresets();
+#endif
 }
 
 void INI::parseMultiplayerColorDefinition( INI* ini )

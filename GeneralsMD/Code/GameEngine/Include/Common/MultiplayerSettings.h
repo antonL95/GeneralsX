@@ -109,19 +109,16 @@ public:
 	MultiplayerColorDefinition * getColor(Int which);
 
 
-  const Money & getDefaultStartingMoney() const
-  {
-    DEBUG_ASSERTCRASH( m_gotDefaultStartingMoney, ("You must specify a default starting money amount in multiplayer.ini") );
-    return m_defaultStartingMoney;
-  }
-
-  const MultiplayerStartingMoneyList & getStartingMoneyList() const { return m_startingMoneyList; }
+  const Money & getDefaultStartingMoney() const;
+  const MultiplayerStartingMoneyList & getStartingMoneyList() const;
+  void updateStartingMoneyPresets();
 
   void addStartingMoneyChoice( const Money & money, Bool isDefault );
 
 private:
-	Int m_initialCreditsMin;
-	Int m_initialCreditsMax;
+	enum StartingMoneyPreset { VeryLow, Low, Medium, High, VeryHigh, NumStartingMoneyPresets };
+	Int m_initialCredits[NumStartingMoneyPresets];
+	MultiplayerStartingMoneyList m_authoredStartingMoneyList;
 	Int m_startCountdownTimerSeconds;
 	Int m_maxBeaconsPerPlayer;
 	Bool m_isShroudInMultiplayer;
