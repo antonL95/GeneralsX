@@ -2,11 +2,14 @@
 237 script-audio-arm Player_1 AudioScriptFixtureActor 0
 238 script-audio-mix - - 0 room
 239 script-audio-mix - - 0 polygon
+241 script-audio-mix - - 0 fade
 242 script-audio-named Player_1 AudioScriptFixtureActor 0
 243 script-audio-volume Player_1 AudioScriptFixtureActor 0
+243 script-audio-mix-state Player_1 AudioScriptFixtureActor 0 transition
 245 script-audio-named Player_1 AudioScriptFixtureActor 0
 246 script-audio-volume Player_1 AudioScriptFixtureActor 0
 246 script-audio-mix-state Player_1 AudioScriptFixtureActor 0
 247 script-audio-team Player_1 AudioScriptFixtureActor 0
+253 script-audio-mix-state Player_1 AudioScriptFixtureActor 0 transition
 257 script-audio-mix-state Player_1 AudioScriptFixtureActor 0
 310 destroy Player_1 AudioScriptFixtureActor 0

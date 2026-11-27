@@ -6873,6 +6873,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 					TheAudio->getScriptAudio().setSuppression(polygon->getTriggerName(), pAction->getParameter(1)->getReal());
 			}
 			return;
+		case ScriptAction::AUDIO_FADE_VOLUME:
+			if (TheAudio)
+				TheAudio->getScriptAudio().fade(pAction->getParameter(0)->getReal(),
+					pAction->getParameter(1)->getReal(), pAction->getParameter(2)->getReal(),
+					pAction->getParameter(3)->getReal(), pAction->getParameter(4)->getReal(),
+					TheGameLogic->getFrame());
+			return;
 		case ScriptAction::AUDIO_POP_MUSIC:
 		case ScriptAction::MUSIC_SCRIPT_POP_MUSIC:
 		case ScriptAction::MUSIC_RETURN_TO_MUSIC_SCRIPTING:
