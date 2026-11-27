@@ -3033,6 +3033,18 @@ Real resolveMapTreeScale(const ThingTemplate& thing, const Dict* properties)
 	const Real instanceScale = thing.getAssetScale() * (hasScale ? mapScale : 1.0f);
 	return std::isfinite(instanceScale) && instanceScale > 0.0f ? instanceScale : 1.0f;
 }
+
+void adjustTargetedTreePowerGroups(std::vector<UnsignedInt>& targeted, size_t erasedIndex)
+{
+	std::erase_if(targeted, [erasedIndex](UnsignedInt& tree)
+	{
+		if (tree == erasedIndex)
+			return true;
+		if (tree > erasedIndex)
+			--tree;
+		return false;
+	});
+}
 }
 
 void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& pos, Real angle, Real scale)
@@ -3171,7 +3183,8 @@ Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real ra
 	if (TheTerrainVisual)
 		TheTerrainVisual->removeMapTree(chosen.position);
 	m_mapTrees.erase(m_mapTrees.begin() + static_cast<std::ptrdiff_t>(bestIndex));
-	clearTreePowerGroups();
+	m_treePowerGroups.clear();
+	adjustTargetedTreePowerGroups(m_targetedTreePowerGroups, bestIndex);
 	return materialized;
 }
 
@@ -3299,8 +3312,10 @@ void TerrainLogic::removeMapTreeAt(const Coord3D& position)
 		return;
 	if (TheTerrainVisual)
 		TheTerrainVisual->removeMapTree(tree->position);
+	const size_t erasedIndex = static_cast<size_t>(tree - m_mapTrees.begin());
 	m_mapTrees.erase(tree);
-	clearTreePowerGroups();
+	m_treePowerGroups.clear();
+	adjustTargetedTreePowerGroups(m_targetedTreePowerGroups, erasedIndex);
 }
 
 Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const
@@ -3390,8 +3405,10 @@ Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 		{
 			if (TheTerrainVisual)
 				TheTerrainVisual->sinkMapTree(it->position);
+			const size_t erasedIndex = static_cast<size_t>(it - m_mapTrees.begin());
 			m_mapTrees.erase(it);
-			clearTreePowerGroups();
+			m_treePowerGroups.clear();
+			adjustTargetedTreePowerGroups(m_targetedTreePowerGroups, erasedIndex);
 		}
 		return taken;
 	}
