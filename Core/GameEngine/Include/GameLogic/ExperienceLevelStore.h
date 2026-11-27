@@ -34,6 +34,7 @@ int award(const Object* obj, int threshold);
 float playerSkillPointsScalar(int rank);
 void applyLevel(Object* obj, int threshold, bool feedback);
 Object* recipientFor(Object* obj);
+void awardVictoryExperience(Object* obj);
 void scoreKill(Object* killer, const Object* victim);
 void awardProductionExperience(Object* producer, Int cost);
 void onObjectCreated(const Object* obj);

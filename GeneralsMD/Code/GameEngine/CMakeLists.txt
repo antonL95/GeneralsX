@@ -246,6 +246,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/FiringTracker.h
     Include/GameLogic/FPUControl.h
     Include/GameLogic/GameLogic.h
+    Include/GameLogic/RetailVictorySystem.h
     Include/GameLogic/RetailRingDrop.h
     Include/GameLogic/RetailSkirmishProbe.h
     Include/GameLogic/RetailSkirmishSpending.h
@@ -1117,6 +1118,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/System/Damage.cpp
     Source/GameLogic/System/GameLogic.cpp
     Source/GameLogic/System/RetailRingDrop.cpp
+    Source/GameLogic/System/RetailVictorySystem.cpp
     Source/GameLogic/System/RetailSkirmishProbe.cpp
 #    Source/GameLogic/System/GameLogicDispatch.cpp
 #    Source/GameLogic/System/RankInfo.cpp

@@ -131,6 +131,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTerrainFire.h"
 #include "Common/RetailINIStartup.h"
+#include "GameLogic/RetailVictorySystem.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
@@ -284,7 +285,7 @@ void setFPMode()
 // ------------------------------------------------------------------------------------------------
 /** GameLogic class constructor */
 // ------------------------------------------------------------------------------------------------
-GameLogic::GameLogic()
+GameLogic::GameLogic() : m_retailVictorySystem(std::make_unique<RetailVictorySystem>())
 {
 	m_background = nullptr;
 	m_CRC = 0;
@@ -496,6 +497,7 @@ void GameLogic::reset()
 	m_retailWeather = WEATHER_NONE;
 	m_retailWeatherEndFrame = 0;
 	m_weatherModifier = {};
+	m_retailVictorySystem->endMap();
 	m_objectivesEnabled = TRUE;
 	m_objectiveVisible.clear();
 	m_objectiveCompleted.clear();
@@ -1945,6 +1947,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// update the terrain logic now that all is loaded
 	TheTerrainLogic->newMap( loadingSaveGame );
+	m_retailVictorySystem->startMap();
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_TERRAIN_LOGIC_NEW_MAP);
@@ -2753,6 +2756,7 @@ void GameLogic::loadMapINI( AsciiString mapName )
 {
 	RetailINIStartup::resetMapShadowSettings();
 	RetailTerrainFire::restoreSettings();
+	m_retailVictorySystem->restoreSettings();
 	if (RetailFileLayers::enabled())
 		RetailSkirmishSpending::resetMapPolicies();
 
@@ -4514,6 +4518,7 @@ void GameLogic::update()
 		TheWeaponStore->UPDATE();
 	}
 	TheLocomotorStore->UPDATE();
+	m_retailVictorySystem->update(m_frame);
 	TheVictoryConditions->UPDATE();
 	if (RetailSkirmishProbe::enabled() && getGameMode() == GAME_SKIRMISH)
 		RetailSkirmishProbe::update(m_frame);
@@ -6380,6 +6385,8 @@ void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 			if (TheVictoryConditions)
 				TheVictoryConditions->resetRetailState();
 		}},
+		{"battle-victory", [this](Xfer* block) { m_retailVictorySystem->xfer(block); },
+			[this] { m_retailVictorySystem->clearMomentum(); }},
 	});
 }
 

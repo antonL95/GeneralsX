@@ -38,6 +38,7 @@
 #include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/RetailSkirmishProbe.h"
+#include "GameLogic/RetailVictorySystem.h"
 #include "GameLogic/ShroudGeometry.h"
 #include "WWMath/wwmath.h"
 #include <cmath>	// For isnan() on Linux
@@ -5936,6 +5937,9 @@ void Object::onDie( DamageInfo *damageInfo )
 			die->onDie(damageInfo);
 		}
 	}
+
+	if (const Object* killer = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID))
+		TheGameLogic->getRetailVictorySystem().recordDeath(*this, *killer);
 
 	if (m_radarData && !keepRadar)
 		TheRadar->removeObject( this );

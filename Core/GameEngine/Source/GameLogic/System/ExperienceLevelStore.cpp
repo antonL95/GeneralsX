@@ -461,20 +461,47 @@ void applyLevel(Object* obj, int threshold, bool feedback)
 	}
 }
 
-Object* recipientFor(Object* obj)
+static Object* resolveRecipient(Object* obj, Real* explicitSinkPoints)
 {
 	for (Int links = 0; obj && links < 32; ++links)
 	{
-		Object* next = TheGameLogic->findObjectByID(obj->getExperienceTracker()->getExperienceSink());
-		if (!next && obj->isKindOf(KINDOF_PASS_EXPERIENCE_TO_PRODUCER))
-			next = TheGameLogic->findObjectByID(obj->getProducerID());
-		if (!next)
-			next = obj->isKindOf(KINDOF_PASS_EXPERIENCE_TO_CONTAINER) ? obj->getContainedBy() : HordeContain::getAnchor(obj);
+		const ExperienceTracker* tracker = obj->getExperienceTracker();
+		Object* next = TheGameLogic->findObjectByID(tracker->getExperienceSink());
+		if (!next && !explicitSinkPoints)
+		{
+			if (obj->isKindOf(KINDOF_PASS_EXPERIENCE_TO_PRODUCER))
+				next = TheGameLogic->findObjectByID(obj->getProducerID());
+			if (!next)
+				next = obj->isKindOf(KINDOF_PASS_EXPERIENCE_TO_CONTAINER) ? obj->getContainedBy() : HordeContain::getAnchor(obj);
+		}
 		if (!next || next->isEffectivelyDead())
 			return obj;
+		if (explicitSinkPoints)
+			*explicitSinkPoints *= tracker->getExperienceScalar();
 		obj = next;
 	}
 	return nullptr;
+}
+
+Object* recipientFor(Object* obj)
+{
+	return resolveRecipient(obj, nullptr);
+}
+
+void awardVictoryExperience(Object* obj)
+{
+	const ExperienceTracker* tracker = obj->getExperienceTracker();
+	if (!tracker)
+		return;
+
+	const Int next = nextThreshold(obj, tracker->getRetailThreshold());
+	const Real current = tracker->getRetailExperience();
+	if (current >= 0.0f && current < Real(next))
+	{
+		Real points = static_cast<Real>(next - static_cast<Int>(current));
+		if (Object* recipient = resolveRecipient(obj, &points))
+			recipient->getExperienceTracker()->addRetailExperience(points, FALSE);
+	}
 }
 
 void scoreKill(Object* killer, const Object* victim)

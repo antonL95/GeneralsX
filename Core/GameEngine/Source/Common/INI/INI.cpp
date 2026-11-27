@@ -50,6 +50,7 @@
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/RetailVictorySystem.h"
 #endif
 #include "Common/RotwkDuration.h"
 #include "Common/INIException.h"
@@ -590,6 +591,10 @@ static INIBlockParse findBlockParse(const char* token)
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "FXParticleSystem") == 0)
 		return INI::parseFXParticleSystemDefinition;
 #if !RTS_GENERALS
+	if (stricmp(token, "VictorySystemData") == 0)
+		return RetailVictorySystem::parseSettings;
+	if (stricmp(token, "FactionVictoryData") == 0)
+		return RetailVictorySystem::parseFaction;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "ModifierList") == 0)
 		return AttributeModifierStore::parseModifierListDefinition;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "EmotionNugget") == 0)

@@ -45,6 +45,7 @@
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
 #include "GameLogic/RetailTerrainFire.h"
+#include "GameLogic/RetailVictorySystem.h"
 #include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/MessageStream.h"
@@ -1077,9 +1078,9 @@ void GameEngine::init()
 			CreateAHeroSystem::loadHouseColors();
 			for (const char* name : {
 				"TheMeshInstancingManager",
-				"TheLivingWorldCampaignManager",
-				"TheVictorySystem"})
+				"TheLivingWorldCampaignManager"})
 				RetailINIStartup::preprocessSubsystem(name);
+			TheGameLogic->getRetailVictorySystem().loadSettings(&xferCRC);
 			RetailTerrainFire::loadLogicSettings(&xferCRC);
 			AISkirmishPlayer::loadRetailData();
 		}

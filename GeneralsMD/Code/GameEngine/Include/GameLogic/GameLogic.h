@@ -39,6 +39,7 @@
 #include "GameLogic/GameMode.h"
 #include "GameLogic/Module/UpdateModule.h"	// needed for DIRECT_UPDATEMODULE_ACCESS
 
+#include <memory>
 #include <optional>
 
 /*
@@ -67,6 +68,7 @@ class TerrainLogic;
 class GhostObjectManager;
 class CommandButton;
 class SpecialPowerModuleData;
+class RetailVictorySystem;
 class ToggleMountedSpecialAbilityUpdateModuleData;
 enum BuildableStatus CPP_11(: Int);
 
@@ -137,6 +139,7 @@ public:
 	UnsignedInt getRetailWeatherEndFrame() const;
 	void setRetailWeatherModifier(const Object& source, const SpecialPowerModuleData& power);
 	void applyRetailWeatherModifier(Object& target);
+	RetailVictorySystem& getRetailVictorySystem() { return *m_retailVictorySystem; }
 	void setObjectivesEnabled(Bool enabled);
 	Bool getObjectivesEnabled() const;
 	void setObjectiveVisible(Int objective, Bool visible);
@@ -397,6 +400,7 @@ private:
 	UnsignedInt m_frame;																		///< Simulation frame number
 	Int m_retailWeather = WEATHER_NONE;
 	UnsignedInt m_retailWeatherEndFrame = 0;
+	std::unique_ptr<RetailVictorySystem> m_retailVictorySystem;
 	struct WeatherModifier
 	{
 		ObjectID source = INVALID_ID;
