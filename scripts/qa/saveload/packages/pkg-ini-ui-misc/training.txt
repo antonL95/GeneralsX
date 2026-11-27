@@ -3,8 +3,10 @@
 242 ui-ini-transition-images-check Player_1 - 0
 242 ui-ini-fonts-check Player_1 - 0
 242 ui-ini-border-check Player_1 - 0
+242 ui-ini-post-load-sound-check Player_1 - 0
 245 ui-ini-credits-check Player_1 - 0
 245 ui-ini-placement-claim-check Player_1 - 0
 245 ui-ini-transition-images-check Player_1 - 0
 245 ui-ini-fonts-check Player_1 - 0
 245 ui-ini-border-check Player_1 - 0
+245 ui-ini-post-load-sound-check Player_1 - 0

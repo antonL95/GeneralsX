@@ -111,6 +111,7 @@ public:
 	virtual void stopAudio(AudioAffect which);
 	virtual void pauseAudio(AudioAffect which);
 	virtual void resumeAudio(AudioAffect which);
+	void resumeAudioFaded(AudioAffect which, UnsignedInt milliseconds) override;
 	virtual void pauseAmbient(Bool shouldPause);
 
 	virtual void killAudioEventImmediately(AudioHandle audioEvent);

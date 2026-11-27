@@ -156,6 +156,7 @@ Transition *getTransitionForStyle( Int style )
 namespace
 {
 	constexpr Int SoundFadeStyle = MAX_TRANSITION_WINDOW_STYLES;
+	constexpr Int FreezePostLoadSoundsStyle = SoundFadeStyle + 1;
 	constexpr AudioAffect SoundFadeChannels[] = {
 		AudioAffect_Music, AudioAffect_Sound, AudioAffect_Sound3D, AudioAffect_Speech
 	};
@@ -234,9 +235,79 @@ namespace
 		Real m_originalVolumes[ARRAY_SIZE(SoundFadeChannels)] = {};
 	};
 
+	class FreezePostLoadSoundsTransition final : public Transition
+	{
+	public:
+		FreezePostLoadSoundsTransition(Int frames, Bool fade)
+			: m_fade(fade)
+		{
+			m_frameLength = frames;
+		}
+
+		~FreezePostLoadSoundsTransition() override { unfreeze(); }
+
+		void init(GameWindow *) override
+		{
+			m_win = nullptr;
+			m_isForward = TRUE;
+			m_isFinished = FALSE;
+		}
+
+		void update(Int frame) override
+		{
+			const Bool finished = m_isForward ? frame >= m_frameLength : frame <= 0;
+			if (finished)
+			{
+				unfreeze();
+				m_isFinished = TRUE;
+			}
+			else if (!m_audio && TheAudio)
+			{
+				m_audio = TheAudio;
+				m_audio->pauseAudio(channels);
+			}
+		}
+
+		void reverse() override
+		{
+			m_isForward = FALSE;
+			m_isFinished = FALSE;
+		}
+
+		void draw() override {}
+
+		void skip() override
+		{
+			unfreeze();
+			m_isFinished = TRUE;
+		}
+
+	private:
+		void unfreeze()
+		{
+			if (m_audio && m_audio == TheAudio)
+			{
+				if (m_fade)
+				{
+					const Int64 duration = static_cast<Int64>(m_frameLength) * MSEC_PER_SECOND / BaseFps;
+					const auto milliseconds = static_cast<UnsignedInt>(
+						std::min<Int64>(duration, std::numeric_limits<UnsignedInt>::max()));
+					m_audio->resumeAudioFaded(channels, milliseconds);
+				}
+				else
+					m_audio->resumeAudio(channels);
+			}
+			m_audio = nullptr;
+		}
+
+		static constexpr AudioAffect channels = static_cast<AudioAffect>(AudioAffect_All & ~AudioAffect_Music);
+		AudioManager *m_audio = nullptr;
+		Bool m_fade;
+	};
+
 	Bool requiresWindow( Int style )
 	{
-		return style != SCREEN_FADE_TRANSITION && style != SoundFadeStyle &&
+		return style != SCREEN_FADE_TRANSITION && style != SoundFadeStyle && style != FreezePostLoadSoundsStyle &&
 			style != REVERSE_SOUND_TRANSITION && style != CONTROL_BAR_ARROW_TRANSITION;
 	}
 
@@ -268,6 +339,7 @@ namespace
 		Color fadeColor = 0;
 		AsciiString viewsToFade;
 		Bool leaveSilent = FALSE;
+		Bool fadeInUnfrozenSounds = TRUE;
 	};
 
 	struct RetailTransitionWindow
@@ -287,6 +359,8 @@ namespace
 		RetailTransitionSpec spec;
 		if (stricmp(styleName, "SOUNDFADE") == 0)
 			spec.style = SoundFadeStyle;
+		else if (stricmp(styleName, "FREEZE_POST_LOAD_SOUNDS") == 0)
+			spec.style = FreezePostLoadSoundsStyle;
 		else
 			for (const auto &style : TransitionStyleNames)
 				if (style.name && stricmp(style.name, styleName) == 0)
@@ -307,6 +381,7 @@ namespace
 			{ "FadeColor", INI::parseColorInt, nullptr, offsetof(RetailTransitionSpec, fadeColor) },
 			{ "ViewsToFade", INI::parseAsciiString, nullptr, offsetof(RetailTransitionSpec, viewsToFade) },
 			{ "LeaveSilent", INI::parseBool, nullptr, offsetof(RetailTransitionSpec, leaveSilent) },
+			{ "FadeInUnfrozenSounds", INI::parseBool, nullptr, offsetof(RetailTransitionSpec, fadeInUnfrozenSounds) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		ini->initFromINI(&spec, fields);
@@ -388,6 +463,8 @@ Bool TransitionWindow::init()
 		m_transition = NEW ScreenFadeTransition(explicitDuration, m_fadeColor);
 	else if (m_style == SoundFadeStyle)
 		m_transition = NEW SoundFadeTransition(explicitDuration ? explicitDuration : 30);
+	else if (m_style == FreezePostLoadSoundsStyle)
+		m_transition = NEW FreezePostLoadSoundsTransition(explicitDuration, m_fadeInUnfrozenSounds);
 	else
 		m_transition = getTransitionForStyle(m_style);
 
@@ -891,6 +968,7 @@ void GameWindowTransitionsHandler::parseWindow( INI* ini, void *instance, void *
 			transition->m_startFrame = spec.startFrame;
 			transition->m_endFrame = spec.endFrame;
 			transition->m_fadeColor = spec.fadeColor;
+			transition->m_fadeInUnfrozenSounds = spec.fadeInUnfrozenSounds;
 			static_cast<TransitionGroup *>(instance)->addWindow(transition.get());
 			transition.release();
 		}

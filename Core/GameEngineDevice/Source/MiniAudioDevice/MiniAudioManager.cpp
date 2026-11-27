@@ -336,6 +336,11 @@ void MiniAudioManager::pauseAudio(AudioAffect which)
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::resumeAudio(AudioAffect which)
 {
+	resumeAudioFaded(which, 0);
+}
+
+void MiniAudioManager::resumeAudioFaded(AudioAffect which, UnsignedInt milliseconds)
+{
 	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
 	// GeneralsX @bugfix elmeriniemela 17/10/2026 Restart the sounds that pauseAudio() paused.
@@ -343,6 +348,8 @@ void MiniAudioManager::resumeAudio(AudioAffect which)
 		PlayingAudio *playing = *it;
 		if (!isAffectedBy(playing, which) || !playing->m_sound || !playing->m_paused)
 			continue;
+		if (milliseconds > 0)
+			ma_sound_set_fade_in_milliseconds(playing->m_sound, 0.0f, 1.0f, milliseconds);
 		ma_sound_start(playing->m_sound);
 		playing->m_paused = false;
 	}
@@ -360,7 +367,6 @@ void MiniAudioManager::resumeAudio(AudioAffect which)
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
 void MiniAudioManager::pauseAmbient(Bool shouldPause)
 {
 }

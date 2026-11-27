@@ -621,6 +621,7 @@ public:
 	Int m_startFrame;
 	Int m_endFrame;
 	Color m_fadeColor;
+	Bool m_fadeInUnfrozenSounds = TRUE;
 
 // standard vars
 	NameKeyType	m_winID;

@@ -163,6 +163,7 @@ class AudioManager : public SubsystemInterface
 		virtual void stopAudio( AudioAffect which ) = 0;
 		virtual void pauseAudio( AudioAffect which ) = 0;
 		virtual void resumeAudio( AudioAffect which ) = 0;
+		virtual void resumeAudioFaded(AudioAffect which, UnsignedInt) { resumeAudio(which); }
 		virtual void pauseAmbient( Bool shouldPause ) = 0;
 
 		void muteAudio( MuteAudioReason reason );

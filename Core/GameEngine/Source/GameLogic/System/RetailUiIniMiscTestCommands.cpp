@@ -8,6 +8,7 @@
 #include "Common/MultiplayerSettings.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/GameFont.h"
+#include "GameClient/GameWindowTransitions.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 
@@ -51,6 +52,15 @@ void checkAlteredBorder(const RetailTestCommands::Context &ctx)
 	const Bool altered = button && button->getCommandButtonMappedBorderType() == COMMAND_BUTTON_BORDER_ALTERED;
 	std::fprintf(stderr, "TEST ui-ini-button-border frame=%u altered=%d\n", ctx.frame, altered);
 }
+
+void checkPostLoadSound(const RetailTestCommands::Context &ctx)
+{
+	const AsciiString name = "UiIniPostLoadSoundFixture";
+	TheTransitionHandler->setGroup(name, TRUE);
+	const Bool active = !TheTransitionHandler->isFinished();
+	TheTransitionHandler->remove(name, TRUE);
+	std::fprintf(stderr, "TEST ui-ini-post-load-sound frame=%u active=%d\n", ctx.frame, active);
+}
 }
 #endif
 
@@ -64,6 +74,7 @@ void registerRetailUiIniMiscTestCommands()
 	registerAction("ui-ini-transition-images-check", checkTransitionImages);
 	registerAction("ui-ini-fonts-check", checkFontDefaults);
 	registerAction("ui-ini-border-check", checkAlteredBorder);
+	registerAction("ui-ini-post-load-sound-check", checkPostLoadSound);
 #endif
 }
 }
