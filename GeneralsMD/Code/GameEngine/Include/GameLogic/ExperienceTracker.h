@@ -52,6 +52,7 @@ public:
 	void initializeRetailLevel();
 	void addRetailExperience(Real points, Bool scale = TRUE);
 	void addScriptRetailExperience(Real points);
+	void setScriptRetailExperience(Int points);
 	void advanceRetailLevel(Real experience, Bool feedback);
 	void setMinRetailRank(Int rank, Bool feedback = FALSE);
 	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE);
@@ -80,6 +81,8 @@ public:
 	virtual void loadPostProcess() override;
 
 private:
+	ExperienceTracker* resolveScriptExperienceSink(Real* scaledPoints);
+
 	Object*						m_parent;														///< Object I am owned by
 	VeterancyLevel		m_currentLevel;											///< Level of experience
 	Int								m_currentExperience;								///< Number of experience points

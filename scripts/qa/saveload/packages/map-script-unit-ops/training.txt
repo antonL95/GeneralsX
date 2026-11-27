@@ -8,6 +8,8 @@
 235 create Player_1 MapScriptVeterancyProbe 0 2000,200,0
 235 create Player_1 MapScriptTeamTeleportProbe 0 2015,190,0
 235 create Player_1 MapScriptTeamTeleportProbe 1 2015,205,0
+235 create Player_1 MapScriptAbsoluteXPProbe 0 2030,190,0
+235 create Player_1 MapScriptAbsoluteXPProbe 1 2030,205,0
 235 create PlyrCreeps MapScriptThreatProbe 0 2010,200,0
 238 map-unit-ops-horde-remove Player_1 GondorFighterHorde 0
 239 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
@@ -20,6 +22,7 @@
 241 map-unit-ops-kill Player_1 MapScriptVeterancyProbe 0 PlyrCreeps:MapScriptScoreTarget:0
 242 map-unit-ops-threat Player_1 MapScriptVeterancyProbe 0
 242 map-unit-ops-team-teleport Player_1 MapScriptTeamTeleportProbe 0 Player_1:MapScriptTeamTeleportProbe:1
+242 map-unit-ops-set-xp Player_1 MapScriptAbsoluteXPProbe 0 Player_1:MapScriptAbsoluteXPProbe:1
 242 create PlyrCreeps MapScriptScoreBuilding 0 2050,156,0
 242 map-unit-ops-kill Player_1 MapScriptVeterancyProbe 0 PlyrCreeps:MapScriptScoreBuilding:0
 243 map-unit-ops-veterancy Player_1 MapScriptVeterancyProbe 0
@@ -33,6 +36,7 @@
 245 map-unit-ops-team-path Player_1 MapScriptUnitOpsProbe 1 Player_1:MapScriptUnitOpsProbe:2
 246 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
 246 map-unit-ops-team-teleport Player_1 MapScriptTeamTeleportProbe 0 Player_1:MapScriptTeamTeleportProbe:1
+246 map-unit-ops-set-xp Player_1 MapScriptAbsoluteXPProbe 0 Player_1:MapScriptAbsoluteXPProbe:1
 247 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
 247 map-unit-ops-guard-area Player_1 MapScriptUnitOpsProbe 0
 
@@ -50,6 +54,8 @@
 250 destroy Player_1 MapScriptVeterancyProbe 0
 250 destroy Player_1 MapScriptTeamTeleportProbe 0
 250 destroy Player_1 MapScriptTeamTeleportProbe 1
+250 destroy Player_1 MapScriptAbsoluteXPProbe 0
+250 destroy Player_1 MapScriptAbsoluteXPProbe 1
 250 destroy Player_1 MapScriptUnitOpsProbe 2
 250 destroy Player_1 MapScriptUnitOpsProbe 1
 250 destroy Player_1 MapScriptUnitOpsProbe 0

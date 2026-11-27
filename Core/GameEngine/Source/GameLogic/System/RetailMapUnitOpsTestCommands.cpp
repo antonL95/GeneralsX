@@ -557,6 +557,66 @@ End
 		loss == expectedLoss && expectedLoss > 0.0f);
 }
 
+void setExperienceProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject();
+	Object* receiver = ctx.findTarget();
+	if (!source || !receiver)
+		return;
+	INI ini;
+	ini.loadText("map-unit-ops-absolute-xp-levels", R"(
+ExperienceLevel MapScriptAbsoluteXPFirst
+    TargetNames = MapScriptAbsoluteXPProbe
+    RequiredExperience = 1
+    Rank = 1
+End
+ExperienceLevel MapScriptAbsoluteXPSecond
+    TargetNames = MapScriptAbsoluteXPProbe
+    RequiredExperience = 20
+    Rank = 2
+End
+)", INI_LOAD_OVERWRITE, "ExperienceLevel", ExperienceLevelStore::parseDefinition);
+	auto* from = source->getExperienceTracker();
+	auto* to = receiver->getExperienceTracker();
+	const Bool first = ctx.frame == 242;
+	if (first)
+	{
+		source->setName("MapScriptAbsoluteXPSource");
+		TheScriptEngine->addObjectToCache(source);
+		from->initializeRetailLevel();
+		to->initializeRetailLevel();
+		from->setExperienceScalar(0.25f);
+		to->setExperienceScalar(0.5f);
+		from->setExperienceSink(receiver->getID());
+	}
+	const Bool baseline = to->getRetailExperience() == (first ? 1.0f : 35.0f) &&
+		to->getRank() == (first ? 1 : 2);
+	const Real sourceExperience = from->getRetailExperience();
+	const Int points = first ? 35 : 2;
+	Bool amount = FALSE;
+	Bool missing = FALSE;
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(360);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	if (definition && definition->m_internalName == "UNIT_SET_EXPERIENCE_POINTS" &&
+		definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::UNIT &&
+		definition->getParameterType(1) == Parameter::INT)
+	{
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString("MapScriptAbsoluteXPSource");
+		action->getParameter(1)->friend_setInt(points);
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		amount = to->getRetailExperience() == static_cast<Real>(points) && to->getRank() == 2 &&
+			from->getRetailExperience() == sourceExperience;
+		action->getParameter(0)->friend_setString("MapScriptAbsoluteXPMissing");
+		action->getParameter(1)->friend_setInt(0);
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		missing = to->getRetailExperience() == static_cast<Real>(points);
+		deleteInstance(action);
+	}
+	std::fprintf(stderr, "TEST map-unit-ops set xp frame=%u baseline=%d amount=%d missing=%d\n",
+		ctx.frame, baseline, amount, missing);
+}
+
 void teleportProbe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -673,6 +733,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-teleport", teleportProbe);
 	registerAction("map-unit-ops-team-teleport", teamTeleportProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
+	registerAction("map-unit-ops-set-xp", setExperienceProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);
 	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
 	registerAction("map-unit-ops-horde-remove", removeHordeMember);

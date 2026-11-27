@@ -697,7 +697,7 @@ void ExperienceTracker::addRetailExperience(Real points, Bool scale)
 	advanceRetailLevel(m_retailExperience + points, TRUE);
 }
 
-void ExperienceTracker::addScriptRetailExperience(Real points)
+ExperienceTracker* ExperienceTracker::resolveScriptExperienceSink(Real* scaledPoints)
 {
 	ExperienceTracker* recipient = this;
 	std::vector<ObjectID> visited;
@@ -707,11 +707,20 @@ void ExperienceTracker::addScriptRetailExperience(Real points)
 		if (!next)
 			break;
 		if (std::find(visited.begin(), visited.end(), next->getID()) != visited.end())
-			return;
+			return nullptr;
 		visited.push_back(next->getID());
-		points *= recipient->m_experienceScalar;
+		if (scaledPoints)
+			*scaledPoints *= recipient->m_experienceScalar;
 		recipient = next->getExperienceTracker();
 	}
+	return recipient;
+}
+
+void ExperienceTracker::addScriptRetailExperience(Real points)
+{
+	ExperienceTracker* recipient = resolveScriptExperienceSink(&points);
+	if (!recipient)
+		return;
 	if (points >= 0.0f)
 	{
 		recipient->addRetailExperience(points, TRUE);
@@ -726,6 +735,16 @@ void ExperienceTracker::addScriptRetailExperience(Real points)
 	points *= ExperienceLevelStore::experienceScalar(recipient->m_parent, recipient->getRank(), recipient->m_retailStartingRank);
 	if (std::isfinite(points + recipient->m_retailExperience))
 		recipient->m_retailExperience += points;
+}
+
+void ExperienceTracker::setScriptRetailExperience(Int points)
+{
+	ExperienceTracker* recipient = resolveScriptExperienceSink(nullptr);
+	if (!recipient || !recipient->m_isTrainable)
+		return;
+	recipient->initializeRetailLevel();
+	recipient->m_retailExperience = INT_TO_REAL(points);
+	recipient->advanceRetailLevel(recipient->m_retailExperience, TRUE);
 }
 
 void ExperienceTracker::setMinRetailRank(Int rank, Bool feedback)
