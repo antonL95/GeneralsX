@@ -57,6 +57,7 @@
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/RetailSkirmishSpending.h"
+#include "GameLogic/RetailProximityCluster.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/AI.h"
@@ -595,71 +596,17 @@ Object* chooseRetailRaidBuilding(std::vector<std::pair<Int, Object*>>& targets, 
 	return std::prev(byWeight.end())->second;
 }
 
-struct RetailDefenseCluster
-{
-	Coord3D center{};
-	Real radius = 0.0f;
-	std::vector<Object*> buildings;
-
-	void add(Object& building, Real nodeRadius)
-	{
-		const Coord3D& point = *building.getPosition();
-		if (buildings.empty())
-		{
-			center = point;
-			radius = nodeRadius;
-		}
-		else
-		{
-			const Real distance = WWMath::SqrtfOrigin(tacticalDistanceSquared(point, center));
-			if (distance > radius - nodeRadius)
-			{
-				const Real nextRadius = (radius + distance + nodeRadius) * 0.5f;
-				const Real fraction = (nextRadius - radius) / distance;
-				center.x += (point.x - center.x) * fraction;
-				center.y += (point.y - center.y) * fraction;
-				center.z += (point.z - center.z) * fraction;
-				radius = nextRadius;
-			}
-		}
-		buildings.push_back(&building);
-	}
-};
+using RetailDefenseCluster = RetailProximityCluster<Object*>;
 
 std::vector<RetailDefenseCluster> makeDefenseClusters(std::vector<Object*> structures, Real nodeRadius)
 {
 	std::sort(structures.begin(), structures.end(), [](const Object* a, const Object* b) {
 		return a->getID() < b->getID();
 	});
-	std::vector<RetailDefenseCluster> clusters;
-	const Real joinDistanceSquared = 2.0f * sqr(nodeRadius);
-	for (Object* building : structures)
+	return buildRetailProximityClusters(structures, nodeRadius, [](const Object* building) -> const Coord3D&
 	{
-		const auto connected = [&](const RetailDefenseCluster& cluster) {
-			return std::any_of(cluster.buildings.begin(), cluster.buildings.end(), [&](const Object* member) {
-				return tacticalDistanceSquared(*building->getPosition(), *member->getPosition()) < joinDistanceSquared;
-			});
-		};
-		const auto first = std::find_if(clusters.begin(), clusters.end(), connected);
-		if (first == clusters.end())
-		{
-			clusters.emplace_back().add(*building, nodeRadius);
-			continue;
-		}
-		first->add(*building, nodeRadius);
-		for (auto it = first + 1; it != clusters.end();)
-		{
-			if (!connected(*it))
-			{
-				++it;
-				continue;
-			}
-			for (Object* member : it->buildings)
-				first->add(*member, nodeRadius);
-			it = clusters.erase(it);
-		}
-	}
-	return clusters;
+		return *building->getPosition();
+	});
 }
 
 Bool isRetailFortressKeep(const ThingTemplate& type)
@@ -3744,7 +3691,7 @@ void AISkirmishPlayer::updateRetail()
 		Object* collector = nullptr;
 		Bool ring = FALSE;
 		ObjectID id() const { return object ? object->getID() : INVALID_ID; }
-		ObjectID defendedID() const { return defense ? defense->buildings.front()->getID() : INVALID_ID; }
+		ObjectID defendedID() const { return defense ? defense->members.front()->getID() : INVALID_ID; }
 	};
 	const auto visibleToPlayer = [&](const Object& object) {
 		return isRetailTacticVisible(object, playerIndex);
@@ -3930,7 +3877,7 @@ void AISkirmishPlayer::updateRetail()
 			if (!defenseChoices.empty())
 			{
 				chosen = defenseChoices[GameLogicRandomValue(0, static_cast<Int>(defenseChoices.size()) - 1)];
-				if (chosen->defense->buildings.size() == 1)
+				if (chosen->defense->members.size() == 1)
 				{
 					const Int roll = GameLogicRandomValue(0, 100);
 					if (trace)
@@ -3966,7 +3913,7 @@ void AISkirmishPlayer::updateRetail()
 	Bool recruitAll = FALSE;
 	if (chosen->defense)
 	{
-		defenseSize = chosen->defense->buildings.size();
+		defenseSize = chosen->defense->members.size();
 		const size_t category = std::min<size_t>(defenseSize, 3) - 1;
 		recruitAll = GameLogicRandomValueReal(0.0f, 1.0f) < rules->defenseRecruitAllChance[category];
 		if (recruitAll)

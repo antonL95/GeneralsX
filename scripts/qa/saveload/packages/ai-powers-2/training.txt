@@ -256,4 +256,15 @@
 1081 destroy Player_1 AiPowers3AttackHealTarget 0
 1081 destroy Player_1 AiPowers3AttackHealTarget 1
 1081 destroy Player_1 AiPowers3AttackHealTarget 2
+30 ai-powers-grove Player_2 AiPowers3FixtureTree 0 2850,1410
+31 create Player_2 AiPowers3TreeCaster 0 2850,1200,0
+243 powers-fire-state Player_2 AiPowers3TreeCaster 0 AiPowers3TreePower
+243 powers-fire-state Player_2 AiPowers3TreeMarker 0
+243 health Player_2 AiPowers3TreeMarker 0
+410 destroy Player_2 AiPowers3TreeCaster 0
+411 create Player_2 AiPowers3TreeCaster 0 2850,1200,0
+620 powers-fire-state Player_2 AiPowers3TreeCaster 0 AiPowers3TreePower
+620 powers-fire-state Player_2 AiPowers3TreeMarker 0
+621 destroy Player_2 AiPowers3TreeCaster 0
+621 destroy Player_2 AiPowers3TreeMarker 0
 1436 destroy Player_1 AiPowers2DominateFootman 0

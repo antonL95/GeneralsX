@@ -29,6 +29,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include <algorithm>
+#include <numeric>
 #include <utility>
 
 #include "Common/DataChunk.h"
@@ -57,6 +58,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailWallMesh.h"
+#include "GameLogic/RetailProximityCluster.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Scripts.h"
@@ -992,6 +994,7 @@ void TerrainLogic::init()
 void TerrainLogic::reset()
 {
 	m_mapTrees.clear();
+	clearTreePowerGroups();
 	m_retailTaint.clear();
 	m_retailFire.reset();
 	m_mapTreesBeforeLegacyLoad.clear();
@@ -1111,6 +1114,7 @@ void TerrainLogic::update()
 void TerrainLogic::newMap( Bool saveGame )
 {
 	m_mapTrees.clear();
+	clearTreePowerGroups();
 	m_retailTaint.clear();
 	m_mapTreesBeforeLegacyLoad.clear();
 	m_legacyMapTreesHaveLedger = FALSE;
@@ -3050,6 +3054,7 @@ void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& po
 		tree.isHarvestable,
 		canTemplateToppleMapTree(thing)
 	});
+	m_treePowerGroups.clear();
 }
 
 void TerrainLogic::populateMapTreeMetadata()
@@ -3166,6 +3171,7 @@ Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real ra
 	if (TheTerrainVisual)
 		TheTerrainVisual->removeMapTree(chosen.position);
 	m_mapTrees.erase(m_mapTrees.begin() + static_cast<std::ptrdiff_t>(bestIndex));
+	clearTreePowerGroups();
 	return materialized;
 }
 
@@ -3196,6 +3202,46 @@ void TerrainLogic::notifyObjectMoved(Object* unit)
 		if (TheTerrainVisual)
 			TheTerrainVisual->fellMapTree(tree.position, pos);
 	}
+}
+
+void TerrainLogic::rebuildTreePowerGroups()
+{
+	std::vector<UnsignedInt> trees(m_mapTrees.size());
+	std::iota(trees.begin(), trees.end(), 0u);
+	constexpr Real treeRadius = 100.0f;
+	const auto groups = buildRetailProximityClusters(trees, treeRadius, [this](UnsignedInt tree) -> const Coord3D&
+	{
+		return m_mapTrees[tree].position;
+	});
+	m_treePowerGroups.reserve(groups.size());
+	for (const auto& group : groups)
+		m_treePowerGroups.push_back({group.center, group.members.front(), static_cast<UnsignedInt>(group.members.size())});
+}
+
+void TerrainLogic::clearTreePowerGroups()
+{
+	m_treePowerGroups.clear();
+	m_targetedTreePowerGroups.clear();
+}
+
+Bool TerrainLogic::takeLargestExploredTreeGroup(Int playerIndex, Coord3D& position)
+{
+	if (m_treePowerGroups.empty())
+		rebuildTreePowerGroups();
+	const TreePowerGroup* largest = nullptr;
+	for (const auto& group : m_treePowerGroups)
+	{
+		if ((largest && group.count <= largest->count) ||
+			ThePartitionManager->getShroudStatusForPlayer(playerIndex, &group.center) == CELLSHROUD_SHROUDED ||
+			std::find(m_targetedTreePowerGroups.begin(), m_targetedTreePowerGroups.end(), group.firstTree) != m_targetedTreePowerGroups.end())
+			continue;
+		largest = &group;
+	}
+	if (!largest)
+		return FALSE;
+	m_targetedTreePowerGroups.push_back(largest->firstTree);
+	position = largest->center;
+	return TRUE;
 }
 
 void TerrainLogic::ensureGrabbableTreeProxy()
@@ -3254,6 +3300,7 @@ void TerrainLogic::removeMapTreeAt(const Coord3D& position)
 	if (TheTerrainVisual)
 		TheTerrainVisual->removeMapTree(tree->position);
 	m_mapTrees.erase(tree);
+	clearTreePowerGroups();
 }
 
 Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const
@@ -3267,9 +3314,11 @@ Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const
 void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle)
 {
 	const GeometryInfo treeGeometry(GEOMETRY_CYLINDER, FALSE, 35.0f, 14.0f, 14.0f);
-	std::erase_if(m_mapTrees, [&](const MapTree& tree) {
+	const auto removed = std::erase_if(m_mapTrees, [&](const MapTree& tree) {
 		return ThePartitionManager->geomCollidesWithGeom(&pos, geometry, angle, &tree.position, treeGeometry, 0.0f);
 	});
+	if (removed)
+		clearTreePowerGroups();
 }
 
 Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,
@@ -3342,6 +3391,7 @@ Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 			if (TheTerrainVisual)
 				TheTerrainVisual->sinkMapTree(it->position);
 			m_mapTrees.erase(it);
+			clearTreePowerGroups();
 		}
 		return taken;
 	}
@@ -3353,7 +3403,7 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 	std::uint64_t boxes = 0;
 	const Real treeRadius = 7.0f;
 	const Real radiusSquared = sqr(radius + treeRadius);
-	std::erase_if(m_mapTrees, [&](const MapTree& tree) {
+	const auto removed = std::erase_if(m_mapTrees, [&](const MapTree& tree) {
 		const Real dx = tree.position.x - origin.x;
 		const Real dy = tree.position.y - origin.y;
 		const Real dz = tree.position.z - origin.z;
@@ -3371,6 +3421,8 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 			FXList::doFXPos(fx, &tree.position);
 		return true;
 	});
+	if (removed)
+		clearTreePowerGroups();
 	return boxes;
 }
 
@@ -3506,12 +3558,30 @@ void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 				tree.toppled = FALSE;
 		}
 	};
+	const RetailSaveBlocks::Block<Xfer> targetedTrees{
+		"targeted-tree-power-groups", [this](Xfer* block)
+		{
+			UnsignedInt count = m_targetedTreePowerGroups.size();
+			block->xferUnsignedInt(&count);
+			if (count > m_mapTrees.size())
+				throw SC_INVALID_DATA;
+			if (block->getXferMode() == XFER_LOAD)
+				m_targetedTreePowerGroups.resize(count);
+			for (UnsignedInt& tree : m_targetedTreePowerGroups)
+			{
+				block->xferUnsignedInt(&tree);
+				if (tree >= m_mapTrees.size())
+					throw SC_INVALID_DATA;
+			}
+		}, [this] { m_targetedTreePowerGroups.clear(); }
+	};
 	if (hasRiverState)
 	{
 		RetailSaveBlocks::transferSection(xfer, loading, present, {
 			fire,
 			taint,
 			toppledTrees,
+			targetedTrees,
 			{"river-water", [this](Xfer* block) { xferImportedRiverState(block); }, []
 				{
 					for (PolygonTrigger* river = PolygonTrigger::getFirstPolygonTrigger(); river; river = river->getNext())
@@ -3522,7 +3592,7 @@ void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 	}
 	else
 	{
-		RetailSaveBlocks::transferSection(xfer, loading, present, {fire, taint, toppledTrees});
+		RetailSaveBlocks::transferSection(xfer, loading, present, {fire, taint, toppledTrees, targetedTrees});
 	}
 }
 
@@ -3621,7 +3691,10 @@ void TerrainLogic::xferMapTrees(Xfer* xfer)
 	UnsignedInt count = m_mapTrees.size();
 	xfer->xferUnsignedInt(&count);
 	if (xfer->getXferMode() == XFER_LOAD)
+	{
 		m_mapTrees.assign(count, MapTree{});
+		m_treePowerGroups.clear();
+	}
 	for (auto& tree : m_mapTrees)
 	{
 		xfer->xferCoord3D(&tree.position);
@@ -3661,6 +3734,7 @@ void TerrainLogic::restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTree
 	}
 	restored.insert(restored.end(), nextSaved, m_mapTrees.cend());
 	m_mapTrees.swap(restored);
+	clearTreePowerGroups();
 	m_mapTreesBeforeLegacyLoad.clear();
 	m_legacyMapTreesHaveLedger = FALSE;
 }
@@ -3692,13 +3766,17 @@ void TerrainLogic::xfer( Xfer *xfer )
 
 	if (retail && version <= 3 && xfer->getXferMode() == XFER_LOAD)
 	{
+		clearTreePowerGroups();
 		m_legacyMapTreesHaveLedger = version == 3;
 		m_mapTreesBeforeLegacyLoad = std::exchange(m_mapTrees, {});
 	}
 	if (version >= 3)
 		xferMapTrees(xfer);
 	else if (!retail && xfer->getXferMode() == XFER_LOAD)
+	{
 		m_mapTrees.clear();
+		clearTreePowerGroups();
+	}
 	if (retail)
 		xferRetailBlocks(xfer, version >= 5);
 }

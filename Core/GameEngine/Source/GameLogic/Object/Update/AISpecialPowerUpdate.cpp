@@ -966,7 +966,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
 		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" ||
-		policy == "AI_SPELLBOOK_CALLTHEHORDE" || policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE")
+		policy == "AI_SPELLBOOK_CALLTHEHORDE" || policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE" ||
+		policy == "AI_SPELLBOOK_TREE_KILLER")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -1110,6 +1111,19 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (!target)
 			return retailPolicyPoll;
 		const auto location = findSummonLocation(*source, *button, *power, *data, *target->getPosition());
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPELLBOOK_TREE_KILLER")
+	{
+		Coord3D target{};
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f ||
+			!TheTerrainLogic->takeLargestExploredTreeGroup(player->getPlayerIndex(), target))
+			return retailPolicyPoll;
+		const auto location = findSummonLocation(*source, *button, *power, *data, target);
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());

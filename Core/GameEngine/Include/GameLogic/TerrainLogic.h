@@ -329,6 +329,7 @@ public:
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos, Real angle = 0.0f, Real scale = 1.0f);
+	Bool takeLargestExploredTreeGroup(Int playerIndex, Coord3D& position);
 	static constexpr ObjectID GRABBABLE_TREE_PROXY_ID = static_cast<ObjectID>(99999996);
 	void ensureGrabbableTreeProxy();
 	const ThingTemplate* findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale = nullptr, Real requestedRadius = 10.0f) const;
@@ -410,7 +411,17 @@ protected:
 	size_t findBestMapTreeIndex(const Coord3D& origin, Real requestedRadius, Real maxDist2DSquared,
 		Bool onlyUpright, Bool grabbableOnly, Bool requireClub, const SpecialPowerObjectFilter* filter) const;
 	const MapTree* findMapTree(const Coord3D& position) const;
+	struct TreePowerGroup
+	{
+		Coord3D center{};
+		UnsignedInt firstTree = 0;
+		UnsignedInt count = 0;
+	};
+	void rebuildTreePowerGroups();
+	void clearTreePowerGroups();
 	std::vector<MapTree> m_mapTrees;
+	std::vector<TreePowerGroup> m_treePowerGroups;
+	std::vector<UnsignedInt> m_targetedTreePowerGroups;
 	std::vector<MapTree> m_mapTreesBeforeLegacyLoad;
 	Bool m_legacyMapTreesHaveLedger = FALSE;
 

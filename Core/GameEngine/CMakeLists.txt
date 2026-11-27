@@ -619,6 +619,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/BfmeMapScripts.h
     Include/GameLogic/BfmeScriptRules.h
 #    Include/GameLogic/Squad.h
+    Include/GameLogic/RetailProximityCluster.h
     Include/GameLogic/RetailTerrainFire.h
     Include/GameLogic/TerrainLogic.h
 #    Include/GameLogic/TurretAI.h
