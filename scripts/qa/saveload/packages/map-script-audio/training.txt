@@ -4,4 +4,5 @@
 243 script-audio-volume Player_1 AudioScriptFixtureActor 0
 245 script-audio-named Player_1 AudioScriptFixtureActor 0
 246 script-audio-volume Player_1 AudioScriptFixtureActor 0
+247 script-audio-team Player_1 AudioScriptFixtureActor 0
 310 destroy Player_1 AudioScriptFixtureActor 0

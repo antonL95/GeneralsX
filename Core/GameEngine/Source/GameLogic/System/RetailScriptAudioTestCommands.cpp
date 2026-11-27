@@ -7,6 +7,7 @@
 #include "Common/DataChunk.h"
 #include "Common/GameAudio.h"
 #include "Common/NameKeyGenerator.h"
+#include "Common/Team.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
@@ -133,6 +134,25 @@ void overrideVolume(const RetailTestCommands::Context& ctx)
 	TheAudio->setAudioEventVolumeOverride(fixtureSound, -1.0f);
 	std::fprintf(stderr, "TEST script audio volume frame=%u mapped=%d muted=%d\n", ctx.frame, mapped, muted);
 }
+
+void playTeam(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	if (!unit || !unit->getTeam())
+		return;
+	Team* team = unit->getTeam();
+	const Object* firstMember = team->getFirstItemIn_TeamMemberList();
+	if (!firstMember)
+		return;
+	TheAudio->setTraceEnabled(TRUE);
+	TheAudio->setHeadlessVirtualPlayback(TRUE);
+	ScriptAction* action = parseAction("PLAY_SOUND_EFFECT_AT_TEAM", 510, {{12, fixtureSound}, {3, team->getName().str()}});
+	const Bool mapped = action->getActionType() != ScriptAction::NO_OP;
+	std::fprintf(stderr, "TEST script audio team frame=%u mapped=%d owner=%u\n", ctx.frame, mapped,
+		static_cast<UnsignedInt>(firstMember->getID()));
+	TheScriptEngine->friend_executeAction(action, team);
+	deleteInstance(action);
+}
 }
 #endif
 
@@ -144,6 +164,7 @@ void registerRetailScriptAudioTestCommands()
 	registerAction("script-audio-arm", arm);
 	registerAction("script-audio-named", playNamed);
 	registerAction("script-audio-volume", overrideVolume);
+	registerAction("script-audio-team", playTeam);
 #endif
 }
 }

@@ -6840,6 +6840,26 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				static_cast<Real>(pAction->getParameter(2)->getInt()), object ? object->getButtonImage() : nullptr);
 			return;
 		}
+		case ScriptAction::PLAY_SOUND_EFFECT_AT_TEAM:
+		{
+			if (!TheAudio)
+				return;
+			const Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString());
+			const Object* unit = team ? team->getFirstItemIn_TeamMemberList() : nullptr;
+			if (!unit)
+				return;
+			if (const HordeContain* horde = HordeContain::get(unit))
+			{
+				const auto* members = horde->getContainedItemsList();
+				if (members && !members->empty() && members->front())
+					unit = members->front();
+			}
+			AudioEventRTS sound(pAction->getParameter(0)->getString(), unit->getID());
+			if (const Player* listener = ThePlayerList->getLocalPlayer())
+				sound.setPlayerIndex(listener->getPlayerIndex());
+			TheAudio->addAudioEvent(&sound);
+			return;
+		}
 		case ScriptAction::AUDIO_POP_MUSIC:
 		case ScriptAction::MUSIC_SCRIPT_POP_MUSIC:
 		case ScriptAction::MUSIC_RETURN_TO_MUSIC_SCRIPTING:
