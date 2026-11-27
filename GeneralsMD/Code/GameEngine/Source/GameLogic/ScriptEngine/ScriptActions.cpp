@@ -7138,7 +7138,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			if (condition < 0 || condition >= MODELCONDITION_COUNT ||
 				!std::isfinite(seconds) || seconds < 0.0f)
 				return;
-			const Real duration = seconds * LOGICFRAMES_PER_SECOND;
+			const Real duration = seconds * LOGICFRAMES_PER_SECONDS_REAL;
 			if (duration >= static_cast<Real>(INT_MAX))
 				return;
 			const auto applyCondition = [&](Object* unit) {
