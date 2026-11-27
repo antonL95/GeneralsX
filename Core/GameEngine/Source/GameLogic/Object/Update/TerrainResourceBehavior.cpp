@@ -207,7 +207,7 @@ TerrainResourceBehavior::ClaimYield TerrainResourceBehavior::calculateClaim(
 	Region3D bounds;
 	TheTerrainLogic->getExtent(&bounds);
 	const Claim claim = makeClaim(position, data.m_radius,
-		{data.m_highPriority != FALSE, frame, id, player.getPlayerIndex()}, bounds, cellSize);
+		{data.m_highPriority != FALSE, object && isComplete(*object), frame, id, player.getPlayerIndex()}, bounds, cellSize);
 	const PlayerTemplate* playerTemplate = player.getPlayerTemplate();
 	const auto& modifiers = playerTemplate->getResourceModifierValues();
 	const auto& modifierFilter = playerTemplate->getResourceModifierObjectFilter();
@@ -242,7 +242,7 @@ TerrainResourceBehavior::ClaimYield TerrainResourceBehavior::calculateClaim(
 				continue;
 			const UnsignedInt otherFrame = resource->m_claiming ? resource->m_claimFrame :
 				std::numeric_limits<UnsignedInt>::max();
-			const TerrainResourceRules::ClaimOrder order{otherData->m_highPriority != FALSE, otherFrame,
+			const TerrainResourceRules::ClaimOrder order{otherData->m_highPriority != FALSE, otherComplete, otherFrame,
 				static_cast<UnsignedInt>(other->getID()), other->getControllingPlayer()->getPlayerIndex()};
 			if (!TerrainResourceRules::blocks(claim.order, order))
 				continue;

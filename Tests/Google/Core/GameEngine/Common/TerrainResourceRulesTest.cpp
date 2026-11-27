@@ -11,16 +11,35 @@ TEST(TerrainResourceRules, ScansTheRetailFootprint)
 		(std::vector<int>{15, 15, 15, 15, 15, 14, 14, 14, 13, 12, 11, 10, 9, 8, 6, 3}));
 }
 
-TEST(TerrainResourceRules, SharesNormalClaimsAcrossPlayersAndRespectsPriority)
+TEST(TerrainResourceRules, ReservesUnfinishedClaimsPerPlayer)
 {
 	using TerrainResourceRules::ClaimOrder;
-	const ClaimOrder normal{false, 100, 5, 3};
-	EXPECT_TRUE(TerrainResourceRules::blocks(normal, ClaimOrder{false, 90, 9, 3}));
-	EXPECT_FALSE(TerrainResourceRules::blocks(normal, ClaimOrder{false, 90, 9, 4}));
-	EXPECT_FALSE(TerrainResourceRules::blocks(normal, ClaimOrder{false, 110, 1, 3}));
-	EXPECT_TRUE(TerrainResourceRules::blocks(normal, ClaimOrder{true, 110, 1, 4}));
-	EXPECT_FALSE(TerrainResourceRules::blocks(ClaimOrder{true, 110, 1, 4}, normal));
-	EXPECT_TRUE(TerrainResourceRules::blocks(ClaimOrder{true, 90, 9, 3}, ClaimOrder{true, 110, 1, 4}));
+	const ClaimOrder foundation{false, false, 100, 5, 3};
+	EXPECT_TRUE(TerrainResourceRules::blocks(foundation, ClaimOrder{false, false, 90, 9, 3}));
+	EXPECT_FALSE(TerrainResourceRules::blocks(foundation, ClaimOrder{false, false, 90, 9, 4}));
+	EXPECT_FALSE(TerrainResourceRules::blocks(foundation, ClaimOrder{false, false, 110, 1, 3}));
+}
+
+TEST(TerrainResourceRules, GivesCompletedClaimsToTheFirstFinisherAcrossPlayers)
+{
+	using TerrainResourceRules::ClaimOrder;
+	const ClaimOrder completed{false, true, 100, 5, 3};
+	const ClaimOrder earlierFoundation{false, false, 90, 9, 4};
+	EXPECT_FALSE(TerrainResourceRules::blocks(completed, earlierFoundation));
+	EXPECT_TRUE(TerrainResourceRules::blocks(earlierFoundation, completed));
+	EXPECT_TRUE(TerrainResourceRules::blocks(completed, ClaimOrder{false, true, 90, 9, 4}));
+	EXPECT_TRUE(TerrainResourceRules::blocks(completed, ClaimOrder{false, true, 100, 4, 4}));
+	EXPECT_FALSE(TerrainResourceRules::blocks(completed, ClaimOrder{false, true, 100, 6, 4}));
+}
+
+TEST(TerrainResourceRules, RetainsHighPriorityClaimOrdering)
+{
+	using TerrainResourceRules::ClaimOrder;
+	const ClaimOrder normal{false, true, 100, 5, 3};
+	const ClaimOrder priority{true, false, 110, 1, 4};
+	EXPECT_TRUE(TerrainResourceRules::blocks(normal, priority));
+	EXPECT_FALSE(TerrainResourceRules::blocks(priority, normal));
+	EXPECT_TRUE(TerrainResourceRules::blocks(ClaimOrder{true, true, 90, 9, 3}, priority));
 }
 
 TEST(TerrainResourceRules, SelectsTheAuthoredModifierAndExtendsItsTail)

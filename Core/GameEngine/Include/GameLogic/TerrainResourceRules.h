@@ -31,6 +31,7 @@ inline std::vector<int> rowHalfWidths(int radius)
 struct ClaimOrder
 {
 	bool priority;
+	bool complete;
 	unsigned int frame;
 	unsigned int objectId;
 	int player;
@@ -44,7 +45,9 @@ inline bool blocks(const ClaimOrder& claim, const ClaimOrder& other)
 	const auto otherOrder = std::tie(other.frame, other.objectId);
 	if (claim.priority)
 		return otherOrder > order;
-	return other.player == claim.player && otherOrder < order;
+	if (claim.complete != other.complete)
+		return other.complete;
+	return (other.complete || other.player == claim.player) && otherOrder < order;
 }
 
 inline float incomeScale(const std::vector<int>& values, std::size_t buildingCount)

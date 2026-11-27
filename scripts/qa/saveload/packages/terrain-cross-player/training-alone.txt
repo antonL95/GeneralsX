@@ -1,0 +1,14 @@
+30 create Player_1 CrossClaimPorter 0 3200,1200,0
+30 create Player_2 CrossClaimPorter 0 3600,1200,0
+60 resground-preview Player_2 - 0 CrossClaimFastFarm 3500 1200
+80 terrain-claim-build Player_1 CrossClaimPorter 0 CrossClaimSlowFarm 3300 1200 0
+100 resground-preview Player_2 - 0 CrossClaimFastFarm 3500 1200
+120 terrain-claim-build Player_2 CrossClaimPorter 0 CrossClaimFastFarm 3500 1200 0
+140 resground-site Player_1 CrossClaimSlowFarm 0 -
+140 resground-site Player_2 CrossClaimFastFarm 0 -
+420 resground-site Player_1 CrossClaimSlowFarm 0 -
+420 resground-site Player_2 CrossClaimFastFarm 0 -
+1350 resground-site Player_1 CrossClaimSlowFarm 0 -
+1350 resground-site Player_2 CrossClaimFastFarm 0 -
+1360 resground-kill Player_2 CrossClaimFastFarm 0 -
+1370 resground-site Player_1 CrossClaimSlowFarm 0 -
