@@ -200,11 +200,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &targetCoord, angle, commandOptions );
 
-	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
-		m_pausedCount == 1 && getSpecialPowerModuleData()->m_startsPaused &&
-		!getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
-		!hasUnpauseUpgrade(getObject(), getSpecialPowerTemplate());
-	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
+	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !canCastWhilePaused(commandOptions)))
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
@@ -306,15 +302,19 @@ void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
 
-	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
-		m_pausedCount == 1 && getSpecialPowerModuleData()->m_startsPaused &&
-		!getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
-		!hasUnpauseUpgrade(getObject(), getSpecialPowerTemplate());
-	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
+	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !canCastWhilePaused(commandOptions)))
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
 	ObjectCreationList::create( ocl, getObject(), &creationCoord, &creationCoord, false );
+}
+
+Bool OCLSpecialPower::canCastWhilePaused(UnsignedInt commandOptions) const
+{
+	const auto* data = getSpecialPowerModuleData();
+	return (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 && m_pausedCount > 0 &&
+		data->m_startsPaused && !data->m_updateModuleStartsAttack &&
+		!hasUnpauseUpgrade(getObject(), getSpecialPowerTemplate());
 }
 
 // ------------------------------------------------------------------------------------------------

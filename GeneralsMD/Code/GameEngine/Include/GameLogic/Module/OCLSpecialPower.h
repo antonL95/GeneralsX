@@ -109,4 +109,7 @@ public:
 protected:
 
 	const ObjectCreationList* findOCL() const;
+
+private:
+	Bool canCastWhilePaused(UnsignedInt commandOptions) const;
 };

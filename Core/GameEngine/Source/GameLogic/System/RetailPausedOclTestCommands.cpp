@@ -8,6 +8,8 @@
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ScriptEngine.h"
+#include "GameLogic/Scripts.h"
 #include "GameLogic/TerrainLogic.h"
 
 namespace
@@ -30,6 +32,37 @@ void pausedOclProbe(const RetailTestCommands::Context& ctx)
 		module && module->isReady(), TheActionManager->canDoSpecialPowerAtLocation(object, &point, CMD_FROM_PLAYER, power, nullptr, button->getOptions()),
 		power->isValidRetailTarget(object, nullptr, &point, CMD_FROM_PLAYER), TheTerrainLogic->isUnderwater(point.x, point.y));
 }
+
+void pausedOclCountdown(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject();
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(ctx.argument);
+	const SpecialPowerModuleInterface* module = object && power ? object->getSpecialPowerModule(power) : nullptr;
+	if (!module)
+		return;
+
+	AsciiString name;
+	name.format("PausedOclCountdownTarget%u", static_cast<UnsignedInt>(object->getID()));
+	object->setName(name);
+	TheScriptEngine->addObjectToCache(object);
+	const auto type = ctx.action == "paused-ocl-stop" ? ScriptAction::NAMED_STOP_SPECIAL_POWER_COUNTDOWN :
+		ScriptAction::NAMED_START_SPECIAL_POWER_COUNTDOWN;
+	auto* action = newInstance(ScriptAction)(type);
+	action->getParameter(0)->friend_setString(name);
+	action->getParameter(1)->friend_setString(ctx.argument);
+	TheScriptEngine->friend_executeAction(action, object->getTeam());
+	deleteInstance(action);
+	std::fprintf(stderr, "TEST paused-ocl-countdown frame=%u ready=%d\n", ctx.frame, module->isReady());
+}
+
+void pausedOclLuaEvent(const RetailTestCommands::Context& ctx)
+{
+	if (Object* object = ctx.requireObject())
+	{
+		object->clearModelConditionState(MODELCONDITION_USER_6);
+		object->setModelConditionState(MODELCONDITION_USER_6);
+	}
+}
 }
 #endif
 
@@ -40,6 +73,9 @@ void registerRetailPausedOclTestCommands()
 #if !RTS_GENERALS
 	registerAction("paused-ocl-state", pausedOclState);
 	registerAction("paused-ocl-probe", pausedOclProbe);
+	registerAction("paused-ocl-stop", pausedOclCountdown);
+	registerAction("paused-ocl-start", pausedOclCountdown);
+	registerAction("paused-ocl-lua", pausedOclLuaEvent);
 #endif
 }
 }

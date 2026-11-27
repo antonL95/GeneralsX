@@ -48,11 +48,42 @@
 450 destroy Player_1 PausedOclGothmog 0
 450 destroy Player_1 PausedOclFortress 0
 450 destroy Player_1 PausedOclGuldurFortress 0
+450 destroy Player_1 PausedOclRazari 1
 450 destroy Player_1 PausedOclRazari 0
-450 destroy Player_1 PausedOclRazari 0
-450 destroy PlyrCreeps PausedOclEnemy 0
-450 destroy PlyrCreeps PausedOclEnemy 0
+450 destroy PlyrCreeps PausedOclEnemy 2
+450 destroy PlyrCreeps PausedOclEnemy 1
 450 destroy PlyrCreeps PausedOclEnemy 0
 189 paused-ocl-probe Player_1 PausedOclRazari 0 Command_SpecialAbilityWrathoftheBalchoth 3080 800
 209 paused-ocl-probe Player_1 PausedOclGuldurFortress 0 Command_SpecialAbilityGuldurEnsnareCaster 2780 800
 234 paused-ocl-probe Player_1 PausedOclRazari 1 Command_SpecialAbilityWrathoftheBalchoth 3080 1100
+180 create Player_1 PausedOclScriptFortress 0 2400,3540,0
+180 create Player_1 PausedOclScriptTargetlessFortress 0 2700,3540,0
+191 paused-ocl-stop Player_1 PausedOclScriptFortress 0 SpecialAbilityActivateeDummy
+192 paused-ocl-start Player_1 PausedOclScriptTargetlessFortress 0 SpecialAbilityActivateeDummy
+194 paused-ocl-stop Player_1 PausedOclScriptTargetlessFortress 0 SpecialAbilityActivateeDummy
+201 objupgrade Player_1 PausedOclScriptFortress 0 Upgrade_ArnorFortressIvoryTower
+201 objupgrade Player_1 PausedOclScriptTargetlessFortress 0 Upgrade_ArnorFortressIvoryTower
+245 paused-ocl-state Player_1 PausedOclScriptMarker 0
+246 power Player_1 PausedOclScriptFortress 0 CallofBelegaer
+255 paused-ocl-state Player_1 PausedOclScriptMarker 0
+256 destroy Player_1 PausedOclScriptMarker 0
+257 paused-ocl-start Player_1 PausedOclScriptFortress 0 SpecialAbilityActivateeDummy
+259 paused-ocl-start Player_1 PausedOclScriptFortress 0 SpecialAbilityActivateeDummy
+264 power Player_1 PausedOclScriptTargetlessFortress 0 CallofBelegaer
+274 paused-ocl-state Player_1 PausedOclScriptMarker 0
+450 destroy Player_1 PausedOclScriptMarker 0
+450 destroy Player_1 PausedOclScriptFortress 0
+450 destroy Player_1 PausedOclScriptTargetlessFortress 0
+220 create Player_1 PausedOclHerald 0 3220,3540,0
+220 create Player_1 PausedOclDurinStatue 0 3380,3540,0
+224 paused-ocl-lua Player_1 PausedOclHerald 0
+228 paused-ocl-state Player_1 PausedOclHeraldMarker 0
+266 objupgrade Player_1 PausedOclHerald 0 Upgrade_MiniHordeLvl6
+270 paused-ocl-lua Player_1 PausedOclHerald 0
+272 power Player_1 PausedOclDurinStatue 0 SpecialAbilityToggleMountedNomadCaravanTwo
+286 paused-ocl-state Player_1 PausedOclHeraldMarker 0
+288 paused-ocl-state Player_1 PausedOclDurinMarker 0
+450 destroy Player_1 PausedOclHeraldMarker 0
+450 destroy Player_1 PausedOclHerald 0
+450 destroy Player_1 PausedOclDurinMarker 0
+450 destroy Player_1 PausedOclDurinStatue 0
