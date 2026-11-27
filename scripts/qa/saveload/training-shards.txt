@@ -76,6 +76,7 @@
 3 tree-cover
 3 locomotor-store
 3 ai-powers
+3 ai-powers-2
 4 pkg30-targeting
 4 horde-turn
 4 pkg33-steering

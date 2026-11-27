@@ -1,0 +1,26 @@
+174 create Player_2 AiPowers2Healer 0 2800,1320,0
+174 create Player_2 AiPowers2Healer 1 2800,1500,0
+174 create Player_2 AiPowers2Healer 2 2800,1650,0
+175 create Player_2 AiPowers2Hero 0 2835,1500,0
+175 create Player_2 AiPowers2Hero 1 2875,1650,0
+175 create Player_2 AiPowers2Infantry 0 2835,1650,0
+176 damage Player_2 AiPowers2Healer 0 650
+176 damage Player_2 AiPowers2Hero 0 650
+176 damage Player_2 AiPowers2Hero 1 650
+176 damage Player_2 AiPowers2Infantry 0 650
+243 ability Player_2 AiPowers2Healer 0
+243 ability Player_2 AiPowers2Healer 1
+243 ability Player_2 AiPowers2Healer 2
+243 health Player_2 AiPowers2Healer 0
+243 health Player_2 AiPowers2Hero 0
+370 health Player_2 AiPowers2Healer 0
+370 health Player_2 AiPowers2Hero 0
+370 health Player_2 AiPowers2Hero 1
+370 health Player_2 AiPowers2Infantry 0
+370 powers-fire-state Player_2 AiPowers2Healer 2 AiPowers2Heal
+371 destroy Player_2 AiPowers2Healer 2
+371 destroy Player_2 AiPowers2Healer 1
+371 destroy Player_2 AiPowers2Healer 0
+371 destroy Player_2 AiPowers2Hero 1
+371 destroy Player_2 AiPowers2Hero 0
+371 destroy Player_2 AiPowers2Infantry 0

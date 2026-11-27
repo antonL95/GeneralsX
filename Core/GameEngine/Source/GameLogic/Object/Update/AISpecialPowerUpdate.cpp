@@ -211,6 +211,24 @@ Real bodyHealthFraction(const Object& object)
 	return maximum > 0.0f ? body->getHealth() / maximum : 1.0f;
 }
 
+Bool shouldHealHeroes(const Object& source, Real radius)
+{
+	const Real threshold = 0.5f + GameLogicRandomValueReal(-0.1f, 0.1f);
+	if (bodyHealthFraction(source) < threshold)
+		return TRUE;
+	if (!(radius > 0.0f) || !std::isfinite(radius))
+		return FALSE;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&source, radius, FROM_CENTER_2D,
+		nullptr, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder hold(nearby);
+	for (const Object* hero = nearby->first(); hero; hero = nearby->next())
+		if (hero != &source && !hero->isEffectivelyDead() && hero->isKindOf(KINDOF_HERO) &&
+			source.getRelationship(hero) == ALLIES && bodyHealthFraction(*hero) < threshold)
+			return TRUE;
+	return FALSE;
+}
+
 Real combatHealthFraction(const Object& source)
 {
 	const auto* horde = HordeContain::get(&source);
@@ -608,6 +626,18 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 			source->doSpecialPowerAtLocation(power, location, INVALID_ANGLE, options);
 		else
 			source->doSpecialPower(power, options);
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_SELFAOEHEALHEROS")
+	{
+		const UnsignedInt options = button->getOptions();
+		if (!button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) ||
+			!power->isValidRetailTarget(source, nullptr, nullptr, CMD_FROM_AI) ||
+			GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f ||
+			!shouldHealHeroes(*source, data->m_specialPowerRadius) || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPower(power, options);
 		return retailPolicyCooldown;
 	}
 
