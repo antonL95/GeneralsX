@@ -29,6 +29,9 @@
 #pragma once
 
 #include "Common/AsciiString.h"
+#include "Common/RetailScriptAudio.h"
+
+#include <array>
 
 enum { MAX_HW_PROVIDERS = 4 };
 
@@ -43,6 +46,7 @@ struct AudioSettings
 		, m_defaultMoneyTransactionVolume(0.0f) // Uses zero volume by default because originally the money sounds did not work in Zero Hour
 #endif
 	{
+		m_roomReverbGain.fill(1.0f);
 	}
 
 	AsciiString m_audioRoot;
@@ -52,6 +56,7 @@ struct AudioSettings
 	AsciiString m_streamingFolder;
 	AsciiString m_ambientStreamFolder;
 	AsciiString m_soundsExtension;
+	std::array<Real, RetailScriptAudio::RoomCount> m_roomReverbGain;
 	Bool m_useDigital;
 	Bool m_useMidi;
 	Int m_outputRate;

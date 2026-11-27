@@ -323,12 +323,14 @@ if(SAGE_USE_MINIAUDIO)
         message(FATAL_ERROR "SAGE_USE_MINIAUDIO is ON but miniaudio_lib target not found. Include cmake/miniaudio.cmake first.")
     endif()
 
-    target_link_libraries(corei_gameenginedevice_public INTERFACE miniaudio_lib)
+    target_link_libraries(corei_gameenginedevice_public INTERFACE miniaudio_lib miniaudio_reverb)
 
     target_sources(corei_gameenginedevice_private INTERFACE
         Include/MiniAudioDevice/MiniAudioManager.h
+        Include/MiniAudioDevice/MiniAudioReverb.h
         Include/MiniAudioDevice/MiniAudioStream.h
         Source/MiniAudioDevice/MiniAudioManager.cpp
+        Source/MiniAudioDevice/MiniAudioReverb.cpp
         Source/MiniAudioDevice/MiniAudioStream.cpp
     )
 endif()

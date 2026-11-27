@@ -1934,6 +1934,9 @@ AsciiString Parameter::getUiText() const
 		case NOTIFICATION_TYPE:
 			uiText.format("Notification type '%s'", uiString.str());
 			break;
+		case REVERB_ROOM:
+			uiText.format("Reverb room '%s'", uiString.str());
+			break;
 		case BRIDGE:
 			uiText.format("Bridge '%s'", uiString.str());
 			break;
@@ -2173,6 +2176,7 @@ Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
 		case BfmeScriptRules::WireKind::UnitReference: return UNIT_REFERENCE;
 		case BfmeScriptRules::WireKind::ModelCondition: return MODEL_CONDITION;
 		case BfmeScriptRules::WireKind::AudioName: return SOUND;
+		case BfmeScriptRules::WireKind::ReverbRoom: return REVERB_ROOM;
 		case BfmeScriptRules::WireKind::ObjectType: return OBJECT_TYPE;
 		case BfmeScriptRules::WireKind::EvaEvent: return EVA_EVENT;
 		case BfmeScriptRules::WireKind::NotificationType: return NOTIFICATION_TYPE;

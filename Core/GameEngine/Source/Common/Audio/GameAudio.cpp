@@ -44,6 +44,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/GameAudio.h"
+#include "Common/RetailScriptAudio.h"
 #include "GameClient/RetailClientAudio.h"
 
 #include "Common/AudioAffect.h"
@@ -132,6 +133,56 @@ static const FieldParse audioSettingsFieldParseTable[] =
 	{ "AudioFootprintInBytes",INI::parseUnsignedInt,							nullptr,							offsetof( AudioSettings, m_maxCacheSize) },
 	{ "Relative2DVolume",			INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_relative2DVolume ) },
 	{ "DefaultSoundVolume",		INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_defaultSoundVolume) },
+	{ "GlobalPaddedCellReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::PaddedCell },
+	{ "GlobalRoomReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::SmallRoom },
+	{ "GlobalBathroomReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Bathroom },
+	{ "GlobalLivingRoomReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::LivingRoom },
+	{ "GlobalStoneRoomReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::StoneRoom },
+	{ "GlobalAuditoriumReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Auditorium },
+	{ "GlobalConcertHallReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::ConcertHall },
+	{ "GlobalCaveReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Cave },
+	{ "GlobalArenaReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Arena },
+	{ "GlobalHangarReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Hangar },
+	{ "GlobalCarpetedHallwayReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::CarpetedHallway },
+	{ "GlobalHallwayReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Hallway },
+	{ "GlobalStoneCorridorReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::StoneCorridor },
+	{ "GlobalAlleyReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Alley },
+	{ "GlobalForestReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Forest },
+	{ "GlobalCityReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::City },
+	{ "GlobalMountainsReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Mountains },
+	{ "GlobalQuarryReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Quarry },
+	{ "GlobalPlainReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Plain },
+	{ "GlobalParkingLotReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::ParkingLot },
+	{ "GlobalSewerPipeReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::SewerPipe },
+	{ "GlobalUnderwaterReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Underwater },
+	{ "GlobalDruggedReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Drugged },
+	{ "GlobalDizzyReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Dizzy },
+	{ "GlobalPsychoticReverbMultiplier", INI::parsePercentToReal, nullptr,
+		offsetof(AudioSettings, m_roomReverbGain) + sizeof(Real) * RetailScriptAudio::Psychotic },
 	{ "Default3DSoundVolume",	INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_default3DSoundVolume) },
 	{ "DefaultSpeechVolume",	INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_defaultSpeechVolume) },
 	{ "DefaultVoiceVolume", INI::parsePercentToReal, nullptr, offsetof(AudioSettings, m_defaultSpeechVolume) },
@@ -165,7 +216,8 @@ AudioManager::AudioManager() :
 	m_music(nullptr),
 	m_sound(nullptr),
 	m_surroundSpeakers(FALSE),
-	m_hardwareAccel(FALSE)
+	m_hardwareAccel(FALSE),
+	m_scriptAudio(std::make_unique<RetailScriptAudio>())
 {
 	static_assert(ARRAY_SIZE(AudioManager::MuteAudioReasonNames) == MuteAudioReason_Count, "Incorrect array size");
 
@@ -278,6 +330,7 @@ void AudioManager::postProcessLoad()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::reset()
 {
+	m_scriptAudio->reset();
 	RetailClientAudio::resetCrowdVoiceCooldowns();
 	m_multiAudioHandles.clear();
 	// clear out any adjusted volumes we might have set.
@@ -316,6 +369,8 @@ std::vector<AudioHandle> AudioManager::startMultiAudioChildren(const AudioEventR
 //-------------------------------------------------------------------------------------------------
 void AudioManager::update()
 {
+	if (m_scriptAudio->updateFade(TheGameLogic ? TheGameLogic->getFrame() : 0))
+		m_volumeHasChanged = TRUE;
 	for (auto it = m_multiAudioHandles.begin(); it != m_multiAudioHandles.end();) {
 		MultiAudioGroup& group = it->second;
 		Bool playing = FALSE;

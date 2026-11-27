@@ -7,6 +7,7 @@
 #include "Common/DataChunk.h"
 #include "Common/GameAudio.h"
 #include "Common/NameKeyGenerator.h"
+#include "Common/RetailScriptAudio.h"
 #include "Common/Team.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "GameLogic/Object.h"
@@ -153,6 +154,20 @@ void playTeam(const RetailTestCommands::Context& ctx)
 	TheScriptEngine->friend_executeAction(action, team);
 	deleteInstance(action);
 }
+
+void runMixAction(const RetailTestCommands::Context& ctx)
+{
+	ScriptAction* action = nullptr;
+	const std::string_view kind(ctx.argument);
+	if (kind == "room")
+		action = parseAction("AUDIO_SET_REVERB_ROOM_TYPE", 448, {{60, "Cave"}});
+	else
+		return;
+	const Bool mapped = action->getActionType() != ScriptAction::NO_OP;
+	std::fprintf(stderr, "TEST script audio %s frame=%u mapped=%d\n", ctx.argument, ctx.frame, mapped);
+	TheScriptEngine->friend_executeAction(action);
+	deleteInstance(action);
+}
 }
 #endif
 
@@ -165,6 +180,7 @@ void registerRetailScriptAudioTestCommands()
 	registerAction("script-audio-named", playNamed);
 	registerAction("script-audio-volume", overrideVolume);
 	registerAction("script-audio-team", playTeam);
+	registerAction("script-audio-mix", runMixAction);
 #endif
 }
 }

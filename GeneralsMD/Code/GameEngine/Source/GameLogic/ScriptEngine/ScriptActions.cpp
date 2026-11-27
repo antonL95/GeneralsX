@@ -33,6 +33,7 @@
 #include "Common/AudioHandleSpecialValues.h"
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
+#include "Common/RetailScriptAudio.h"
 #include "Common/GameUtility.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/RetailSkirmishProbe.h"
@@ -6860,6 +6861,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			TheAudio->addAudioEvent(&sound);
 			return;
 		}
+		case ScriptAction::AUDIO_SET_REVERB_ROOM_TYPE:
+			if (TheAudio)
+				TheAudio->getScriptAudio().setRoom(pAction->getParameter(0)->getString());
+			return;
 		case ScriptAction::AUDIO_POP_MUSIC:
 		case ScriptAction::MUSIC_SCRIPT_POP_MUSIC:
 		case ScriptAction::MUSIC_RETURN_TO_MUSIC_SCRIPTING:

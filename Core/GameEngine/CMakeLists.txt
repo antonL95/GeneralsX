@@ -45,6 +45,7 @@ set(GAMEENGINE_SRC
     Include/Common/FrameRateLimit.h
 #    Include/Common/FunctionLexicon.h
     Include/Common/GameAudio.h
+    Include/Common/RetailScriptAudio.h
     Include/Common/GameCommon.h
     Include/Common/GameDefines.h
 #    Include/Common/GameEngine.h
@@ -690,6 +691,7 @@ set(GAMEENGINE_SRC
     Source/Common/Audio/AudioRequest.cpp
     Source/Common/Audio/DynamicAudioEventInfo.cpp
     Source/Common/Audio/GameAudio.cpp
+    Source/Common/Audio/RetailScriptAudio.cpp
     Source/Common/Audio/GameMusic.cpp
     Source/Common/Audio/GameSounds.cpp
     #Source/Common/Audio/simpleplayer.cpp # unused

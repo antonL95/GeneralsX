@@ -1,5 +1,6 @@
 236 create Player_1 AudioScriptFixtureActor 0 315,280,0
 237 script-audio-arm Player_1 AudioScriptFixtureActor 0
+238 script-audio-mix - - 0 room
 242 script-audio-named Player_1 AudioScriptFixtureActor 0
 243 script-audio-volume Player_1 AudioScriptFixtureActor 0
 245 script-audio-named Player_1 AudioScriptFixtureActor 0

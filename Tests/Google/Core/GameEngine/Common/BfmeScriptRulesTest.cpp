@@ -43,6 +43,11 @@ TEST(BfmeScriptRules, ResolvesAudioNameInMapScripts)
 	EXPECT_EQ(classifyWire(59).kind, WireKind::AudioName);
 }
 
+TEST(BfmeScriptRules, ResolvesReverbRoomInMapScripts)
+{
+	EXPECT_EQ(classifyWire(60).kind, WireKind::ReverbRoom);
+}
+
 TEST(BfmeScriptRules, ResolvesEveryParameterTypeOfTheSkirmishSet)
 {
 	for (int wire : { 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 18, 19, 22, 24, 25, 27, 31, 32, 33, 41, 47, 52, 54, 58, 61, 76 })

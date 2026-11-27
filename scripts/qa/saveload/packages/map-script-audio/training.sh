@@ -21,5 +21,12 @@ check() {
             result=1
         fi
     fi
+    for assertion in '238 room'; do
+        frame=${assertion% *}
+        kind=${assertion#* }
+        if covers "$frame"; then
+            expect "TEST script audio $kind frame=$frame mapped=1" || result=1
+        fi
+    done
     return "$result"
 }

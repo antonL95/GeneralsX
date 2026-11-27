@@ -37,6 +37,7 @@
 #include "Lib/BaseType.h"
 #define MINIAUDIO_IMPLEMENTATION
 #include "MiniAudioDevice/MiniAudioManager.h"
+#include "MiniAudioDevice/MiniAudioReverb.h"
 #include "MiniAudioDevice/MiniAudioStream.h"
 
 #include "Common/AudioAffect.h"
@@ -223,6 +224,8 @@ void MiniAudioManager::reset()
 	m_completedMusicByHandle.clear();
 	m_completedMusicByName.clear();
 	stopAllAudioImmediately();
+	if (m_reverb)
+		m_reverb->setRoom(RetailScriptAudio::None, 0.0f);
 	// GeneralsX @bugfix coolswood 18/07/2026 Restart sound groups in reset() to fix silent audio after loadGame.
 	// stopAllAudioImmediately() releases individual PlayingAudio entries but does not touch the four
 	// ma_sound_group nodes. pauseAudio() and stopAudio() used to stop these groups (e.g. via the ESC
@@ -243,6 +246,13 @@ void MiniAudioManager::update()
 	ScopedFPUGuard fpuGuard;
 
 	AudioManager::update();
+	if (m_reverb)
+	{
+		const auto room = getScriptAudio().getRoom();
+		const Real gain = getAudioSettings()->m_roomReverbGain[room];
+		if (m_reverb->setRoom(room, std::isfinite(gain) ? gain : 0.0f))
+			m_volumeHasChanged = TRUE;
+	}
 	setDeviceListenerPosition();
 	processRequestList();
 	processPlayingList();
@@ -592,6 +602,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	// Assign to PlayingAudio before any early returns below
 	audio->m_sound = sound;
 	audio->m_audioBuffer = audioBuffer;
+	audio->m_dryGroup = groupToUse;
 	if (pitch != 1.0f)
 		ma_sound_set_pitch(sound, pitch);
 
@@ -797,6 +808,11 @@ void MiniAudioManager::releaseMiniAudioHandles(PlayingAudio *release)
 		free(release->m_sound);
 		release->m_sound = NULL;
 	}
+	if (release->m_reverbSends)
+	{
+		ma_splitter_node_uninit(release->m_reverbSends.get(), nullptr);
+		release->m_reverbSends.reset();
+	}
 	if (release->m_audioBuffer) {
 		ma_audio_buffer_uninit(release->m_audioBuffer);
 		free(release->m_audioBuffer);
@@ -878,6 +894,23 @@ void MiniAudioManager::adjustPlayingVolume(PlayingAudio *audio)
 {
 	if (!audio || !audio->m_audioEventRTS || !audio->m_sound) return;
 	ma_sound_set_volume(audio->m_sound, getEffectiveVolume(audio->m_audioEventRTS.Peek()));
+	adjustReverbSends(audio);
+}
+
+void MiniAudioManager::adjustReverbSends(PlayingAudio* audio)
+{
+	if (!m_reverb || !audio->m_sound || !audio->m_audioEventRTS)
+		return;
+	AudioEventRTS& event = *audio->m_audioEventRTS.Peek();
+	const AudioEventInfo* info = event.getAudioEventInfo();
+	if (!info)
+		return;
+	const Bool positional = event.isPositionalAudio();
+	const auto gain = [](Real value) { return std::isfinite(value) ? std::clamp(value, 0.0f, 1.0f) : 1.0f; };
+	const Real dry = positional ? 1.0f : gain(info->m_dryLevel);
+	const Real wet = gain(info->m_reverbEffectLevel) *
+		getScriptAudio().suppressionAt(positional ? event.getCurrentPosition() : nullptr);
+	m_reverb->setSends(audio->m_sound, audio->m_dryGroup, audio->m_reverbSends, dry, wet);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1061,6 +1094,7 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_init(&m_engine, 0, NULL, &m_soundGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_speechGroup);
+	m_reverb = std::make_unique<MiniAudioReverb>(m_engine);
 	m_deviceOpened = TRUE;
 
 	fprintf(stderr, "AUDIO: MiniAudio backend loaded - version %s, device: %s, playback devices: %d\n",
@@ -1080,6 +1114,7 @@ void MiniAudioManager::closeDevice(void)
 		return;
 	m_deviceOpened = FALSE;
 
+	m_reverb.reset();
 	ma_sound_group_uninit(&m_speechGroup);
 	ma_sound_group_uninit(&m_sound3DGroup);
 	ma_sound_group_uninit(&m_soundGroup);
@@ -1577,6 +1612,8 @@ void MiniAudioManager::processPlayingList(void)
 		if (m_volumeHasChanged || (playing->m_audioEventRTS && playing->m_audioEventRTS->hasRetailEmitter())) {
 			adjustPlayingVolume(playing);
 		}
+		else if (m_reverb && m_reverb->isActive() && playing->m_type == PAT_3DSample)
+			adjustReverbSends(playing);
 
 		// Update 3D position for positional sounds
 		if (playing->m_type == PAT_3DSample && playing->m_audioEventRTS) {
@@ -1620,7 +1657,10 @@ void MiniAudioManager::processFadingList(void)
 		volume *= (1.0f - 1.0f * playing->m_framesFaded / getAudioSettings()->m_fadeAudioFrames);
 
 		if (playing->m_sound)
+		{
 			ma_sound_set_volume(playing->m_sound, volume);
+			adjustReverbSends(playing);
+		}
 
 		++it;
 	}
@@ -1756,7 +1796,8 @@ Real MiniAudioManager::getEffectiveVolume(AudioEventRTS *event) const
 	if (!event || m_muteReasonBits)
 		return 0.0f;
 	const AudioEventInfo *info = event->getAudioEventInfo();
-	const Real gain = event->getVolume() * event->getVolumeShift();
+	const Real gain = event->getVolume() * event->getVolumeShift() *
+		getScriptAudio().fadeMultiplier(event->getEventName());
 	if (info && info->m_soundType == AT_Music)
 		return gain * m_musicVolume;
 	if (info && (info->m_soundType == AT_Streaming || (info->m_type & ST_VOICE)))

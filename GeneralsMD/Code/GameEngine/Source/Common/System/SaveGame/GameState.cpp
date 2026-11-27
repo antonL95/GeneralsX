@@ -50,6 +50,8 @@
 #include "Common/Team.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/XferLoad.h"
+#include "Common/GameAudio.h"
+#include "Common/RetailScriptAudio.h"
 #include "Common/XferSave.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/GadgetListBox.h"
@@ -353,6 +355,8 @@ void GameState::init()
 	addSnapshotBlock( "CHUNK_ParticleSystem",					TheParticleSystemManager,	SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_TerrainVisual",					TheTerrainVisual,					SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_GhostObject",						TheGhostObjectManager,		SNAPSHOT_SAVELOAD );
+	if (TheAudio)
+		addSnapshotBlock("CHUNK_RetailScriptAudio", &TheAudio->getScriptAudio(), SNAPSHOT_SAVELOAD);
 
 	// add all the snapshot objects to our list of data blocks for deep CRCs of logic
 	addSnapshotBlock( "CHUNK_TeamFactory",						TheTeamFactory,						SNAPSHOT_DEEPCRC_LOGICONLY );

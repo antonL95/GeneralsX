@@ -31,6 +31,8 @@
 
 enum { MAXPROVIDERS = 64 };
 
+class MiniAudioReverb;
+
 enum PlayingAudioType
 {
 	PAT_Sample,
@@ -43,6 +45,8 @@ struct PlayingAudio
 {
 	ma_sound* m_sound;
 	ma_audio_buffer* m_audioBuffer;
+	ma_sound_group* m_dryGroup = nullptr;
+	std::unique_ptr<ma_splitter_node> m_reverbSends;
 	PlayingAudioType m_type;
 	RefCountPtr<DynamicAudioEventRTS> m_audioEventRTS;
 	Bool m_requestStop;
@@ -183,6 +187,7 @@ protected:
 	const Coord3D *getCurrentPositionFromEvent(AudioEventRTS *event);
 	Bool isOnScreen(const Coord3D *pos) const;
 	Real getEffectiveVolume(AudioEventRTS *event) const;
+	void adjustReverbSends(PlayingAudio* audio);
 
 	// Looping functions
 
@@ -246,6 +251,7 @@ protected:
 	std::list<PlayingAudio *> m_stoppedAudio;
 
 	Bool m_deviceOpened = FALSE;
+	std::unique_ptr<MiniAudioReverb> m_reverb;
 	std::map<AudioHandle, Int> m_completedMusicByHandle;
 	std::map<AsciiString, Int> m_completedMusicByName;
 	void *m_binkHandle;

@@ -144,6 +144,8 @@ public:
 	Real m_perFileVolumeShift = 0.0f;
 	Real m_perFilePitchMin = 1.0f;
 	Real m_perFilePitchMax = 1.0f;
+	Real m_dryLevel = 1.0f;
+	Real m_reverbEffectLevel = 1.0f;
 
 
   // DynamicAudioEventInfo interfacing functions

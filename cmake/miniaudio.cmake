@@ -14,10 +14,11 @@ if(SAGE_USE_MINIAUDIO)
         find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
     endif()
 
-    if(MINIAUDIO_INCLUDE_DIR)
+    if(MINIAUDIO_INCLUDE_DIR AND EXISTS "${MINIAUDIO_INCLUDE_DIR}/extras/nodes/ma_reverb_node/ma_reverb_node.c")
         message(STATUS "✓ Found system miniaudio header at ${MINIAUDIO_INCLUDE_DIR}")
         add_library(miniaudio_lib INTERFACE)
         target_include_directories(miniaudio_lib INTERFACE ${MINIAUDIO_INCLUDE_DIR})
+        set(miniaudio_reverb_source "${MINIAUDIO_INCLUDE_DIR}/extras/nodes/ma_reverb_node/ma_reverb_node.c")
         target_compile_definitions(miniaudio_lib INTERFACE SAGE_USE_MINIAUDIO)
         
         # Platform-specific audio backend configuration
@@ -47,6 +48,7 @@ if(SAGE_USE_MINIAUDIO)
 
         add_library(miniaudio_lib INTERFACE)
         target_include_directories(miniaudio_lib INTERFACE ${miniaudio_SOURCE_DIR})
+        set(miniaudio_reverb_source "${miniaudio_SOURCE_DIR}/extras/nodes/ma_reverb_node/ma_reverb_node.c")
         target_compile_definitions(miniaudio_lib INTERFACE SAGE_USE_MINIAUDIO)
 
         # Platform-specific audio backend configuration
@@ -64,4 +66,6 @@ if(SAGE_USE_MINIAUDIO)
 
         message(STATUS "miniaudio configured: target miniaudio_lib available")
     endif()
+    add_library(miniaudio_reverb STATIC "${miniaudio_reverb_source}")
+    target_link_libraries(miniaudio_reverb PRIVATE miniaudio_lib)
 endif()

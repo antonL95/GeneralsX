@@ -56,6 +56,7 @@ class DebugDisplayInterface;
 class Drawable;
 class MusicManager;
 class Object;
+class RetailScriptAudio;
 class SoundManager;
 
 
@@ -154,6 +155,9 @@ class AudioManager : public SubsystemInterface
 		virtual void postProcessLoad() override;
 		virtual void reset() override;
 		virtual void update() override;
+
+		RetailScriptAudio& getScriptAudio() { return *m_scriptAudio; }
+		const RetailScriptAudio& getScriptAudio() const { return *m_scriptAudio; }
 
 		// device dependent stop, pause and resume
 		virtual void stopAudio( AudioAffect which ) = 0;
@@ -406,6 +410,7 @@ class AudioManager : public SubsystemInterface
 		};
 		std::vector<AudioHandle> startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop);
 		std::map<AudioHandle, MultiAudioGroup> m_multiAudioHandles;
+		std::unique_ptr<RetailScriptAudio> m_scriptAudio;
 };
 
 extern AudioManager *TheAudio;
