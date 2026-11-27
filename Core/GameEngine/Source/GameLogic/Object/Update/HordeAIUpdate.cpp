@@ -59,8 +59,9 @@ UnsignedInt getCavalryLaunchFrames(const Object& anchor, const Locomotor& anchor
 		const Real speed = std::min(launchSpeed, locomotor->getMaxSpeedForCondition(damage, member));
 		frames = std::max(frames, (speed - locomotor->getRetailScalarSpeed()) / acceleration);
 	}
-	frames = WWMath::Ceil(std::min(frames, anchorMaxSpeed / anchorAcceleration));
-	return frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()) ? static_cast<UnsignedInt>(frames) : 0;
+	const Real framesBeforeLaunch = WWMath::Ceil(std::min(frames, anchorMaxSpeed / anchorAcceleration)) - 1.0f;
+	return framesBeforeLaunch > 0.0f && framesBeforeLaunch < static_cast<Real>(std::numeric_limits<UnsignedInt>::max())
+		? static_cast<UnsignedInt>(framesBeforeLaunch) : 0;
 }
 #endif
 
