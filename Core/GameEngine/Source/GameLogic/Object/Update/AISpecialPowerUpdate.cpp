@@ -29,9 +29,11 @@
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "WWMath/wwmath.h"
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <vector>
 
 namespace
@@ -283,6 +285,95 @@ Object* selectCombatPowerTarget(const Object& source, const Player& player, cons
 	return best;
 }
 
+Bool canSummonAt(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
+	const AISpecialPowerUpdateModuleData& data, const Coord3D& location)
+{
+	if (!button.isValidToUseOn(&source, nullptr, &location, CMD_FROM_AI) ||
+		!power.isValidRetailTarget(&source, nullptr, &location, CMD_FROM_AI))
+		return FALSE;
+	if (data.m_spellMakesAStructure)
+	{
+		constexpr Real structureClearance = 150.0f;
+		SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&location, structureClearance, FROM_CENTER_2D);
+		MemoryPoolObjectHolder hold(nearby);
+		for (const Object* object = nearby->first(); object; object = nearby->next())
+			if (!object->isEffectivelyDead() && object->isKindOf(KINDOF_STRUCTURE))
+				return FALSE;
+	}
+	return TRUE;
+}
+
+std::optional<Coord3D> findSummonLocation(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
+	const AISpecialPowerUpdateModuleData& data, const Coord3D& location)
+{
+	if (canSummonAt(source, button, power, data, location))
+		return location;
+	if (!data.m_randomizeTargetLocation)
+		return std::nullopt;
+
+	const Real dx = GameLogicRandomValueReal(-1.0f, 1.0f);
+	const Real dy = GameLogicRandomValueReal(-1.0f, 1.0f);
+	const Real length = WWMath::Sqrt(dx * dx + dy * dy);
+	if (length <= 0.0f)
+		return std::nullopt;
+
+	constexpr Real retryStep = 15.0f;
+	constexpr Real retryDistance = 150.0f;
+	for (Real distance = retryStep; distance <= retryDistance; distance += retryStep)
+	{
+		const Coord3D shifted{location.x + dx / length * distance, location.y + dy / length * distance, location.z};
+		if (canSummonAt(source, button, power, data, shifted))
+			return shifted;
+	}
+	return std::nullopt;
+}
+
+std::optional<Coord3D> selectSummonLocation(const Object& source, const Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data)
+{
+	constexpr Real defaultRange = 149.0f;
+	const Real configuredRange = specialPowerSearchRange(source, power, data.m_specialPowerRange);
+	const Real range = configuredRange > 0.0f ? configuredRange : defaultRange;
+	if (!std::isfinite(range))
+		return std::nullopt;
+	const Real diagonalOffset = range / WWMath::Sqrt(2.0f);
+	const Coord3D& center = *source.getPosition();
+	const Coord3D points[] = {
+		{center.x + diagonalOffset, center.y + diagonalOffset, center.z},
+		{center.x - diagonalOffset, center.y + diagonalOffset, center.z},
+		{center.x - diagonalOffset, center.y - diagonalOffset, center.z},
+		{center.x + diagonalOffset, center.y - diagonalOffset, center.z}
+	};
+	constexpr Int minimumEnemies = 2;
+	Int bestCount = minimumEnemies - 1;
+	std::optional<Coord3D> best;
+	for (const Coord3D& location : points)
+	{
+		SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&location, range, FROM_CENTER_2D);
+		MemoryPoolObjectHolder hold(nearby);
+		Int count = 0;
+		for (const Object* object = nearby->first(); object; object = nearby->next())
+		{
+			if (source.getRelationship(object) != ENEMIES || object->isEffectivelyDead() || object->getContainedBy() ||
+				object->isKindOf(KINDOF_INERT) ||
+				(object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED)))
+				continue;
+			const auto shroud = object->getShroudedStatus(player.getPlayerIndex());
+			if (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR)
+				++count;
+		}
+		if (count > bestCount)
+		{
+			if (const auto validLocation = findSummonLocation(source, button, power, data, location))
+			{
+				best = validLocation;
+				bestCount = count;
+			}
+		}
+	}
+	return best;
+}
+
 void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
 {
 	constexpr Int samplesPerAxis = 16;
@@ -391,7 +482,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 #if RTS_ZEROHOUR
 	const Int type = getAISpecialPowerUpdateModuleData()->m_specialPowerAIType;
 	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
-	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED || combatPowerTargets(policy) != CombatPowerTargets::None)
+	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
+		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -438,6 +530,17 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
 		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
+
+	if (policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
+	{
+		if (!combatVictim(*source) || GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+			return retailPolicyPoll;
+		const auto location = selectSummonLocation(*source, *player, *button, *power, *data);
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
 
 	const auto combatTargets = combatPowerTargets(policy);
 	if (combatTargets != CombatPowerTargets::None)
