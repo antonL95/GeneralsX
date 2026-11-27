@@ -10,15 +10,18 @@
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/dx8renderer.h"
+#include "WW3D2/htree.h"
 #include "WW3D2/lightenvironment.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
 #include "WW3D2/vertmaterial.h"
+#include "WW3D2/w3dbfmechunks.h"
 #include "WW3D2/w3dfxmaterial.h"
 
 #include <cstdlib>
 #include <memory>
 #include <set>
+#include <tuple>
 
 namespace RetailFX
 {
@@ -35,6 +38,8 @@ struct PackedMesh
 		const TriIndex *polygons = nullptr;
 		Int vertexCount = 0;
 		Int polygonCount = 0;
+		unsigned pass = 0;
+		unsigned material = 0;
 
 		bool operator==(const Source &) const = default;
 	} source;
@@ -72,7 +77,12 @@ public:
 	std::array<std::unique_ptr<NativePass>, 2> passes;
 	std::array<std::unique_ptr<NativePass>, 4> shadowed;
 	std::unique_ptr<NativePass> composite;
-	std::set<std::string, std::less<>> traced;
+	std::set<std::tuple<std::string, unsigned, unsigned, bool>> traced;
+	std::vector<NormalMappedVertex> posed;
+	std::vector<Vector3> positions;
+	std::vector<Vector3> normals;
+	std::vector<Matrix3D> inverseBindPose;
+	std::vector<Matrix3D> bindPose;
 	std::array<bool, 2> initialized{};
 	std::array<bool, 2> reportedFailure{};
 	bool shadowsInitialized = false;
@@ -80,21 +90,23 @@ public:
 
 std::unique_ptr<NormalMappedRuntime> runtime;
 
-bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, PackedMesh &geometry)
+bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, PackedMesh &geometry,
+	DX8PolygonRendererClass &renderer, unsigned material)
 {
 	const Int vertexCount = model.Get_Vertex_Count();
 	const Int polygonCount = model.Get_Polygon_Count();
 	if (vertexCount <= 0 || polygonCount <= 0 || (fx &&
 		(fx->tangents.size() != static_cast<size_t>(vertexCount) || fx->bitangents.size() != static_cast<size_t>(vertexCount))))
 		return false;
-	const auto *uv = model.Get_UV_Array(0, 0);
+	const unsigned pass = renderer.Get_Pass();
+	const auto *uv = model.Get_UV_Array(pass, 0);
 	const auto *position = model.Get_Vertex_Array();
 	const auto *normal = model.Get_Vertex_Normal_Array();
 	const auto *color = model.Get_Color_Array(0, false);
 	const auto *polys = model.MeshGeometryClass::Get_Polygon_Array();
 	if (!uv || !position || !normal || !polys)
 		return false;
-	const PackedMesh::Source source{fx, position, normal, uv, color, polys, vertexCount, polygonCount};
+	const PackedMesh::Source source{fx, position, normal, uv, color, polys, vertexCount, polygonCount, pass, material};
 	if (source == geometry.source)
 		return true;
 	geometry.source = {};
@@ -111,9 +123,12 @@ bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, PackedMesh &geometry
 		});
 	}
 	geometry.indices.clear();
-	geometry.indices.reserve(static_cast<size_t>(polygonCount) * 3);
+	geometry.indices.reserve(renderer.Get_Index_Count());
+	const auto *ids = fx ? &fx->passes[pass].ids : nullptr;
 	for (Int i = 0; i < polygonCount; ++i)
 	{
+		if (ids && ids->size() > 1 && (*ids)[i] != material)
+			continue;
 		for (Int corner = 0; corner < 3; ++corner)
 		{
 			const auto index = static_cast<uint32_t>(polys[i][corner]);
@@ -122,8 +137,97 @@ bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, PackedMesh &geometry
 			geometry.indices.push_back(index);
 		}
 	}
+	if (geometry.indices.size() != renderer.Get_Index_Count())
+		return false;
 	geometry.source = source;
 	return true;
+}
+
+std::optional<unsigned> selectMaterial(MeshModelClass &model, const W3dFx::Mesh &fx, unsigned pass,
+	const VertexMaterialClass *vertexMaterial)
+{
+	if (pass >= fx.passes.size() || !vertexMaterial)
+		return {};
+	const auto &data = fx.passes[pass];
+	if (data.ids.size() == 1 && !data.vertexMaterials.empty())
+		return data.ids.front();
+	if (data.ids.size() != static_cast<size_t>(model.Get_Polygon_Count()) || data.vertexMaterials.empty())
+		return {};
+	const auto crc = vertexMaterial->Get_CRC();
+	for (unsigned polygon = 0; polygon < data.ids.size(); ++polygon)
+	{
+		const auto *polygonMaterial = model.Peek_Polygon_Material(polygon, pass);
+		if (polygonMaterial && polygonMaterial->Get_CRC() == crc)
+			return data.ids[polygon];
+	}
+	return {};
+}
+
+std::span<const NormalMappedVertex> poseMesh(MeshClass &mesh, const PackedMesh &geometry)
+{
+	auto &model = *mesh.Peek_Model();
+	if (!model.Get_Flag(MeshGeometryClass::SKIN))
+		return geometry.vertices;
+
+	const auto *container = mesh.Get_Container();
+	const auto *tree = container ? container->Get_HTree() : nullptr;
+	const auto *links = model.Get_Vertex_Bone_Links();
+	const auto count = geometry.vertices.size();
+	if (!tree || !links || std::any_of(links, links + count, [tree](auto bone) { return bone >= tree->Num_Pivots(); }))
+		return {};
+
+	runtime->posed = geometry.vertices;
+	runtime->positions.resize(count);
+	runtime->normals.resize(count);
+	mesh.Get_Deformed_Vertices(runtime->positions.data(), runtime->normals.data());
+	const auto *influences = model.Peek_Second_Skin_Influences();
+	auto &bindPose = runtime->bindPose;
+	auto &inverseBindPose = runtime->inverseBindPose;
+	if (influences)
+	{
+		bindPose.resize(tree->Num_Pivots());
+		inverseBindPose.resize(tree->Num_Pivots());
+		const Matrix3D identity(true);
+		for (Int pivot = 0; pivot < tree->Num_Pivots(); ++pivot)
+		{
+			tree->Simple_Evaluate_Pivot(pivot, identity, &bindPose[pivot]);
+			bindPose[pivot].Get_Orthogonal_Inverse(inverseBindPose[pivot]);
+		}
+	}
+	for (size_t i = 0; i < count; ++i)
+	{
+		const auto bone = links[i];
+		const auto &transform = tree->Get_Transform(bone);
+		auto &vertex = runtime->posed[i];
+		const auto rotateBasis = [&](const float (&axis)[3], float (&result)[3]) {
+			const Vector3 local(axis[0], axis[1], axis[2]);
+			auto direction = transform.Rotate_Vector(local);
+			if (influences && influences[i].Weight1 && influences[i].Bone1 < tree->Num_Pivots())
+			{
+				const auto &influence = influences[i];
+				const auto second = influence.Bone1;
+				const auto bindDirection = bindPose[bone].Rotate_Vector(local);
+				const auto secondLocal = inverseBindPose[second].Rotate_Vector(bindDirection);
+				direction = direction * (influence.Weight0 / 100.0f) +
+					tree->Get_Transform(second).Rotate_Vector(secondLocal) * (influence.Weight1 / 100.0f);
+				direction.Normalize();
+			}
+			result[0] = direction.X;
+			result[1] = direction.Y;
+			result[2] = direction.Z;
+		};
+		const auto &position = runtime->positions[i];
+		const auto &normal = runtime->normals[i];
+		vertex.position[0] = position.X;
+		vertex.position[1] = position.Y;
+		vertex.position[2] = position.Z;
+		vertex.normal[0] = normal.X;
+		vertex.normal[1] = normal.Y;
+		vertex.normal[2] = normal.Z;
+		rotateBasis(geometry.vertices[i].tangent, vertex.tangent);
+		rotateBasis(geometry.vertices[i].bitangent, vertex.bitangent);
+	}
+	return runtime->posed;
 }
 
 Register fromVector(const Vector3 &value)
@@ -142,25 +246,31 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	const bool normalMapped = fx && !fx->materials.empty();
 	const auto *lights = mesh.Get_Lighting_Environment();
 	auto *shroud = TheTerrainRenderObject->getShroud();
-	if (model.Get_Pass_Count() != 1 || model.Get_Flag(MeshGeometryClass::SKIN) || !lights ||
+	if (!lights ||
 		!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
 		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
 		return false;
-	if (normalMapped && (fx->materials.size() != 1 || fx->materials[0].effect != "normalmapped.fx"))
+	const unsigned meshPass = renderer.Get_Pass();
+	const auto materialId = normalMapped ? selectMaterial(model, *fx, meshPass, vertexMaterial) : std::optional(0u);
+	if (!materialId || (normalMapped && (*materialId >= fx->materials.size() ||
+		fx->materials[*materialId].effect != "normalmapped.fx")))
 		return false;
-	if (!normalMapped && (secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
+	if (!normalMapped && (model.Get_Pass_Count() != 1 || model.Get_Flag(MeshGeometryClass::SKIN) ||
+		secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
 		vertexMaterial->Get_Opacity() != 1.0f || shader.Get_Depth_Compare() != ShaderClass::PASS_LEQUAL ||
 		shader.Get_Depth_Mask() != ShaderClass::DEPTH_WRITE_ENABLE ||
 		shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE ||
 		shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO))
 		return false;
 	static const W3dFx::Material noFx{};
-	const auto &material = normalMapped ? fx->materials[0] : noFx;
+	const auto &material = normalMapped ? fx->materials[*materialId] : noFx;
 	const auto normalName = material.get<std::string>("NormalMap", {});
 	const auto diffuseColor = material.get<W3dFx::Float4>("DiffuseColor", {1.0f, 1.0f, 1.0f, 1.0f});
-	if (normalMapped && (normalName.empty() || normalName == "None" || diffuseColor[3] != 1.0f ||
-		material.get<bool>("AlphaBlendEnable", false)))
+	if (normalMapped && (normalName.empty() || stricmp(normalName.c_str(), "None") == 0))
 		return false;
+	const float opacity = mesh.Get_Animation_Opacity() * mesh.Get_Alpha_Override();
+	const bool alphaBlend = normalMapped && (opacity < 1.0f || diffuseColor[3] < 1.0f ||
+		material.get<bool>("AlphaBlendEnable", false));
 
 	auto *device = DX8Wrapper::Get_Effect_Device9();
 	if (!device)
@@ -190,7 +300,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	D3DXMATRIX worldToShadow;
 	float shadowTexel = 0.0f;
 	void *shadow = nullptr;
-	const bool useShadows = normalMapped && material.technique == 2 && TheRetailTerrainShadow &&
+	const bool useShadows = normalMapped && !alphaBlend && material.technique == 2 && TheRetailTerrainShadow &&
 		TheRetailTerrainShadow->getAuthoredShadow(shadow, worldToShadow, shadowTexel);
 	const auto cloud = !normalMapped || useShadows ? nativeTexture(TheTerrainRenderObject->peekCloudTexture()) : nullptr;
 	if ((normalMapped && !normal) || !base || !mask)
@@ -201,7 +311,10 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	if (cacheable && !stored)
 		stored = std::make_shared<PackedMesh>();
 	auto &geometry = cacheable ? *stored : temporary;
-	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry))
+	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry, renderer, *materialId))
+		return false;
+	const auto vertices = poseMesh(mesh, geometry);
+	if (vertices.empty())
 		return false;
 
 	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
@@ -320,7 +433,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		else if (name == "Shininess" && !normalMapped)
 			floats[0][0] = vertexMaterial->Get_Shininess();
 		else if (name == "Opacity" || name == "OpacityOverride")
-			floats[0][0] = mesh.Get_Alpha_Override();
+			floats[0][0] = opacity;
 		else if (name == "HouseColorEnable")
 			floats[0][0] = 0.0f;
 		else if (name == "Cloud")
@@ -346,8 +459,8 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
 		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
 	const auto draw = [&](NativePass &effectPass) {
-		return effectPass.drawNormalMapped(device, geometry.vertices, geometry.indices, setBinding, getTexture,
-			alphaTest, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE,
+		return effectPass.drawNormalMapped(device, vertices, geometry.indices, setBinding, getTexture,
+			alphaTest, alphaBlend, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE && !alphaBlend,
 			model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
 	};
 	const auto variant = (havePoint ? 1u : 0u) | (fog[0][0] != 0.0f ? 2u : 0u);
@@ -357,8 +470,14 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	const bool drawn = drewShadows || draw(*pass);
 	if (drewShadows)
 		label = "NormalMapped Default with authored shadows";
-	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime->traced.insert(mesh.Get_Name()).second)
+	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") &&
+		runtime->traced.emplace(mesh.Get_Name(), meshPass, *materialId, alphaBlend).second)
+	{
 		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, mesh.Get_Name());
+		if (normalMapped && (fx->materials.size() > 1 || alphaBlend))
+			std::fprintf(stderr, "[RetailFX] NormalMapped batch (%s) pass=%u material=%u triangles=%zu blend=%d opacity=%.3f\n",
+				mesh.Get_Name(), meshPass, *materialId, geometry.indices.size() / 3, alphaBlend, opacity);
+	}
 	if (!drawn && !runtime->reportedFailure[slot])
 	{
 		std::fprintf(stderr, "[RetailFX] Could not bind or draw %s\n", label);

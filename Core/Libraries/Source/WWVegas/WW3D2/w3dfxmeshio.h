@@ -203,6 +203,8 @@ bool MeshModelClass::install_fx_materials(MeshLoadContextClass * context)
 			auto fixed = id == data.ids.front() ? first : W3dFx::fixedMaterial(fx.materials[id], Get_Name(), autoFog);
 			auto * material = NEW_REF(VertexMaterialClass, ());
 			W3dFx::configureVertexMaterial(fixed, *material);
+			if (fx.materials.size() > 1)
+				material->Make_Unique();
 			data.vertexMaterials[id] = context->Add_Vertex_Material(material);
 			context->FxVertexMaterials.emplace_back(material, pass, fixed.unlit);
 			material->Release_Ref();

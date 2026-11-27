@@ -435,19 +435,20 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 
 bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
 	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
-	bool alphaTest, bool depthWrite, bool twoSided)
+	bool alphaTest, bool alphaBlend, bool depthWrite, bool twoSided)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	if (vertices.empty() || indices.empty())
 		return false;
 	return m_data->draw(device, setBinding, getTexture, [&] {
 		const bool categoryState = m_data->useCategoryDepthAndCull;
+		const bool blend = alphaBlend || m_data->composite;
 		if (FAILED(device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest ? TRUE : FALSE)) ||
-			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, m_data->composite ? TRUE : FALSE)) ||
-			(m_data->composite && (FAILED(device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD)) ||
+			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, blend ? TRUE : FALSE)) ||
+			(blend && (FAILED(device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD)) ||
 				FAILED(device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE)))) ||
 			FAILED(device->SetRenderState(D3DRS_FOGENABLE, FALSE)) ||
-			(categoryState && FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, depthWrite ? TRUE : FALSE))) ||
+			((categoryState || alphaBlend) && FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, depthWrite ? TRUE : FALSE))) ||
 			((categoryState || twoSided) && FAILED(device->SetRenderState(D3DRS_CULLMODE, twoSided ? D3DCULL_NONE : D3DCULL_CW))))
 			return false;
 		return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
@@ -482,7 +483,7 @@ bool NativePass::drawTerrain(void *, std::span<const TerrainVertex>, std::span<c
 	std::span<const uint32_t>, void *) { return false; }
 
 bool NativePass::drawNormalMapped(void *, std::span<const NormalMappedVertex>, std::span<const uint32_t>,
-	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool, bool) { return false; }
+	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool, bool, bool) { return false; }
 
 #endif
 

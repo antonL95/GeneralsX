@@ -1973,14 +1973,25 @@ void DX8TextureCategoryClass::Render()
 		const float animationOpacity = mesh->Get_Animation_Opacity();
 		const bool particle = mesh->Get_Particle_Tint() != 0;
 		const bool retailAdditiveFade = retailAdditiveMaterial && mesh->Is_Additive() && mesh->Get_Alpha_Override() != 1.0f;
-		if (!particle && !retailAdditiveFade && animationOpacity == 1.0f &&
-			mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
+		const bool materialOverride = mesh->Get_User_Data() &&
+			*(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE;
+		const bool opacityOverride = animationOpacity != 1.0f || mesh->Get_Alpha_Override() != 1.0f;
+		const bool sorted = !particle && !retailAdditiveFade && animationOpacity == 1.0f &&
+			mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled();
+		bool drawn = false;
+		if (meshEffectDraw && !m_gForceMultiply && !particle && !materialOverride && !sorted &&
+			(mesh->Peek_Model()->Has_Fx_Materials() || (!opacityOverride && pass == 0)))
+		{
+			Matrix4x4 queuedWorld;
+			DX8Wrapper::Get_Transform(D3DTS_WORLD, queuedWorld);
+			drawn = meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader, queuedWorld, *renderer);
+		}
+		if (!drawn && sorted) {
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
-		} else {
+		} else if (!drawn) {
 			//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material
 			//if necessary
-			if (particle || animationOpacity != 1.0f || mesh->Get_Alpha_Override() != 1.0f ||
-				(mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))
+			if (particle || opacityOverride || materialOverride)
 			{
 				//mesh has material override of some kind
 				//adjust the opacity of this model
@@ -2041,18 +2052,7 @@ void DX8TextureCategoryClass::Render()
 				DX8Wrapper::Set_Material(vmaterial);	//restore previous material.
 			}
 			else
-			{
-				bool drawn = false;
-				if (meshEffectDraw && pass == 0 && !m_gForceMultiply &&
-					renderer->Get_Index_Count() == static_cast<unsigned>(mesh->Peek_Model()->Get_Polygon_Count()) * 3)
-				{
-					Matrix4x4 queuedWorld;
-					DX8Wrapper::Get_Transform(D3DTS_WORLD, queuedWorld);
-					drawn = meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader, queuedWorld, *renderer);
-				}
-				if (!drawn)
-					renderer->Render(mesh->Get_Base_Vertex_Offset());
-			}
+				renderer->Render(mesh->Get_Base_Vertex_Offset());
 		}
 //--------------------------------------------------------------------
 		if (mesh->Get_ObjectScale() != 1.0f)

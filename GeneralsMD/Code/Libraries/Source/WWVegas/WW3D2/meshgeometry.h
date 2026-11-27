@@ -142,7 +142,8 @@ public:
 	const Vector4 *			Get_Plane_Array(bool create = true);
 	void							Compute_Plane(int pidx,PlaneClass * set_plane) const;
 	const uint32 *				Get_Vertex_Shade_Index_Array(bool create = true)	{ return get_shade_indices(create); }
-	const uint16 *				Get_Vertex_Bone_Links()								{ return get_bone_links(); }
+	const uint16 *				Get_Vertex_Bone_Links()								{ return get_bone_links(false); }
+	const W3dBfme::Influence *	Peek_Second_Skin_Influences() const				{ return Vertex2 && SkinInfluences ? SkinInfluences->Get_Array() : nullptr; }
 	uint8 *						Get_Poly_Surface_Type_Array()						{ WWASSERT(PolySurfaceType); return PolySurfaceType->Get_Array(); }
 	uint8							Get_Poly_Surface_Type(int poly_index) const;
 

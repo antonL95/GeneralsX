@@ -1,0 +1,5 @@
+20 create Player_1 MordorTrollCage 0 3240,1330,0
+20 create Player_1 PlaytestNormalMappedMulti 0 3280,1460,0
+21 reveal Player_1 MordorTrollCage 0
+41 objupgrade Player_1 PlaytestNormalMappedMulti 0 Upgrade_MenFortressBanners
+60 kill Player_1 MordorTrollCage 0
