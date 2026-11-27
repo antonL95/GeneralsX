@@ -1,0 +1,10 @@
+175 create Player_1 SpawnVoicesProducer 0 3900,2400,0
+181 audio-loop-trace - - 0 virtual
+184 queue Player_1 SpawnVoicesProducer 0 SpawnVoicesHero
+228 kill Player_1 SpawnVoicesHero 0
+232 queue Player_1 SpawnVoicesProducer 0 SpawnVoicesHero
+246 audio-loop-trace - - 0 virtual
+293 audio-loop-trace - - 0 off
+294 destroy Player_1 SpawnVoicesHero 1
+294 destroy Player_1 SpawnVoicesHero 0
+294 destroy Player_1 SpawnVoicesProducer 0

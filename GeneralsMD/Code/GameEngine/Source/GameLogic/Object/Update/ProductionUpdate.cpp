@@ -52,7 +52,6 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
-#include "GameClient/FXList.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
@@ -63,7 +62,6 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
-#include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
@@ -123,15 +121,6 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 
 namespace
 {
-Bool spawnFXSpeaks(Object& produced)
-{
-	UpdateModule* update = produced.findUpdateModule(TheNameKeyGenerator->nameToKey("RespawnUpdate"));
-	if (!update)
-		return FALSE;
-	const FXList* fx = static_cast<RespawnUpdate*>(update)->spawnFX();
-	return fx && fx->playsVoice();
-}
-
 void parseRetailProductionModifier(INI* ini, void*, void* store, const void*)
 {
 	auto& modifier = static_cast<std::vector<RetailProductionModifier>*>(store)->emplace_back();
@@ -1045,11 +1034,12 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						// when we toss this production entry. so set it back to an innocuous value.
 						production->setExitDoor(DOOR_NONE_AVAILABLE);
 
-						if (!spawnFXSpeaks(*newObj))
+						const Bool firstProduced = production->getProductionQuantity() == production->getProductionQuantityRemaining();
+						if (firstProduced)
 						{
-							AudioEventRTS voiceCreate = *RetailClientAudio::select(*newObj, "VoiceCreated", newObj->getTemplate()->getVoiceCreated());
-							voiceCreate.setObjectID(newObj->getID());
-							TheAudio->addAudioEvent(&voiceCreate);
+							AudioEventRTS voiceCreated = *RetailClientAudio::select(*newObj, "VoiceCreated", newObj->getTemplate()->getVoiceCreated());
+							voiceCreated.setObjectID(newObj->getID());
+							TheAudio->addAudioEvent(&voiceCreated);
 						}
 
 						// call the onUnitCreated for the player
@@ -1065,7 +1055,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 							create->onBuildComplete();
 						}
 
-						if( production->getProductionQuantity() == production->getProductionQuantityRemaining() )
+						if (firstProduced)
 						{
 							//Call the voice created for the 1st object -- because it's possible to create multiple objects like redguards!
 							AudioEventRTS sound = *newObj->getTemplate()->getPerUnitSound( "VoiceCreate" );

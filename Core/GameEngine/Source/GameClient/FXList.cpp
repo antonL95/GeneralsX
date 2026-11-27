@@ -152,19 +152,13 @@ public:
 		play(primary, RetailFileLayers::enabled() ? source : nullptr);
 	}
 
-	void playRetail(const Coord3D* position, const Object* source, const Object* target, Bool& played, Bool ownVoice = FALSE) const
+	void playRetail(const Coord3D* position, const Object* source, const Object* target, Bool& played) const
 	{
 		if ((m_stopIfPlayed && played) ||
 			(m_objectFilter && (!target || !m_objectFilter->matchesObject(source, target))))
 			return;
-		if (play(position, source, ownVoice))
+		if (play(position, source))
 			played = TRUE;
-	}
-
-	Bool isVoice() const
-	{
-		const AudioEventInfo* info = TheAudio ? TheAudio->findAudioEventInfo(m_soundName) : nullptr;
-		return info && BitIsSet(info->m_type, ST_VOICE);
 	}
 
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
@@ -204,7 +198,7 @@ private:
 		SpecialPowerObjectFilter::parse(ini, instance, &filter.emplace(), userData);
 	}
 
-	Bool play(const Coord3D* position, const Object* source, Bool ownVoice = FALSE) const
+	Bool play(const Coord3D* position, const Object* source) const
 	{
 		if (!matchesSourceConditions(source, m_requiredConditions) ||
 			(m_sourceFilter && (!source || !m_sourceFilter->matchesObject(source, source))))
@@ -215,9 +209,7 @@ private:
 		AudioEventRTS sound(m_soundName);
 		if (source)
 			sound.setPlayerIndex(source->getControllingPlayer()->getPlayerIndex());
-		if (source && ownVoice && isVoice())
-			sound.setObjectID(source->getID());
-		else if (position)
+		if (position)
 			sound.setPosition(position);
 		if (traceRetailFXLists())
 			std::fprintf(stderr, "[Retail FXList] Sound %s owner=%u action=start frame=%u\n", m_soundName.str(),
@@ -1737,7 +1729,7 @@ void FXList::doFXFromDrawable(const FXList* fx, const Drawable& drawable)
 }
 
 void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
-	const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target, Bool ownVoices) const
+	const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
 	if (!m_playEvenIfShrouded && ThePartitionManager->getShroudStatusForPlayer(playerIndex, primary) != CELLSHROUD_CLEAR)
@@ -1751,7 +1743,7 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 	{
 		if (const SoundFXNugget* sound = retail ? (*it)->asSoundNugget() : nullptr)
 		{
-			sound->playRetail(primary, source, target, playedSound, ownVoices);
+			sound->playRetail(primary, source, target, playedSound);
 			continue;
 		}
 		if (source || target)
@@ -1759,22 +1751,6 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 		else
 			(*it)->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 	}
-}
-
-void FXList::doSpawnFX(const Object* spawned) const
-{
-	doFXPos(spawned->getPosition(), nullptr, 0.0f, nullptr, 0.0f, spawned, nullptr, TRUE);
-}
-
-Bool FXList::playsVoice() const
-{
-	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
-	{
-		const SoundFXNugget* sound = (*it)->asSoundNugget();
-		if (sound && sound->isVoice())
-			return TRUE;
-	}
-	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -157,9 +157,6 @@ public:
 		if (fx) fx->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius, source, target);
 	}
 
-	void doSpawnFX(const Object* spawned) const;
-	Bool playsVoice() const;
-
 	/// inline convenience method to avoid having to check for null.
 	inline static void doFXObj(const FXList* fx, const Object* primary, const Object* secondary = nullptr)
 	{
@@ -185,7 +182,7 @@ protected:
 		needed. Note that primary and/or secondary can be null, so you must check for this.
 	*/
 	void doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
-		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target, Bool ownVoices = FALSE) const;
+		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
 
 	/**
 		the object-based version... by default, just call the location-based implementation.

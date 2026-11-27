@@ -72,7 +72,6 @@ public:
 	virtual void onDie(const DamageInfo *damageInfo) override;
 
 	void markRevived(Int healthPercent);
-	const FXList* spawnFX() const;
 
 private:
 	Int m_animCondition = -1;

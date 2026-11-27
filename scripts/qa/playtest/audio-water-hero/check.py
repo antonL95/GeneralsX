@@ -49,8 +49,8 @@ def check(log):
         starts = [event for event in events if event[4] == name and event[1] == "start"]
         if len(starts) != 1:
             raise RuntimeError(f"Expected exactly one {name}, saw {len(starts)}")
-        if starts[0][2] == "0":
-            raise RuntimeError(f"{name} has no owning hero")
+        if starts[0][2] != "0":
+            raise RuntimeError(f"Expected positional playback for {name}, got object owner {starts[0][2]}")
     recruit = next(event[0] for event in events if event[4] == "PippinVoiceSalute")
     revive = next(event[0] for event in events if event[4] == "PippinVoiceRespawn")
     if not recruit < 800 < 880 < revive:
