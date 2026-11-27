@@ -3210,7 +3210,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 	{
 		const PolygonTrigger* trigger = m_triggerInfo[i].pTrigger;
 		if (trigger && (!refresh || trigger->isCastleArea()) &&
-			!trigger->pointInTrigger(trigger->isCastleArea() ? iPos : m_iPos))
+			!trigger->pointInTrigger(iPos))
 		{
 			const Bool exited = m_triggerInfo[i].isInside;
 			m_triggerInfo[i].isInside = false;

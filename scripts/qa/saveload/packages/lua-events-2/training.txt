@@ -1,0 +1,44 @@
+227 create Player_1 LuaEventsEnt 0 2480,2340,0
+228 create Player_1 LuaEventsEnt 1 2520,2340,0
+400 lua-events-area - - 0 - 2520 2780
+401 create Player_1 LuaEventsGrond 0 2460,2780,0
+402 create Player_1 LuaEventsChant 0 2460,2830,0
+403 lua-events-state Player_1 LuaEventsChant 0
+404 move Player_1 LuaEventsGrond 0 - 2520 2780
+492 lua-events-state Player_1 LuaEventsGrond 0
+493 lua-events-state Player_1 LuaEventsChant 0
+494 move Player_1 LuaEventsGrond 0 - 2460 2780
+582 lua-events-state Player_1 LuaEventsGrond 0
+583 lua-events-state Player_1 LuaEventsChant 0
+584 move Player_1 LuaEventsGrond 0 - 2520 2780
+672 lua-events-state Player_1 LuaEventsGrond 0
+673 lua-events-state Player_1 LuaEventsChant 0
+674 lua-events-reposition Player_1 LuaEventsGrond 0 - 2460 2780
+674 lua-events-state Player_1 LuaEventsGrond 0
+674 lua-events-state Player_1 LuaEventsChant 0
+676 move Player_1 LuaEventsGrond 0 - 2520 2780
+679 lua-events-state Player_1 LuaEventsEnt 1
+680 kill Player_1 LuaEventsEnt 0
+681 lua-events-state Player_1 LuaEventsEnt 0
+690 create Player_1 LuaEventsGate 0 2750,2450,0
+691 create Player_1 LuaEventsCower 0 2685,2450,0
+692 create PlyrCreeps LuaEventsCower 0 2750,2480,0
+695 lua-events-state Player_1 LuaEventsCower 0
+696 lua-events-hit PlyrCreeps LuaEventsCower 0 Player_1:LuaEventsGate:0
+697 lua-events-state Player_1 LuaEventsCower 0
+730 lua-events-state Player_1 LuaEventsCower 0
+731 lua-events-state PlyrCreeps LuaEventsCower 0
+734 lua-events-state Player_1 LuaEventsChant 0
+735 kill Player_1 LuaEventsGrond 0
+736 lua-events-state Player_1 LuaEventsChant 0
+740 create Player_1 LuaEventsPanic 0 3100,2630,0
+741 create PlyrCreeps LuaEventsPanic 0 3140,2660,0
+742 lua-events-state Player_1 LuaEventsPanic 0
+743 create PlyrCreeps LuaEventsAura 0 3150,2630,0
+793 lua-events-state Player_1 LuaEventsPanic 0
+794 lua-events-state PlyrCreeps LuaEventsPanic 0
+900 create Player_1 LuaEventsBreath 0 3000,2340,0
+901 create PlyrCreeps LuaEventsStationary 0 3035,2340,0
+902 lua-events-state PlyrCreeps LuaEventsStationary 0
+920 objupgrade Player_1 LuaEventsBreath 0 LuaEventsCastBreath
+1080 lua-events-state PlyrCreeps LuaEventsStationary 0

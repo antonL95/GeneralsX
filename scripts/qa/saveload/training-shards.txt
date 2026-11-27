@@ -120,3 +120,4 @@
 3 lua-inventory
 3 lua-ai-states
 3 lua-actions
+3 lua-events-2
