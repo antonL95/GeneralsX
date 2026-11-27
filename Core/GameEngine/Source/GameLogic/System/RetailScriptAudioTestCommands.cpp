@@ -183,6 +183,8 @@ void runMixAction(const RetailTestCommands::Context& ctx)
 		action = parseAction("AUDIO_SET_REVERB_ROOM_TYPE", 448, {{60, "Cave"}});
 	else if (kind == "polygon")
 		action = parseAction("AUDIO_SET_REVERB_SUPPRESSION_POLYGON", 525, {{9, fixtureArea}, {52, "", 0.25f}});
+	else if (kind == "immune")
+		action = parseAction("AUDIO_MAKE_SOUND_IMMUNE_TO_FADE", 441, {{59, fixtureSound}});
 	else if (kind == "fade")
 		action = parseAction("AUDIO_FADE_VOLUME", 417,
 			{{1, "", 1.0f}, {1, "", 0.25f}, {1, "", 0.1f}, {1, "", 0.25f}, {1, "", 0.1f}});

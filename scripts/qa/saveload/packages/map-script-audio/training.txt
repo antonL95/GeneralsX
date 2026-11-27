@@ -2,6 +2,7 @@
 237 script-audio-arm Player_1 AudioScriptFixtureActor 0
 238 script-audio-mix - - 0 room
 239 script-audio-mix - - 0 polygon
+240 script-audio-mix - - 0 immune
 241 script-audio-mix - - 0 fade
 242 script-audio-named Player_1 AudioScriptFixtureActor 0
 243 script-audio-volume Player_1 AudioScriptFixtureActor 0

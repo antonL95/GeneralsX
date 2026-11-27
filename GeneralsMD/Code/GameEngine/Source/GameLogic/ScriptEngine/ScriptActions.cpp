@@ -6873,6 +6873,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 					TheAudio->getScriptAudio().setSuppression(polygon->getTriggerName(), pAction->getParameter(1)->getReal());
 			}
 			return;
+		case ScriptAction::AUDIO_MAKE_SOUND_IMMUNE_TO_FADE:
+			if (TheAudio)
+				TheAudio->getScriptAudio().makeFadeImmune(pAction->getParameter(0)->getString());
+			return;
 		case ScriptAction::AUDIO_FADE_VOLUME:
 			if (TheAudio)
 				TheAudio->getScriptAudio().fade(pAction->getParameter(0)->getReal(),

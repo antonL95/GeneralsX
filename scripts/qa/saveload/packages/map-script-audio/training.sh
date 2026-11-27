@@ -21,7 +21,7 @@ check() {
             result=1
         fi
     fi
-    for assertion in '238 room' '239 polygon' '241 fade'; do
+    for assertion in '238 room' '239 polygon' '240 immune' '241 fade'; do
         frame=${assertion% *}
         kind=${assertion#* }
         if covers "$frame"; then
@@ -34,7 +34,7 @@ check() {
         fi
     done
     if covers 246; then
-        expect "TEST script audio mix-state frame=246 room=1 inside=0.25 outside=1.00 immune=0.25 fade=0.25" || result=1
+        expect "TEST script audio mix-state frame=246 room=1 inside=0.25 outside=1.00 immune=1.00 fade=0.25" || result=1
     fi
     if covers 257; then
         expect "TEST script audio mix-state frame=257 room=1 inside=0.25 outside=1.00 immune=1.00 fade=1.00" || result=1
