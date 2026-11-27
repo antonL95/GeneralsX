@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "Common/INIAudit.h"
 #include "Common/Player.h"
@@ -11,6 +12,7 @@
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/SupplyCenterProductionExitUpdate.h"
 #include "GameLogic/Module/WorkerAIUpdate.h"
 #include "GameLogic/Object.h"
@@ -213,11 +215,16 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 				if (Object* depot = TheGameLogic->findObjectByID(m_harvestDepot);
 					harvestDepot(depot, player) && distanceSquared(position, m_harvestDropPoint) <= range * range)
 				{
-					const UnsignedInt amount = m_numberBoxes * player->getSupplyBoxValue();
-					player->getMoney()->deposit(amount);
-					player->getScoreKeeper()->addMoneyEarned(amount);
-					depot->getExperienceTracker()->addRetailExperience(static_cast<Real>(amount));
-					RetailWorldUI::showPayout(*depot, amount, FALSE);
+					const Real boxValue = static_cast<Real>(m_numberBoxes) * player->getSupplyBoxValue();
+					const Real scaledValue = boxValue * AttributeModifiers::productionFactor(depot);
+					if (scaledValue >= 1.0f)
+					{
+						const Int amount = static_cast<Int>(std::min<double>(scaledValue, std::numeric_limits<Int>::max()));
+						player->getMoney()->deposit(amount);
+						player->getScoreKeeper()->addMoneyEarned(amount);
+						depot->getExperienceTracker()->addRetailExperience(static_cast<Real>(amount));
+						RetailWorldUI::showPayout(*depot, amount, FALSE);
+					}
 					m_numberBoxes = 0;
 					worker->clearModelConditionState(MODELCONDITION_CARRYING);
 				}

@@ -1,0 +1,9 @@
+525 create PlyrCivilian WorkerDepotFixture 0 3650,970,0
+526 worker-depot-probe PlyrCivilian WorkerDepotFixture 0
+526 pkg23-cash PlyrCivilian - 0 worker-depot-before
+530 worker-depot-place-tree PlyrCivilian WorkerDepotFixtureTree 0 - 3560 888
+850 worker-depot-probe PlyrCivilian WorkerDepotFixture 0
+850 pkg23-cash PlyrCivilian - 0 worker-depot-first
+900 worker-depot-place-tree PlyrCivilian WorkerDepotFixtureTree 0 - 3550 880
+1250 worker-depot-probe PlyrCivilian WorkerDepotFixture 0
+1250 pkg23-cash PlyrCivilian - 0 worker-depot-second
