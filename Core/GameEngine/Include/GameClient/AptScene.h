@@ -46,6 +46,7 @@ public:
 	void draw(const Visibility &visible, const DrawText &text, const HorizontalScale &scale = {}) const;
 	void drawAt(const Visibility &visible, Real x, Real y, Real sx, Real sy, Real opacity) const;
 	Int frameCount() const;
+	UnsignedInt frameTimeMs() const;
 	void drawFrameAt(Int frame, Real x, Real y, Real sx, Real sy) const;
 	Real xScale() const;
 	Real yScale() const;

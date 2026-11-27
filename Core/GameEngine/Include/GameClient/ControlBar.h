@@ -1066,6 +1066,7 @@ protected:
 
 	GameWindow *m_contextParent[ NUM_CONTEXT_PARENTS ];		///< "parent" window for buttons that are part of the context sensitive interface
 	GameWindow *m_retailSelectionName = nullptr;
+	double m_retailAutoAbilityElapsedMs = 0.0;
 	GameWindow *m_retailPortrait = nullptr;
 	ObjectID m_retailPortraitObject = INVALID_ID;
 	GameWindow *m_retailResources = nullptr;
@@ -1166,6 +1167,7 @@ public:
 	Real getRetailRecharge(const GameWindow *window) const;
 	Bool hasRetailAutoAbility(const GameWindow* window) const;
 	Bool isRetailAutoAbilityOn(const GameWindow* window) const;
+	double getRetailAutoAbilityElapsedMs() const { return m_retailAutoAbilityElapsedMs; }
 	Bool toggleRetailAutoAbility(const GameWindow* window);
 	void showRetailCommandTooltip(GameWindow *window) const;
 	Bool closeRetailTray();

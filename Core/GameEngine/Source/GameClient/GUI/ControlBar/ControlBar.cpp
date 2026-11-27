@@ -1688,6 +1688,7 @@ void ControlBar::reset()
 
 	m_lastFlashedAtPointValue = -1;
 	m_genStarFlash = TRUE;
+	m_retailAutoAbilityElapsedMs = 0.0;
 	if (m_retailSelectionName)
 	{
 		RetailHeroBar::reset();
@@ -1709,7 +1710,11 @@ void ControlBar::update()
 	if(m_controlBarSchemeManager)
 		m_controlBarSchemeManager->update();
 	if (m_retailSelectionName)
+	{
+		if (TheGameLogic && !TheGameLogic->isGamePaused())
+			m_retailAutoAbilityElapsedMs += TheFramePacer->getUpdateTime() * static_cast<double>(MSEC_PER_SECOND);
 		updateRetailHud();
+	}
 
 	// Update our video manager
 	if( m_videoManager )

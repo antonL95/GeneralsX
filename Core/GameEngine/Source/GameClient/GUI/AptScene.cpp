@@ -373,6 +373,7 @@ public:
 	std::vector<std::vector<Art>> frames;
 	std::vector<Label> labels;
 	Int width = 0, height = 0;
+	UnsignedInt frameTimeMs = 0;
 	size_t visits = 0;
 	size_t vertices = 0;
 
@@ -899,6 +900,7 @@ void AptScene::loadAnimated(const char *movie, const char *exportName, std::init
 		{
 			data->width = root->apt.number(root->root + 28);
 			data->height = root->apt.number(root->root + 32);
+			data->frameTimeMs = root->apt.number(root->root + 36);
 			if (data->width > 0 && data->height > 0)
 				m_data = std::move(data);
 		}
@@ -912,6 +914,11 @@ void AptScene::loadAnimated(const char *movie, const char *exportName, std::init
 Int AptScene::frameCount() const
 {
 	return m_data ? static_cast<Int>(m_data->frames.size()) : 0;
+}
+
+UnsignedInt AptScene::frameTimeMs() const
+{
+	return m_data ? m_data->frameTimeMs : 0;
 }
 
 void AptScene::drawFrameAt(Int frame, Real x, Real y, Real sx, Real sy) const

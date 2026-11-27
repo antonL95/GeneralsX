@@ -240,11 +240,13 @@ void drawAutoAbilitySparkles(Int x, Int y, Int width, Int height)
 {
 	static AptScene sparkles("Palantir", AptScene::AnimatedPath{{"AutoAbilityOverlays", "0"}, "_loop"});
 	const Int frames = sparkles.frameCount();
-	if (frames <= 0 || !TheGameLogic)
+	if (frames <= 0)
 		return;
+	const auto frameTime = sparkles.frameTimeMs();
+	const auto elapsedMs = TheControlBar->getRetailAutoAbilityElapsedMs();
+	const Int phase = frameTime ? static_cast<Int>(std::fmod(elapsedMs / frameTime, frames)) : 0;
 	const Real scale = width / RingButtonDesignDiameter;
-	sparkles.drawFrameAt(static_cast<Int>(TheGameLogic->getFrame() % static_cast<UnsignedInt>(frames)),
-		x + width * 0.5f, y + height * 0.5f, scale, scale);
+	sparkles.drawFrameAt(phase, x + width * 0.5f, y + height * 0.5f, scale, scale);
 }
 
 void windowRect(const GameWindow *window, Int &x, Int &y, Int &width, Int &height)

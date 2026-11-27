@@ -131,9 +131,53 @@ class PinClientUpdateDelta(gdb.Breakpoint):
         return False
 
 
+class RestoreGamePause(gdb.FinishBreakpoint):
+    def __init__(self, paused):
+        super().__init__(internal=True)
+        self.paused = paused
+
+    def stop(self):
+        gdb.execute(f"set variable TheGameLogic->m_gamePaused = {self.paused}", to_string=True)
+        return False
+
+
+class SparkleClockUpdates(gdb.Breakpoint):
+    def __init__(self, first_paused_frame, last_paused_frame):
+        super().__init__("ControlBar::update", internal=True)
+        self.first = first_paused_frame
+        self.last = last_paused_frame
+        self.elapsed_ms = 0.0
+        self.paused_updates = 0
+
+    def stop(self):
+        if self.first <= logic_frame() <= self.last:
+            RestoreGamePause(int(gdb.parse_and_eval("TheGameLogic->m_gamePaused")))
+            gdb.execute("set variable TheGameLogic->m_gamePaused = 1", to_string=True)
+            self.paused_updates += 1
+        else:
+            self.elapsed_ms += 1000 * float(gdb.parse_and_eval("TheFramePacer->m_updateTime"))
+        return False
+
+
+class TraceSparkleClock(gdb.Breakpoint):
+    def __init__(self, clock):
+        super().__init__("AptScene::drawFrameAt", internal=True)
+        self.clock = clock
+
+    def stop(self):
+        caller = gdb.newest_frame().older()
+        if caller and "drawAutoAbilitySparkles" in (caller.name() or ""):
+            index = int(gdb.parse_and_eval("frame"))
+            gdb.write(f"TEST sparkle-clock frame={logic_frame()} clip={index} "
+                      f"elapsed={self.clock.elapsed_ms:.3f} paused_updates={self.clock.paused_updates}\n")
+        return False
+
+
 Draw("W3DDisplay::draw", internal=True)
 Capture()
 if os.environ.get("PLAYTEST_PIN_DYNAMIC_LOD") == "1":
     PinDynamicLOD("GameLODManager::findDynamicLODLevel", internal=True)
 if "PLAYTEST_FIXED_UPDATE_FPS" in os.environ:
     PinClientUpdateDelta(int(os.environ["PLAYTEST_FIXED_UPDATE_FPS"]))
+if "PLAYTEST_SPARKLE_PAUSE_FRAMES" in os.environ:
+    TraceSparkleClock(SparkleClockUpdates(*map(int, os.environ["PLAYTEST_SPARKLE_PAUSE_FRAMES"].split(":"))))
