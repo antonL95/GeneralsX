@@ -176,7 +176,11 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 
 	if (!label)
 		label = TheDisplayStringManager->newDisplayString();
+#if RTS_ZEROHOUR
+	label->setFont(TheInGameUI->getPlacementClaimFont());
+#else
 	label->setFont(TheFontLibrary->getFont("Albertus MT", std::max(9u, TheDisplay->getHeight() / 60), FALSE));
+#endif
 	UnicodeString text;
 	text.format(L"%.0f%%", std::max(0.0f, efficiency * 100.0f));
 	if (label->getText().compare(text) != 0)
@@ -185,7 +189,12 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 	label->getSize(&width, &height);
 	const Int x = center.x - width / 2;
 	const Int y = center.y - height - 28;
-	label->draw(x, y, GameMakeColor(131, 255, 94, 255), GameMakeColor(13, 25, 12, 240));
+#if RTS_ZEROHOUR
+	const Color color = TheInGameUI->getPlacementClaimFontColor();
+#else
+	const Color color = GameMakeColor(131, 255, 94, 255);
+#endif
+	label->draw(x, y, color, GameMakeColor(13, 25, 12, 240));
 }
 
 

@@ -34,6 +34,7 @@
 #include <stdio.h>
 
 #define DEFINE_SHADOW_NAMES
+#define DEFINE_RADIUSCURSOR_NAMES
 
 #include "Common/ActionManager.h"
 #include "Common/FramePacer.h"
@@ -823,7 +824,9 @@ const FieldParse InGameUI::s_fieldParseTable[] =
 	{ "MessageDelayMS",									INI::parseInt,					nullptr,		offsetof( InGameUI, m_messageDelayMS ) },
 
 	{ "MilitaryCaptionColor",						INI::parseRGBAColorInt,	nullptr,		offsetof( InGameUI, m_militaryCaptionColor ) },
-	{ "MilitaryCaptionPosition",				INI::parseICoord2D,			nullptr,		offsetof( InGameUI, m_militaryCaptionPosition ) },
+	{ "MilitaryCaptionPosition", InGameUI::parseMilitaryCaptionPosition, nullptr, offsetof(InGameUI, m_militaryCaptionPosition) },
+	{ "MilitaryCaptionCentered", INI::parseBool, nullptr, offsetof(InGameUI, m_militaryCaptionCentered) },
+	{ "MilitaryCaptionDelayMS", INI::parseInt, nullptr, offsetof(InGameUI, m_militaryCaptionDelayMS) },
 
 	{ "MilitaryCaptionTitleFont",				INI::parseAsciiString,	nullptr,		offsetof( InGameUI, m_militaryCaptionTitleFont ) },
 	{ "MilitaryCaptionTitlePointSize",	INI::parseInt,					nullptr,		offsetof( InGameUI, m_militaryCaptionTitlePointSize ) },
@@ -836,7 +839,6 @@ const FieldParse InGameUI::s_fieldParseTable[] =
 	{ "MilitaryCaptionRandomizeTyping",	INI::parseBool,					nullptr,		offsetof( InGameUI, m_militaryCaptionRandomizeTyping ) },
 	{ "MilitaryCaptionSpeed",						INI::parseInt,					nullptr,		offsetof( InGameUI, m_militaryCaptionSpeed ) },
 
-	{ "MilitaryCaptionPosition",				INI::parseICoord2D,			nullptr,		offsetof( InGameUI, m_militaryCaptionPosition ) },
 
 	{ "SuperweaponCountdownPosition",					INI::parseCoord2D,			nullptr,		offsetof( InGameUI, m_superweaponPosition ) },
 	{ "SuperweaponCountdownFlashDuration",		INI::parseDurationReal,	nullptr,		offsetof( InGameUI, m_superweaponFlashDuration ) },
@@ -865,6 +867,9 @@ const FieldParse InGameUI::s_fieldParseTable[] =
 	{ "NamedTimerCountdownReadyColor",				INI::parseColorInt,			nullptr,		offsetof( InGameUI, m_namedTimerReadyColor ) },
 	{ "TerrainResourceClaimDecal", INI::parseAsciiString, nullptr, offsetof(InGameUI, m_terrainClaimDecal) },
 	{ "PlaceTerrainResourceClaimantDecal", INI::parseAsciiString, nullptr, offsetof(InGameUI, m_placementClaimDecal) },
+	{ "PlaceTerrainResourceClaimantFont", InGameUI::parsePlacementClaimFont, nullptr, offsetof(InGameUI, m_placementClaimFont) },
+	{ "PlaceTerrainResourceClaimantFontColor", InGameUI::parsePlacementClaimFontColor, nullptr, offsetof(InGameUI, m_placementClaimFontColor) },
+	{ "RadiusCursorUseWeaponScatterRadius", RadiusDecalTemplate::parseCursorType, TheRadiusCursorNames, offsetof(InGameUI, m_weaponScatterRadiusCursor) },
 
 	{ "FloatingTextTimeOut",									INI::parseEngineDurationUnsignedInt,	nullptr,	offsetof( InGameUI, m_floatingTextTimeOut ) },
 	{ "FloatingTextMoveUpSpeed",							INI::parseVelocityReal,	nullptr,		offsetof( InGameUI, m_floatingTextMoveUpSpeed ) },
@@ -1125,8 +1130,8 @@ InGameUI::InGameUI()
 	m_militaryCaptionColor.green = 200;
 	m_militaryCaptionColor.blue  = 30;
 	m_militaryCaptionColor.alpha = 255;
-	m_militaryCaptionPosition.x = 10;
-	m_militaryCaptionPosition.y = 380;
+	m_militaryCaptionPosition.x = 10.0f / DEFAULT_DISPLAY_WIDTH;
+	m_militaryCaptionPosition.y = 380.0f / DEFAULT_DISPLAY_HEIGHT;
 
 	m_militaryCaptionTitleFont = "Courier";
 	m_militaryCaptionTitlePointSize = 12;
@@ -1507,10 +1512,17 @@ void InGameUI::setRadiusCursor(RadiusCursorType cursorType, const SpecialPowerTe
 	if (RetailFileLayers::enabled() && cursorType >= RADIUSCURSOR_COUNT)
 	{
 		const RadiusDecalTemplate* decal = RadiusDecalTemplate::findNamedCursor(cursorType);
-		if (decal && specPowTempl && specPowTempl->getRadiusCursorRadius() > 0.0f)
+		Real radius = specPowTempl ? specPowTempl->getRadiusCursorRadius() : 0.0f;
+		if (cursorType == m_weaponScatterRadiusCursor)
+		{
+			const Weapon* weapon = obj->getWeaponInWeaponSlot(weaponSlot);
+			if (weapon)
+				radius = weapon->getScatterRadius() + weapon->getScatterTargetScalar();
+		}
+		if (decal && radius > 0.0f)
 		{
 			const Coord3D position{};
-			decal->createRadiusDecal(position, specPowTempl->getRadiusCursorRadius(), controller, m_curRadiusCursor);
+			decal->createRadiusDecal(position, radius, controller, m_curRadiusCursor);
 			m_curRcType = cursorType;
 			handleRadiusCursor();
 		}
@@ -2155,7 +2167,7 @@ void InGameUI::update()
 						m_militarySubtitle->displayStrings[m_militarySubtitle->currentDisplayString]->setFont(	TheFontLibrary->getFont( m_militaryCaptionFont, TheGlobalLanguageData->adjustFontSize(m_militaryCaptionPointSize), m_militaryCaptionBold ) )	;
 
 						m_militarySubtitle->blockDrawn = TRUE;
-						m_militarySubtitle->incrementOnFrame = currLogicFrame + (Int)(((Real)LOGICFRAMES_PER_SECOND * TheGlobalLanguageData->m_militaryCaptionDelayMS)/1000.0f);
+						m_militarySubtitle->incrementOnFrame = currLogicFrame + (Int)(((Real)LOGICFRAMES_PER_SECOND * getMilitaryCaptionDelayMS())/1000.0f);
 					}
 					else
 					{
@@ -4058,11 +4070,14 @@ void InGameUI::postDraw()
 		UnsignedByte r, g, b, a;
 		GameGetColorComponents( m_militarySubtitle->color, &r, &g, &b, &a );
 		dropColor = GameMakeColor( 0, 0, 0, a );
+		Int lastOffset = 0;
 		for(UnsignedInt i = 0; i <= m_militarySubtitle->currentDisplayString; i++)
 		{
-			m_militarySubtitle->displayStrings[i]->draw(pos.x,pos.y, m_militarySubtitle->color,dropColor );
-			Int height;
-			m_militarySubtitle->displayStrings[i]->getSize(nullptr, &height);
+			Int width, height;
+			auto *line = m_militarySubtitle->displayStrings[i];
+			line->getSize(&width, &height);
+			lastOffset = m_militaryCaptionCentered ? width / 2 : 0;
+			line->draw(pos.x - lastOffset, pos.y, m_militarySubtitle->color, dropColor);
 			pos.y += height;
 		}
 		if( m_militarySubtitle->blockDrawn )
@@ -4070,7 +4085,7 @@ void InGameUI::postDraw()
 			ICoord2D size;
 			size.y = m_militarySubtitle->displayStrings[m_militarySubtitle->currentDisplayString]->getFont()->height;
 			size.x = size.y * 0.8f;
-			TheDisplay->drawFillRect(m_militarySubtitle->blockPos.x, m_militarySubtitle->blockPos.y, size.x, size.y, m_militarySubtitle->color);
+			TheDisplay->drawFillRect(m_militarySubtitle->blockPos.x - lastOffset, m_militarySubtitle->blockPos.y, size.x, size.y, m_militarySubtitle->color);
 		}
 
 	}
@@ -4684,6 +4699,52 @@ void InGameUI::displayCantBuildMessage( LegalBuildCode lbc )
 // ------------------------------------------------------------------------------------------------
 // InGameUI::militarySubtitle
 // ------------------------------------------------------------------------------------------------
+void InGameUI::parseMilitaryCaptionPosition(INI *ini, void *instance, void *store, const void *data)
+{
+	INI::parseCoord2D(ini, instance, store, data);
+	if (!RetailFileLayers::enabled())
+	{
+		auto &position = *static_cast<Coord2D *>(store);
+		position.x /= DEFAULT_DISPLAY_WIDTH;
+		position.y /= DEFAULT_DISPLAY_HEIGHT;
+	}
+}
+
+Int InGameUI::getMilitaryCaptionDelayMS() const
+{
+	return m_militaryCaptionDelayMS < 0 ? TheGlobalLanguageData->m_militaryCaptionDelayMS : m_militaryCaptionDelayMS;
+}
+
+void InGameUI::parsePlacementClaimFont(INI *ini, void *, void *store, const void *)
+{
+	auto &font = *static_cast<PlacementClaimFont *>(store);
+	font.name = ini->getNextQuotedAsciiString();
+	font.size = INI::scanInt(ini->getNextToken());
+	font.bold = INI::scanBool(ini->getNextToken());
+}
+
+void InGameUI::parsePlacementClaimFontColor(INI *ini, void *instance, void *store, const void *data)
+{
+	Color color = 0;
+	INI::parseColorInt(ini, instance, &color, data);
+	*static_cast<std::optional<Color> *>(store) = color;
+}
+
+GameFont *InGameUI::getPlacementClaimFont() const
+{
+	const auto &font = m_placementClaimFont;
+	if (font.name.isNotEmpty() && font.size > 0)
+		if (GameFont *configured = TheFontLibrary->getUiFont(font.name, font.size, font.bold,
+			TheDisplay->getWidth(), TheDisplay->getHeight()))
+			return configured;
+	return TheFontLibrary->getFont("Albertus MT", std::max(9u, TheDisplay->getHeight() / 60), FALSE);
+}
+
+Color InGameUI::getPlacementClaimFontColor() const
+{
+	return m_placementClaimFontColor.value_or(GameMakeColor(131, 255, 94, 255));
+}
+
 void InGameUI::militarySubtitle( const AsciiString& label, Int duration )
 {
 	// make sure we don't already have a subtitle up there
@@ -4708,11 +4769,6 @@ void InGameUI::militarySubtitle( const AsciiString& label, Int duration )
 	// disable tooltips until this frame, cause we don't want to collide with the military subtitles.
 	disableTooltipsUntil(messageTimeout);
 
-	// calculate where this screen position should be since the position being passed in is based off 8x6
-	Coord2D multiplier;
-	multiplier.x = (Real)TheDisplay->getWidth() / (Real)DEFAULT_DISPLAY_WIDTH;
-	multiplier.y = (Real)TheDisplay->getHeight() / (Real)DEFAULT_DISPLAY_HEIGHT;
-
 	// lets bring out the data structure!
 	m_militarySubtitle = NEW MilitarySubtitleData;
 
@@ -4720,9 +4776,9 @@ void InGameUI::militarySubtitle( const AsciiString& label, Int duration )
 	m_militarySubtitle->blockDrawn = TRUE;
 	m_militarySubtitle->blockBeginFrame = currLogicFrame;
 	m_militarySubtitle->lifetime = messageTimeout;
-	m_militarySubtitle->blockPos.x =  m_militarySubtitle->position.x = m_militaryCaptionPosition.x * multiplier.x;
-	m_militarySubtitle->blockPos.y =  m_militarySubtitle->position.y = m_militaryCaptionPosition.y * multiplier.y;
-	m_militarySubtitle->incrementOnFrame = currLogicFrame + (Int)(((Real)LOGICFRAMES_PER_SECOND * TheGlobalLanguageData->m_militaryCaptionDelayMS)/1000.0f);
+	m_militarySubtitle->blockPos.x = m_militarySubtitle->position.x = m_militaryCaptionPosition.x * TheDisplay->getWidth();
+	m_militarySubtitle->blockPos.y = m_militarySubtitle->position.y = m_militaryCaptionPosition.y * TheDisplay->getHeight();
+	m_militarySubtitle->incrementOnFrame = currLogicFrame + (Int)(((Real)LOGICFRAMES_PER_SECOND * getMilitaryCaptionDelayMS())/1000.0f);
 	m_militarySubtitle->index = 0;
 	for (int i = 1; i < MAX_SUBTITLE_LINES; i ++)
 		m_militarySubtitle->displayStrings[i] = nullptr;

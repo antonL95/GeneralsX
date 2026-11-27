@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "Common/GameCommon.h"
 #include "Common/GameType.h"
 #include "Common/MessageStream.h"		// for GameMessageTranslator
@@ -408,6 +410,8 @@ public:  // ********************************************************************
 	{
 		return placement ? m_placementClaimDecal : m_terrainClaimDecal;
 	}
+	GameFont *getPlacementClaimFont() const;
+	Color getPlacementClaimFontColor() const;
 	virtual void createForceAttackHint( const GameMessage *msg );		///< A force attack command has occurred, start graphical "hint"
 
 	virtual void createMouseoverHint( const GameMessage *msg );	///< An object is mouse hovered over, start hint if any
@@ -774,6 +778,16 @@ protected:
 	Bool m_retailPlacementValid = FALSE;
 	AsciiString m_terrainClaimDecal;
 	AsciiString m_placementClaimDecal;
+	struct PlacementClaimFont
+	{
+		AsciiString name;
+		Int size = 0;
+		Bool bold = FALSE;
+	};
+	PlacementClaimFont m_placementClaimFont;
+	std::optional<Color> m_placementClaimFontColor;
+	static void parsePlacementClaimFont(INI *ini, void *instance, void *store, const void *data);
+	static void parsePlacementClaimFontColor(INI *ini, void *instance, void *store, const void *data);
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	BuildProgress								m_buildProgress[ MAX_BUILD_PROGRESS ];	///< progress for building units
 	const ThingTemplate *				m_pendingPlaceType;											///< type of built thing we're trying to place
@@ -960,7 +974,11 @@ protected:
 	Int													m_messageDelayMS;
 
 	RGBAColorInt								m_militaryCaptionColor;				///< color for the military-style caption
-	ICoord2D										m_militaryCaptionPosition;					///< position for the military-style caption
+	Coord2D m_militaryCaptionPosition;
+	Bool m_militaryCaptionCentered = FALSE;
+	Int m_militaryCaptionDelayMS = -1;
+	Int getMilitaryCaptionDelayMS() const;
+	static void parseMilitaryCaptionPosition(INI *ini, void *instance, void *store, const void *data);
 
 	AsciiString									m_militaryCaptionTitleFont;
 	Int													m_militaryCaptionTitlePointSize;
@@ -974,6 +992,7 @@ protected:
 	Int													m_militaryCaptionSpeed;
 
 	RadiusDecalTemplate					m_radiusCursors[RADIUSCURSOR_COUNT];
+	RadiusCursorType m_weaponScatterRadiusCursor = RADIUSCURSOR_NONE;
 	RadiusDecal									m_curRadiusCursor;
 	RadiusCursorType						m_curRcType;
 

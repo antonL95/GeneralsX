@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "Common/MultiplayerSettings.h"
+#include "GameClient/InGameUI.h"
 
 namespace
 {
@@ -20,7 +21,11 @@ void checkStartingCredits(const RetailTestCommands::Context &ctx)
 		matches ? TheMultiplayerSettings->getDefaultStartingMoney().countMoney() : 0u);
 }
 
-
+void checkPlacementClaim(const RetailTestCommands::Context &ctx)
+{
+	const Color color = TheInGameUI->getPlacementClaimFontColor();
+	std::fprintf(stderr, "TEST ui-ini-placement-claim frame=%u color=%08x\n", ctx.frame, static_cast<unsigned>(color));
+}
 }
 #endif
 
@@ -30,6 +35,7 @@ void registerRetailUiIniMiscTestCommands()
 {
 #if RTS_ZEROHOUR
 	registerAction("ui-ini-credits-check", checkStartingCredits);
+	registerAction("ui-ini-placement-claim-check", checkPlacementClaim);
 #endif
 }
 }
