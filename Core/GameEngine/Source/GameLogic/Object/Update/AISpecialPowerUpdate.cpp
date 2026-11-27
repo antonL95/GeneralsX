@@ -30,6 +30,10 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
 namespace
 {
 const char* const specialPowerAITypes[] =
@@ -101,6 +105,22 @@ void parseSpecialPowerAIType(INI* ini, void*, void* store, const void*)
 #if RTS_ZEROHOUR
 constexpr UpdateSleepTime retailPolicyCooldown = UPDATE_SLEEP(LOGICFRAMES_PER_SECOND * 5);
 constexpr UpdateSleepTime retailPolicyPoll = UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND));
+
+enum class CombatPowerTargets
+{
+	None,
+	Enemies,
+	EnemyHeroes
+};
+
+CombatPowerTargets combatPowerTargets(std::string_view policy)
+{
+	if (policy == "AI_SPECIAL_POWER_CHARGE")
+		return CombatPowerTargets::Enemies;
+	if (policy == "AI_SPECIAL_POWER_MORGUL_BLADE")
+		return CombatPowerTargets::EnemyHeroes;
+	return CombatPowerTargets::None;
+}
 
 Int stancePolicy(std::string_view policy)
 {
@@ -196,7 +216,7 @@ UpdateSleepTime updateStancePolicy(Object& source, const Player& player, const C
 	return retailPolicyCooldown;
 }
 
-Real targetKillerRange(const Object& source, const SpecialPowerTemplate& power, Real authoredRange)
+Real specialPowerSearchRange(const Object& source, const SpecialPowerTemplate& power, Real authoredRange)
 {
 	if (authoredRange > 0.0f)
 		return authoredRange;
@@ -209,7 +229,7 @@ Real targetKillerRange(const Object& source, const SpecialPowerTemplate& power, 
 		if (range > 0.0f)
 			return range;
 	}
-	return power.getMaxCastRange();
+	return 0.0f;
 }
 
 void tracePowerTarget(const Object& source, const SpecialPowerTemplate& power, const Object& target, ObjectShroudStatus shroud)
@@ -221,6 +241,46 @@ void tracePowerTarget(const Object& source, const SpecialPowerTemplate& power, c
 			source.getControllingPlayer()->getPlayerIndex(), power.getName().str(), source.getID(), target.getID(), shroud);
 		std::fflush(stderr);
 	}
+}
+
+Object* selectCombatPowerTarget(const Object& source, const Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, const SpecialPowerModuleInterface& module, CombatPowerTargets targets, Real range)
+{
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return nullptr;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&source, range, FROM_CENTER_2D);
+	MemoryPoolObjectHolder hold(nearby);
+	std::vector<Object*> candidates;
+	for (Object* target = nearby->first(); target; target = nearby->next())
+	{
+		if (target->isEffectivelyDead() || target->getContainedBy() || target->isKindOf(KINDOF_INERT) ||
+			source.getRelationship(target) != ENEMIES ||
+			(targets == CombatPowerTargets::EnemyHeroes && !target->isKindOf(KINDOF_HERO) && !target->isKindOf(KINDOF_CREATE_A_HERO)))
+			continue;
+		candidates.push_back(target);
+	}
+	std::sort(candidates.begin(), candidates.end(), [](const Object* left, const Object* right) {
+		return left->getID() < right->getID();
+	});
+
+	Object* best = nullptr;
+	Real bestHealth = 0.0f;
+	for (Object* target : candidates)
+	{
+		const auto shroud = target->getShroudedStatus(player.getPlayerIndex());
+		if ((shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR) ||
+			(target->testStatus(OBJECT_STATUS_STEALTHED) && !target->testStatus(OBJECT_STATUS_DETECTED)))
+			continue;
+		const Real health = bodyHealthFraction(*target);
+		if ((best && health >= bestHealth) || !module.isValidPowerTarget(target) ||
+			!button.isValidToUseOn(&source, target, target->getPosition(), CMD_FROM_AI) ||
+			!power.isValidRetailTarget(&source, target, nullptr, CMD_FROM_AI))
+			continue;
+		best = target;
+		bestHealth = health;
+	}
+	return best;
 }
 
 void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
@@ -330,7 +390,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 {
 #if RTS_ZEROHOUR
 	const Int type = getAISpecialPowerUpdateModuleData()->m_specialPowerAIType;
-	if (type >= 0 && stancePolicy(specialPowerAITypes[type]) != AttributeModifierRules::STANCE_UNINITIALIZED)
+	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
+	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED || combatPowerTargets(policy) != CombatPowerTargets::None)
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -377,6 +438,20 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
 		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
+
+	const auto combatTargets = combatPowerTargets(policy);
+	if (combatTargets != CombatPowerTargets::None)
+	{
+		if (!combatVictim(*source))
+			return retailPolicyPoll;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		Object* target = selectCombatPowerTarget(*source, *player, *button, *power, *module, combatTargets, range);
+		if (!target || !rollRetailPolicyActivation(*player))
+			return retailPolicyPoll;
+		tracePowerTarget(*source, *power, *target, target->getShroudedStatus(player->getPlayerIndex()));
+		source->doSpecialPowerAtObject(power, target, button->getOptions());
+		return retailPolicyCooldown;
+	}
 
 	const Bool always = policy == "AI_SPELLBOOK_ALWAYS_FIRE";
 	const Bool allyBattle = policy == "AI_SPELLBOOK_ASSIST_BATTLE_BUFF" ||
@@ -435,7 +510,9 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		? data->m_specialPowerRange : data->m_specialPowerRadius;
 	if (enemyTypeKiller)
 	{
-		range = targetKillerRange(*source, *power, data->m_specialPowerRange);
+		range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		if (range <= 0.0f)
+			range = power->getMaxCastRange();
 		if (range <= 0.0f)
 			return checkAgain;
 	}

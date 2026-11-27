@@ -1,8 +1,40 @@
+35 create Player_2 AiPowersChargeCaster 0 3100,1450,0
+35 create Player_2 AiPowersChargeCaster 1 3650,1750,0
+35 create Player_2 AiPowersMorgulCaster 0 3390,1450,0
+36 create Player_1 AiPowersCombatTarget 0 3140,1450,0
+36 create Player_1 AiPowersCombatTarget 1 3128,1480,0
+36 create Player_1 AiPowersCombatTarget 2 3180,1450,0
+36 create Player_1 AiPowersCombatTarget 3 3685,1750,0
+36 create Player_1 AiPowersCombatTarget 4 3430,1450,0
+36 create Player_1 AiPowersMonsterTarget 0 3418,1470,0
+36 create Player_1 AiPowersHeroTarget 0 3440,1475,0
+39 damage Player_1 AiPowersCombatTarget 1 600
+39 damage Player_1 AiPowersCombatTarget 2 800
+39 damage Player_1 AiPowersCombatTarget 3 700
+39 damage Player_1 AiPowersMonsterTarget 0 700
+39 damage Player_1 AiPowersHeroTarget 0 400
+40 attack Player_2 AiPowersChargeCaster 0 Player_1:AiPowersCombatTarget:0
+40 attack Player_2 AiPowersMorgulCaster 0 Player_1:AiPowersCombatTarget:4
 160 create Player_2 AiPowersStanceHero 0 3400,1750,0
 160 create Player_2 AiPowersStanceInjured 0 3400,1790,0
 160 create Player_2 AiPowersStanceHoldControl 0 3400,1830,0
 243 mods Player_2 AiPowersStanceHero 0
+243 ability Player_2 AiPowersChargeCaster 0
+243 ability Player_2 AiPowersMorgulCaster 0
+243 health Player_1 AiPowersHeroTarget 0
 305 mods Player_2 AiPowersStanceHero 0
+400 health Player_1 AiPowersHeroTarget 0
+400 powers-fire-state Player_2 AiPowersChargeCaster 1 AiPowersCharge
+401 destroy Player_2 AiPowersChargeCaster 1
+401 destroy Player_2 AiPowersChargeCaster 0
+401 destroy Player_2 AiPowersMorgulCaster 0
+401 destroy Player_1 AiPowersCombatTarget 4
+401 destroy Player_1 AiPowersCombatTarget 3
+401 destroy Player_1 AiPowersCombatTarget 2
+401 destroy Player_1 AiPowersCombatTarget 1
+401 destroy Player_1 AiPowersCombatTarget 0
+401 destroy Player_1 AiPowersMonsterTarget 0
+401 destroy Player_1 AiPowersHeroTarget 0
 480 mods Player_2 AiPowersStanceHero 0
 480 mods Player_2 AiPowersStanceInjured 0
 480 mods Player_2 AiPowersStanceHoldControl 0
