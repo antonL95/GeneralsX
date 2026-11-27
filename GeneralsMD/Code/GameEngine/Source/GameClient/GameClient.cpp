@@ -1678,7 +1678,7 @@ void GameClient::xfer( Xfer *xfer )
 		}
 	}
 	if (RetailFileLayers::enabled())
-		RetailEva::xferScoredKills(xfer, version >= 4);
+		RetailEva::xfer(xfer, version >= 4);
 }
 
 // ------------------------------------------------------------------------------------------------

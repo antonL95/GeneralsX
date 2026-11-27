@@ -203,18 +203,23 @@ void resetScoredKills()
 		rule.kills = {};
 }
 
-void resetPlayback()
+void resetRuntimeState()
 {
 	s_pending.clear();
-	s_lastPlayed.clear();
 	s_playedEvents.clear();
 	s_recharging.clear();
 	s_seenRings.clear();
 	s_seenEnemies.clear();
 	s_breachedCastles.clear();
+	s_quietUntil = 0;
+}
+
+void resetPlayback()
+{
+	resetRuntimeState();
+	s_lastPlayed.clear();
 	s_viewer = nullptr;
 	s_speech.setPlayingHandle(0);
-	s_quietUntil = 0;
 }
 
 void updateScoredKills(const Player& player, UnsignedInt frame)
@@ -278,6 +283,158 @@ void transferScoredKillRule(Xfer* xfer, ScoredKillAnnouncer& rule)
 		if (xfer->getXferMode() == XFER_LOAD)
 			s_lastPlayed[key] = frame;
 	}
+}
+
+void transferObjectIDSet(Xfer* xfer, std::set<ObjectID>& ids)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt count = static_cast<UnsignedInt>(ids.size());
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+	{
+		ids.clear();
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			ObjectID id = INVALID_ID;
+			xfer->xferObjectID(&id);
+			if (id != INVALID_ID)
+				ids.insert(id);
+		}
+		return;
+	}
+	for (ObjectID id : ids)
+		xfer->xferObjectID(&id);
+}
+
+void transferRuntimeState(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	if (loading)
+	{
+		resetRuntimeState();
+		s_lastPlayed.clear();
+	}
+
+	xfer->xferUnsignedInt(&s_quietUntil);
+
+	UnsignedInt lastPlayedCount = static_cast<UnsignedInt>(s_lastPlayed.size());
+	xfer->xferUnsignedInt(&lastPlayedCount);
+	if (loading)
+	{
+		for (UnsignedInt i = 0; i < lastPlayedCount; ++i)
+		{
+			AsciiString key;
+			UnsignedInt frame = 0;
+			xfer->xferAsciiString(&key);
+			xfer->xferUnsignedInt(&frame);
+			if (key.isNotEmpty())
+				s_lastPlayed[key] = frame;
+		}
+	}
+	else
+	{
+		for (const auto& entry : s_lastPlayed)
+		{
+			AsciiString key = entry.first;
+			UnsignedInt frame = entry.second;
+			xfer->xferAsciiString(&key);
+			xfer->xferUnsignedInt(&frame);
+		}
+	}
+
+	UnsignedInt playedCount = static_cast<UnsignedInt>(s_playedEvents.size());
+	xfer->xferUnsignedInt(&playedCount);
+	if (loading)
+	{
+		for (UnsignedInt i = 0; i < playedCount; ++i)
+		{
+			AsciiString key;
+			PlayedEvent played{};
+			xfer->xferAsciiString(&key);
+			xfer->xferUnsignedInt(&played.frame);
+			xfer->xferCoord3D(&played.position);
+			xfer->xferBool(&played.positioned);
+			if (key.isNotEmpty())
+				s_playedEvents[key] = played;
+		}
+	}
+	else
+	{
+		for (const auto& entry : s_playedEvents)
+		{
+			AsciiString key = entry.first;
+			PlayedEvent played = entry.second;
+			xfer->xferAsciiString(&key);
+			xfer->xferUnsignedInt(&played.frame);
+			xfer->xferCoord3D(&played.position);
+			xfer->xferBool(&played.positioned);
+		}
+	}
+
+	UnsignedInt pendingCount = static_cast<UnsignedInt>(s_pending.size());
+	xfer->xferUnsignedInt(&pendingCount);
+	if (loading)
+	{
+		for (UnsignedInt i = 0; i < pendingCount; ++i)
+		{
+			AsciiString name;
+			UnsignedInt frame = 0;
+			Coord3D position{};
+			Bool positioned = FALSE;
+			xfer->xferAsciiString(&name);
+			xfer->xferUnsignedInt(&frame);
+			xfer->xferCoord3D(&position);
+			xfer->xferBool(&positioned);
+			if (const Event* event = findEvent(eventKey(name)))
+				s_pending.push_back({event, name, frame, position, positioned});
+		}
+	}
+	else
+	{
+		for (const Pending& pending : s_pending)
+		{
+			AsciiString name = pending.name;
+			UnsignedInt frame = pending.frame;
+			Coord3D position = pending.position;
+			Bool positioned = pending.positioned;
+			xfer->xferAsciiString(&name);
+			xfer->xferUnsignedInt(&frame);
+			xfer->xferCoord3D(&position);
+			xfer->xferBool(&positioned);
+		}
+	}
+
+	UnsignedInt rechargingCount = static_cast<UnsignedInt>(s_recharging.size());
+	xfer->xferUnsignedInt(&rechargingCount);
+	if (loading)
+	{
+		for (UnsignedInt i = 0; i < rechargingCount; ++i)
+		{
+			ObjectID objectID = INVALID_ID;
+			AsciiString templateName;
+			xfer->xferObjectID(&objectID);
+			xfer->xferAsciiString(&templateName);
+			const SpecialPowerTemplate* power = TheSpecialPowerStore
+				? TheSpecialPowerStore->findSpecialPowerTemplate(templateName)
+				: nullptr;
+			if (objectID != INVALID_ID && power)
+				s_recharging[{objectID, power->getID()}] = power;
+		}
+	}
+	else
+	{
+		for (const auto& entry : s_recharging)
+		{
+			ObjectID objectID = entry.first.first;
+			AsciiString templateName = entry.second ? entry.second->getName() : AsciiString::TheEmptyString;
+			xfer->xferObjectID(&objectID);
+			xfer->xferAsciiString(&templateName);
+		}
+	}
+
+	transferObjectIDSet(xfer, s_seenRings);
+	transferObjectIDSet(xfer, s_seenEnemies);
+	transferObjectIDSet(xfer, s_breachedCastles);
 }
 }
 
@@ -422,7 +579,7 @@ void scoredKill(const Object& killer, const Object& victim)
 	}
 }
 
-void xferScoredKills(Xfer* xfer, Bool present)
+void xfer(Xfer* xfer, Bool present)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
 	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
@@ -445,7 +602,8 @@ void xferScoredKills(Xfer* xfer, Bool present)
 					transferScoredKillRule(x, *rule);
 				x->endBlock();
 			}
-		}, resetScoredKills}
+		}, resetScoredKills},
+		{"eva-state", transferRuntimeState, resetRuntimeState}
 	});
 }
 
