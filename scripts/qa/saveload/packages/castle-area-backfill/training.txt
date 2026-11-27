@@ -1,0 +1,8 @@
+222 create Player_1 CastleAreaBackfillCamp 0 2100,1380,30
+229 castle-area-backfill-transfer Player_1 CastleAreaBackfillCamp 0 PlyrCivilian
+243 castle-area-backfill-probe * CastleAreaBackfillCamp 0
+244 castle-area-backfill-probe * CastleAreaBackfillCamp 0
+320 castle-area-backfill-probe * CastleAreaBackfillCamp 0
+330 destroy PlyrCivilian CastleAreaBackfillOccupant 0
+405 castle-area-backfill-probe * CastleAreaBackfillCamp 0
+406 destroy * CastleAreaBackfillCamp 0

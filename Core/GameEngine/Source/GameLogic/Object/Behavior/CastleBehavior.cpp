@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 #include "Common/Errors.h"
 #include "Common/INI.h"
@@ -34,6 +37,37 @@
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/CastleUpgrade.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+
+namespace
+{
+const CastleTemplates::Camp* readCastleCamp(const AsciiString& name)
+{
+	try
+	{
+		return CastleTemplates::find(name);
+	}
+	catch (ErrorCode)
+	{
+		std::fprintf(stderr, "Castle %s: cannot read the castle templates\n", name.str());
+		return nullptr;
+	}
+}
+
+const ThingTemplate* findCastleMemberTemplate(const std::string& name)
+{
+	if (name.empty() || name.size() >= AsciiString::MAX_LEN)
+		return nullptr;
+	const ThingTemplate* definition = TheThingFactory->findTemplate(name.c_str(), FALSE);
+	return definition && !definition->isKindOf(KINDOF_DRAWABLE_ONLY) ? definition : nullptr;
+}
+
+AsciiString castlePerimeterPrefix(const Object& packed)
+{
+	AsciiString prefix;
+	prefix.format("Dynamic_%s_of_id_%d_at_index_", packed.getTemplate()->getName().str(), packed.getID());
+	return prefix;
+}
+}
 
 CastleBehaviorModuleData::CastleBehaviorModuleData()
 {
@@ -438,6 +472,109 @@ const CastleBehaviorModuleData::CampEntry* CastleBehavior::findCamp(const Player
 	return faction == data->m_castles.end() ? nullptr : &*faction;
 }
 
+const CastleTemplates::Camp* CastleBehavior::findUnpackedCamp() const
+{
+	const Player* player = getObject()->getControllingPlayer();
+	const auto* ownerCamp = player ? findCamp(*player) : nullptr;
+	const CastleTemplates::Camp* bestCamp = nullptr;
+	using CampMatch = std::pair<std::size_t, std::size_t>;
+	CampMatch bestMatches{};
+	const Matrix3D& transform = *getObject()->getTransformMatrix();
+	const auto matchingMembers = [this, &transform](const CastleTemplates::Camp& camp) -> std::optional<CampMatch>
+	{
+		std::size_t index = 0;
+		std::size_t positionMatches = 0;
+		std::size_t templateMatches = 0;
+		for (const auto& authored : camp.members)
+		{
+			const ThingTemplate* type = findCastleMemberTemplate(authored.templateName);
+			if (!type)
+				continue;
+			if (index == m_members.size())
+				return std::nullopt;
+			const Object* member = TheGameLogic->findObjectByID(m_members[index++]);
+			if (!member || member->getTemplate() != type)
+				continue;
+			++templateMatches;
+			Vector3 position;
+			Matrix3D::Transform_Vector(transform, Vector3(authored.offsetX, authored.offsetY, authored.offsetZ), &position);
+			if (member->getPosition()->x == position.X && member->getPosition()->y == position.Y)
+				++positionMatches;
+		}
+		return index == m_members.size() ? std::optional(CampMatch{positionMatches, templateMatches}) : std::nullopt;
+	};
+
+	if (ownerCamp)
+	{
+		bestCamp = readCastleCamp(ownerCamp->camp);
+		if (bestCamp)
+		{
+			const auto matches = matchingMembers(*bestCamp);
+			if (matches && matches->first == m_members.size())
+				return bestCamp;
+			bestMatches = matches.value_or(CampMatch{});
+		}
+	}
+
+	for (const auto& entry : getCastleBehaviorModuleData()->m_castles)
+	{
+		if (&entry == ownerCamp)
+			continue;
+		const auto* camp = readCastleCamp(entry.camp);
+		if (!camp)
+			continue;
+		const auto matches = matchingMembers(*camp);
+		if (matches && (!bestCamp || *matches > bestMatches))
+		{
+			bestMatches = *matches;
+			bestCamp = camp;
+		}
+	}
+	return bestCamp;
+}
+
+void CastleBehavior::registerPerimeters(const CastleTemplates::Camp& camp, const Matrix3D& transform)
+{
+	const Object* packed = getObject();
+	const AsciiString prefix = castlePerimeterPrefix(*packed);
+	Bool registeredArea = FALSE;
+	for (std::size_t i = 0; i < camp.perimeters.size(); ++i)
+	{
+		const auto& points = camp.perimeters[i];
+		if (points.size() < 3)
+			continue;
+		auto* area = newInstance(PolygonTrigger)(static_cast<Int>(points.size()));
+		AsciiString name;
+		name.format("%s%d", prefix.str(), static_cast<Int>(i));
+		area->setTriggerName(name);
+		area->setCastleAreaOwner(packed->getID());
+		for (const auto& [x, y] : points)
+		{
+			Vector3 world;
+			Matrix3D::Transform_Vector(transform, Vector3(x, y, 0.0f), &world);
+			area->addPoint({static_cast<Int>(world.X), static_cast<Int>(world.Y), 0});
+		}
+		PolygonTrigger::addPolygonTrigger(area);
+		registeredArea = TRUE;
+	}
+	if (registeredArea)
+		PolygonTrigger::refreshObjectMembership();
+}
+
+void CastleBehavior::restoreMissingPerimeters()
+{
+	const Object* packed = getObject();
+	const AsciiString prefix = castlePerimeterPrefix(*packed);
+	for (const auto* polygon = PolygonTrigger::getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+	{
+		if (polygon->isCastleArea() && !polygon->isRetired() &&
+			std::string_view(polygon->getTriggerName().str()).starts_with(prefix.str()))
+			return;
+	}
+	if (const auto* camp = findUnpackedCamp())
+		registerPerimeters(*camp, *packed->getTransformMatrix());
+}
+
 void CastleBehavior::unpack(Bool charge)
 {
 	Object* packed = getObject();
@@ -455,16 +592,7 @@ void CastleBehavior::unpack(Bool charge)
 	if (player->getMoney()->countMoney() < cost)
 		return;
 
-	const CastleTemplates::Camp* camp = nullptr;
-	try
-	{
-		camp = CastleTemplates::find(faction->camp);
-	}
-	catch (ErrorCode)
-	{
-		std::fprintf(stderr, "Castle %s: cannot read the castle templates, nothing unpacked\n", faction->camp.str());
-		return;
-	}
+	const auto* camp = readCastleCamp(faction->camp);
 	if (!camp || camp->members.empty())
 		return;
 
@@ -474,16 +602,13 @@ void CastleBehavior::unpack(Bool charge)
 	for (std::size_t i = 0; i < members.size(); ++i)
 	{
 		const auto& member = members[i];
-		const ThingTemplate* definition = nullptr;
-		if (!member.templateName.empty() && member.templateName.size() < AsciiString::MAX_LEN)
-			definition = TheThingFactory->findTemplate(member.templateName.c_str(), FALSE);
-		if (!definition || definition->isKindOf(KINDOF_DRAWABLE_ONLY))
+		const ThingTemplate* definition = findCastleMemberTemplate(member.templateName);
+		if (!definition)
 		{
 			std::fprintf(stderr, "Castle %s: skipped member %u with %s template '%s'\n", faction->camp.str(),
 				static_cast<unsigned>(i), member.templateName.empty() ? "an empty" : "an unknown", member.templateName.c_str());
 			if (INIAudit::isEnabled())
 				INIAudit::record("error", "Invalid castle member template: " + member.templateName, faction->camp.str(), 0);
-			definition = nullptr;
 		}
 		templates.push_back(definition);
 	}
@@ -563,29 +688,7 @@ void CastleBehavior::unpack(Bool charge)
 			piece->updateUpgradeModules();
 	}
 
-	Bool registeredArea = FALSE;
-	for (std::size_t i = 0; i < camp->perimeters.size(); ++i)
-	{
-		const auto& points = camp->perimeters[i];
-		if (points.size() < 3)
-			continue;
-		auto* area = newInstance(PolygonTrigger)(static_cast<Int>(points.size()));
-		AsciiString name;
-		name.format("Dynamic_%s_of_id_%d_at_index_%d", packed->getTemplate()->getName().str(),
-			packed->getID(), static_cast<Int>(i));
-		area->setTriggerName(name);
-		area->setCastleAreaOwner(packed->getID());
-		for (const auto& [x, y] : points)
-		{
-			Vector3 world;
-			Matrix3D::Transform_Vector(transform, Vector3(x, y, 0.0f), &world);
-			area->addPoint({static_cast<Int>(world.X), static_cast<Int>(world.Y), 0});
-		}
-		PolygonTrigger::addPolygonTrigger(area);
-		registeredArea = TRUE;
-	}
-	if (registeredArea)
-		PolygonTrigger::refreshObjectMembership();
+	registerPerimeters(*camp, transform);
 
 	if (data->m_maxCastleRadius > 0.0f)
 	{
@@ -700,6 +803,7 @@ void CastleBehavior::loadPostProcess()
 			friend_setNextCallFrame(TheGameLogic->getFrame());
 		if (Drawable* drawable = getObject()->getDrawable())
 			drawable->setDrawableHidden(TRUE);
+		restoreMissingPerimeters();
 	}
 }
 

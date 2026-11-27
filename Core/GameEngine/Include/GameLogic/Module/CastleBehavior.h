@@ -1,10 +1,16 @@
 #pragma once
 
+class Matrix3D;
 class UpgradeTemplate;
 
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/UpdateModule.h"
+
+namespace CastleTemplates
+{
+struct Camp;
+}
 
 class CastleBehaviorModuleData : public UpdateModuleData
 {
@@ -100,6 +106,9 @@ private:
 	void repack();
 	void scanForCapture();
 	const CastleBehaviorModuleData::CampEntry* findCamp(const Player& player) const;
+	const CastleTemplates::Camp* findUnpackedCamp() const;
+	void registerPerimeters(const CastleTemplates::Camp& camp, const Matrix3D& transform);
+	void restoreMissingPerimeters();
 
 	Bool m_buildComplete = FALSE;
 	Bool m_pendingUnpack = FALSE;
