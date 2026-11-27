@@ -687,33 +687,30 @@ void GameEngine::init()
 
 		if (TheLocalFileSystem->doesFileExist(sagePatchPath.str()))
 		{
-			// Check and migrate existing SagePatch.ini for 60 FPS
-			FILE *f = fopen(sagePatchPath.str(), "rb");
-			if (f)
+			std::string buffer;
+			if (FILE* f = fopen(sagePatchPath.str(), "rb"))
 			{
-				fseek(f, 0, SEEK_END);
-				long size = ftell(f);
-				fseek(f, 0, SEEK_SET);
-				char *buffer = new char[size + 1];
-				fread(buffer, 1, size, f);
-				buffer[size] = 0;
-				fclose(f);
-
-				if (!strstr(buffer, "FramesPerSecondLimit"))
+				const long size = fseek(f, 0, SEEK_END) == 0 ? ftell(f) : -1;
+				if (size >= 0 && fseek(f, 0, SEEK_SET) == 0)
 				{
-					char *endPos = strstr(buffer, "End");
-					if (endPos != nullptr)
+					buffer.resize(static_cast<std::size_t>(size));
+					if (fread(buffer.data(), 1, buffer.size(), f) != buffer.size())
+						buffer.clear();
+				}
+				fclose(f);
+			}
+			if (!buffer.empty() && buffer.find("FramesPerSecondLimit") == std::string::npos)
+			{
+				const std::size_t end = buffer.find("End");
+				if (end != std::string::npos)
+				{
+					buffer.resize(end);
+					if (FILE* fw = fopen(sagePatchPath.str(), "wb"))
 					{
-						*endPos = '\0';
-						FILE *fw = fopen(sagePatchPath.str(), "wb");
-						if (fw)
-						{
-							fprintf(fw, "%s  ; Migrated 60 FPS defaults\n  UseFPSLimit = Yes\n  FramesPerSecondLimit = 60\nEnd\n", buffer);
-							fclose(fw);
-						}
+						fprintf(fw, "%s  UseFPSLimit = Yes\n  FramesPerSecondLimit = 60\nEnd\n", buffer.c_str());
+						fclose(fw);
 					}
 				}
-				delete[] buffer;
 			}
 
 			ini.load(sagePatchPath, INI_LOAD_OVERWRITE, nullptr);

@@ -442,36 +442,32 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 					fclose(fp);
 				}
 
-				if (serverLen == fileLen)
+				if (fileLen > 0 && serverLen == fileLen)
 				{
-					// we don't need to download the MOTD again
-					--checksLeftBeforeOnline;
-					DEBUG_ASSERTCRASH(checksLeftBeforeOnline>=0, ("Too many callbacks"));
-					if (onlineCancelWindow && !checksLeftBeforeOnline)
+					if (FILE* cached = fopen(fname.str(), "rb"))
 					{
-						TheWindowManager->winDestroy(onlineCancelWindow);
-						onlineCancelWindow = nullptr;
-					}
-
-					delete[] configBuffer;
-					configBuffer = nullptr;
-
-					AsciiString fname;
-					fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
-					FILE *fp = fopen(fname.str(), "rb");
-					if (fp)
-					{
-						configBuffer = NEW char[fileLen];
-						fread(configBuffer, fileLen, 1, fp);
-						configBuffer[fileLen-1] = 0;
-						fclose(fp);
-
-						DEBUG_LOG(("Got Config before going online"));
-
-						if (!checksLeftBeforeOnline)
-							startOnline();
-
-						return GHTTPTrue;
+						char* contents = NEW char[fileLen];
+						const Bool complete = fread(contents, fileLen, 1, cached) == 1;
+						fclose(cached);
+						if (complete)
+						{
+							contents[fileLen - 1] = 0;
+							delete[] configBuffer;
+							configBuffer = contents;
+							--checksLeftBeforeOnline;
+							DEBUG_ASSERTCRASH(checksLeftBeforeOnline >= 0, ("Too many callbacks"));
+							if (!checksLeftBeforeOnline)
+							{
+								if (onlineCancelWindow)
+								{
+									TheWindowManager->winDestroy(onlineCancelWindow);
+									onlineCancelWindow = nullptr;
+								}
+								startOnline();
+							}
+							return GHTTPTrue;
+						}
+						delete[] contents;
 					}
 				}
 			}

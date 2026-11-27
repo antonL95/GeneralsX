@@ -509,8 +509,7 @@ void AIGuardRetaliateOuterState::xfer( Xfer *xfer )
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
 void AIGuardRetaliateOuterState::loadPostProcess()
-{						 AIGuardRetaliateOuterState
-	onEnter();
+{
 }
 
 // ------------------------------------------------------------------------------------------------

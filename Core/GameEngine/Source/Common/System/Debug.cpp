@@ -358,7 +358,7 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 	}
 	#else
 	// Linux: Output to stderr (game will crash anyway after this)
-	fprintf(stderr, "FATAL ERROR: %s\n%s\n", prompt.str(), mesg.str());
+	fprintf(stderr, "FATAL ERROR: %ls\n%ls\n", prompt.str(), mesg.str());
 	#endif
 
 	char prevbuf[ _MAX_PATH ];
