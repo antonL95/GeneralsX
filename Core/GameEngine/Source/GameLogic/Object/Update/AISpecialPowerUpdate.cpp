@@ -474,6 +474,53 @@ std::optional<Coord3D> selectSummonLocation(const Object& source, const Player& 
 	return best;
 }
 
+std::optional<Coord3D> selectAreaBuffLocation(const Object& source, const Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data)
+{
+	const Real range = specialPowerSearchRange(source, power, data.m_specialPowerRange);
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return std::nullopt;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(source.getPosition(), range, FROM_CENTER_2D);
+	MemoryPoolObjectHolder hold(nearby);
+	Int allies = 0;
+	const Object* nearest = nullptr;
+	Real nearestDistance = 0.0f;
+	for (const Object* candidate = nearby->first(); candidate; candidate = nearby->next())
+	{
+		if (candidate->isEffectivelyDead() || candidate->isKindOf(KINDOF_STRUCTURE) ||
+			candidate->isKindOf(KINDOF_IGNORES_SELECT_ALL) ||
+			(!candidate->isKindOf(KINDOF_CAN_ATTACK) && !candidate->isKindOf(KINDOF_HERO)))
+			continue;
+		const auto relationship = source.getRelationship(candidate);
+		if (relationship == ALLIES)
+		{
+			++allies;
+			continue;
+		}
+		if (relationship != ENEMIES || (candidate->testStatus(OBJECT_STATUS_STEALTHED) &&
+			!candidate->testStatus(OBJECT_STATUS_DETECTED)))
+			continue;
+		const auto shroud = candidate->getShroudedStatus(player.getPlayerIndex());
+		if (shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR)
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(&source, candidate, FROM_CENTER_2D);
+		if (!nearest || distance < nearestDistance || (distance == nearestDistance && candidate->getID() < nearest->getID()))
+		{
+			nearest = candidate;
+			nearestDistance = distance;
+		}
+	}
+
+	constexpr Int minimumAllies = 2;
+	constexpr Real minimumRangeFraction = 0.8f;
+	const Real minimumRange = range * minimumRangeFraction;
+	if (allies < minimumAllies || !nearest ||
+		ThePartitionManager->getDistanceSquared(&source, nearest, FROM_CENTER_3D) < minimumRange * minimumRange)
+		return std::nullopt;
+	return findSummonLocation(source, button, power, data, *nearest->getPosition());
+}
+
 void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
 {
 	constexpr Int samplesPerAxis = 16;
@@ -696,6 +743,17 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		const auto location = wizardBlast
 			? selectWizardBlastLocation(*source, *player, *button, *power, data->m_specialPowerRadius)
 			: selectSummonLocation(*source, *player, *button, *power, *data, callOfTheDeep ? callOfTheDeepRange : defaultSummonRange);
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_AOE_AND_BUFF")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+			return retailPolicyPoll;
+		const auto location = selectAreaBuffLocation(*source, *player, *button, *power, *data);
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());

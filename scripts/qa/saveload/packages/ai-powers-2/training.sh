@@ -60,4 +60,13 @@ check() {
             return 1
         fi
     fi
+    if covers 1060; then
+        expect 'TEST powers-fire-state frame=1060 template=AiPowers2BuffCaster alive=3 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=1060 template=AiPowers2BuffMarker alive=1' || return 1
+        if ! grep -F 'TEST health 1060 Player_2 AiPowers2BuffMarker 0 ' "$log" | grep -Fq ' pos=2890.0,1320.0'; then
+            printf 'Expected the area buff on the distant target with nearby allies\n' >&2
+            grep -F 'TEST health 1060 Player_2 AiPowers2BuffMarker 0 ' "$log" >&2 || true
+            return 1
+        fi
+    fi
 }

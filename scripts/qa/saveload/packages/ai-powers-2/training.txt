@@ -100,3 +100,25 @@
 856 destroy Player_1 AiPowers2ClusterTarget 2
 856 destroy Player_1 AiPowers2ClusterTarget 1
 856 destroy Player_1 AiPowers2ClusterTarget 0
+900 create Player_2 AiPowers2BuffCaster 0 2800,1320,0
+900 create Player_2 AiPowers2BuffCaster 1 2800,1500,0
+900 create Player_2 AiPowers2BuffCaster 2 2800,1710,0
+900 create Player_2 AiPowers2BuffTarget 0 2810,1320,0
+900 create Player_2 AiPowers2BuffTarget 1 2810,1500,0
+900 create Player_1 AiPowers2BuffTarget 0 2890,1320,0
+900 create Player_1 AiPowers2BuffTarget 1 2840,1500,0
+900 create Player_1 AiPowers2BuffTarget 2 2890,1500,0
+900 create Player_1 AiPowers2BuffTarget 3 2890,1710,0
+1060 powers-fire-state Player_2 AiPowers2BuffCaster 2 AiPowers2Buff
+1060 powers-fire-state Player_2 AiPowers2BuffMarker 0
+1060 health Player_2 AiPowers2BuffMarker 0
+1061 destroy Player_2 AiPowers2BuffMarker 0
+1061 destroy Player_2 AiPowers2BuffCaster 2
+1061 destroy Player_2 AiPowers2BuffCaster 1
+1061 destroy Player_2 AiPowers2BuffCaster 0
+1061 destroy Player_2 AiPowers2BuffTarget 1
+1061 destroy Player_2 AiPowers2BuffTarget 0
+1061 destroy Player_1 AiPowers2BuffTarget 3
+1061 destroy Player_1 AiPowers2BuffTarget 2
+1061 destroy Player_1 AiPowers2BuffTarget 1
+1061 destroy Player_1 AiPowers2BuffTarget 0
