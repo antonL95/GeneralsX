@@ -223,7 +223,7 @@
 661 destroy Player_2 AiPowers3FreezeAlly 0
 661 destroy Player_1 AiPowers3FreezeEnemy 1
 661 destroy Player_1 AiPowers3FreezeEnemy 0
-690 ai-powers-economy Player_2 - 0 1000,100000
+690 ai-powers-economy Player_2 - 0 500,100000
 690 create Player_2 AiPowers3ReinforcementsCaster 0 2870,2070,0
 900 powers-fire-state Player_2 AiPowers3ReinforcementsCaster 0 AiPowers3Reinforcements
 900 cash Player_2 - 0 0
