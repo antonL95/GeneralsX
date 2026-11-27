@@ -145,6 +145,18 @@ public:
 		Int sizeY;
 	};
 
+	struct NamedCamera
+	{
+		Coord3D lookAt;
+		AsciiString name;
+		Real pitch;
+		Real roll;
+		Real yaw;
+		Real zoom;
+		Real fieldOfView;
+		Real unknown;
+	};
+
 #ifdef EVAL_TILING_MODES
 	enum {TILE_4x4, TILE_6x6, TILE_8x8} m_tileMode;
 #endif
@@ -287,6 +299,8 @@ private:
 	std::vector<MapPolygon> m_standingWater;
 	std::vector<MapPolygon> m_triggerAreas;
 	std::vector<MapPolygon> m_rivers;
+	std::vector<NamedCamera> m_namedCameras;
+	static Bool ParseNamedCameras(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void finalizeImportedPolygons(Bool install);
 	Bool m_releaseAlphaTiles = true;
 	void readBfmeLighting(DataChunkInput &file, unsigned version);
@@ -313,6 +327,7 @@ public: // constructors/destructors
 	Bool writeBlendTileChecksums(const char *path) const;
 	const auto& getStandingWater() const { return m_standingWater; }
 	const auto& getTriggerAreas() const { return m_triggerAreas; }
+	const std::vector<NamedCamera>& getNamedCameras() const { return m_namedCameras; }
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info

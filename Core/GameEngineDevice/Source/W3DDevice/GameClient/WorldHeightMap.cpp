@@ -521,7 +521,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("StandingWaveAreas", root, ParseRetailStandingWaves, 2);
 	file.registerVersionedParser("PostEffectsChunk", root, nullptr, 1);
 	file.registerVersionedParser("EnvironmentData", root, nullptr, 3);
-	file.registerVersionedParser("NamedCameras", root, nullptr, 2);
+	file.registerVersionedParser("NamedCameras", root, ParseNamedCameras, 2);
 	file.registerVersionedParser("CameraAnimationList", root, nullptr, 3);
 	file.registerVersionedParser("SkyboxSettings", root, nullptr, 1);
 }
@@ -1429,12 +1429,12 @@ Bool WorldHeightMap::ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataCh
 
 namespace
 {
-class BfmePolygonReader
+class BfmeChunkReader
 {
 	DataChunkInput &m_file;
 
 public:
-	explicit BfmePolygonReader(DataChunkInput &file) : m_file(file) {}
+	explicit BfmeChunkReader(DataChunkInput &file) : m_file(file) {}
 
 	template<class T>
 	T read()
@@ -1458,6 +1458,14 @@ public:
 			m_file.readArrayOfBytes(bytes, size);
 			bytes[size] = '\0';
 		}
+		return value;
+	}
+
+	Real readFiniteReal()
+	{
+		const Real value = read<Real>();
+		if (!std::isfinite(value))
+			throw ERROR_CORRUPT_FILE_FORMAT;
 		return value;
 	}
 
@@ -1565,6 +1573,44 @@ void WorldHeightMap::MapPolygonDeleter::operator()(PolygonTrigger *polygon) cons
 	deleteInstance(polygon);
 }
 
+Bool WorldHeightMap::ParseNamedCameras(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	if (info->version < 1)
+		return true;
+
+	std::vector<NamedCamera> cameras;
+	try
+	{
+		BfmeChunkReader reader(file);
+		const UnsignedInt count = reader.read<UnsignedInt>();
+		const Bool hasRoll = info->version >= 2;
+		const UnsignedInt minRecordBytes = sizeof(UnsignedShort) + (hasRoll ? 9 : 8) * sizeof(Real);
+		if (count > file.getChunkDataSizeLeft() / minRecordBytes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		cameras.reserve(count);
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			const Coord3D lookAt = {reader.readFiniteReal(), reader.readFiniteReal(), reader.readFiniteReal()};
+			const AsciiString name = reader.readString();
+			const Real pitch = reader.readFiniteReal();
+			const Real roll = hasRoll ? reader.readFiniteReal() : 0.0f;
+			cameras.push_back({lookAt, name, pitch, roll, reader.readFiniteReal(),
+				reader.readFiniteReal(), reader.readFiniteReal(), reader.readFiniteReal()});
+		}
+		if (file.getChunkDataSizeLeft() != 0)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+	catch (ErrorCode)
+	{
+		if (!INIAudit::isEnabled())
+			throw;
+		INIAudit::record("error", "Invalid named cameras map chunk", info->label.str(), 0);
+		return true;
+	}
+	static_cast<WorldHeightMap *>(userData)->m_namedCameras = std::move(cameras);
+	return true;
+}
+
 Bool WorldHeightMap::ParseTriggerAreas(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
 	auto *map = static_cast<WorldHeightMap *>(userData);
@@ -1576,7 +1622,7 @@ Bool WorldHeightMap::ParseTriggerAreas(DataChunkInput &file, DataChunkInfo *info
 	{
 		if (info->dataSize > std::numeric_limits<Int>::max())
 			throw ERROR_CORRUPT_FILE_FORMAT;
-		BfmePolygonReader reader(file);
+		BfmeChunkReader reader(file);
 		const UnsignedInt count = reader.read<UnsignedInt>();
 		constexpr UnsignedInt minAreaBytes = 3 * sizeof(UnsignedInt) + 2 * sizeof(UnsignedShort);
 		constexpr UnsignedInt maxAreas = 4096;
@@ -1632,7 +1678,7 @@ Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo
 	{
 		if (info->dataSize > std::numeric_limits<Int>::max())
 			throw ERROR_CORRUPT_FILE_FORMAT;
-		BfmePolygonReader reader(file);
+		BfmeChunkReader reader(file);
 		const UnsignedInt count = reader.read<UnsignedInt>();
 		constexpr UnsignedInt minAreaBytes = 4 * sizeof(UnsignedInt) + sizeof(UnsignedByte) +
 			6 * sizeof(UnsignedShort);
@@ -1704,7 +1750,7 @@ Bool WorldHeightMap::ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, 
 	std::vector<MapPolygon> rivers;
 	try
 	{
-		BfmePolygonReader reader(file);
+		BfmeChunkReader reader(file);
 		const UnsignedInt count = reader.read<UnsignedInt>();
 		const UnsignedInt strings = info->version >= 2 ? 7 : 6;
 		const UnsignedInt minAreaBytes = 6 * sizeof(UnsignedInt) + strings * sizeof(UnsignedShort) + sizeof(UnsignedByte);

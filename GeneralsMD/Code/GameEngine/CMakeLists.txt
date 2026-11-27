@@ -1205,6 +1205,11 @@ add_library(z_gameengine STATIC)
 
 target_sources(z_gameengine PRIVATE ${GAMEENGINE_SRC})
 
+set_source_files_properties(
+    "${CMAKE_SOURCE_DIR}/Core/GameEngine/Source/GameLogic/System/RetailMapScriptCameraUiTestCommands.cpp"
+    PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Core/GameEngineDevice/Include"
+)
+
 target_include_directories(z_gameengine PUBLIC
     Include
 )
