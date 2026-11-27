@@ -301,13 +301,21 @@ int executeAction(lua_State* state)
 	return luaL_error(state, "unsupported ExecuteAction %s", name);
 }
 
-template<EmotionType type, bool requiresSource = false>
+template<EmotionType type>
 int enterFearState(lua_State* state)
 {
 	Object* object = getObject(state, 1);
 	const Object* source = getObject(state, 2);
-	if (object && (!requiresSource || source))
-		EmotionTrackerUpdate::signalWeaponEmotion(object, type, source, 0);
+	EmotionTrackerUpdate::requestScriptedFear(object, type, source);
+	return 0;
+}
+
+int enterFearOfObjectState(lua_State* state)
+{
+	Object* object = getObject(state, 1);
+	const Object* source = getObject(state, 2);
+	if (object && source)
+		EmotionTrackerUpdate::signalWeaponEmotion(object, EMOTION_FEAR, source, 0);
 	return 0;
 }
 
@@ -433,7 +441,7 @@ void bindLogicLua(LuaState& state)
 		{ "ObjectChangeAllegianceFromNonPlayablePlayer", changeAllegianceFromNonPlayablePlayer },
 		{ "ExecuteAction", executeAction },
 		{ "ObjectEnterAlertState", enterAlertState },
-		{ "ObjectEnterFearState", enterFearState<EMOTION_FEAR, true> },
+		{ "ObjectEnterFearState", enterFearOfObjectState },
 		{ "ObjectEnterCowerState", enterFearState<EMOTION_FEAR> },
 		{ "ObjectEnterRunAwayPanicState", enterFearState<EMOTION_TERROR> },
 		{ "ObjectEnterUncontrollableCowerState", enterFearState<EMOTION_UNCONTROLLABLE_FEAR> },

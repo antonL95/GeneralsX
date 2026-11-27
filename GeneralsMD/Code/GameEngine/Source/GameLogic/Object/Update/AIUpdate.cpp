@@ -27,7 +27,9 @@
 // Author: Michael S. Booth, 2001-2002
 // Subsequently : John Ahlquist 2002 and a cast of thousands.
 
-#include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "PreRTS.h"
+
+#include <utility>
 
 #define DEFINE_LOCOMOTORSET_NAMES					// for TheLocomotorSetNames[]
 #define DEFINE_AUTOACQUIRE_NAMES
@@ -920,9 +922,13 @@ void AIUpdateInterface::setRetailComboLocomotor(Bool enabled)
 
 Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 {
-	if (wst == LOCOMOTORSET_NORMAL && m_fearUntil && RetailFileLayers::enabled() &&
-		getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_SCARED))
-		wst = LOCOMOTORSET_SCARED;
+	if (wst == LOCOMOTORSET_NORMAL && m_fearUntil && RetailFileLayers::enabled())
+	{
+		if (m_emotionFearAction && m_curLocomotorSet == LOCOMOTORSET_PANIC)
+			wst = LOCOMOTORSET_PANIC;
+		else if (!m_emotionFearAction && getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_SCARED))
+			wst = LOCOMOTORSET_SCARED;
+	}
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testStatus(OBJECT_STATUS_ENRAGED))
 	{
 		const auto* tmpl = getObject()->getTemplate();
@@ -1340,20 +1346,7 @@ UpdateSleepTime AIUpdateInterface::update()
 	{
 		const UnsignedInt now = TheGameLogic->getFrame();
 		if (m_fearUntil && now >= m_fearUntil)
-		{
-			m_fearUntil = 0;
-			if (m_curLocomotorSet == LOCOMOTORSET_SCARED)
-			{
-				const auto previous = m_preFearLocomotorSet;
-				if (previous == LOCOMOTORSET_INVALID || previous == LOCOMOTORSET_NORMAL_UPGRADED ||
-					!chooseLocomotorSet(previous))
-					chooseLocomotorSet(LOCOMOTORSET_NORMAL);
-			}
-			m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
-			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_AFRAID);
-			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_TERROR);
-			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID);
-		}
+			finishFearMovement();
 		if (m_crushWarningUntil && now >= m_crushWarningUntil)
 			clearCrushBrace();
 		if (m_fearUntil || m_crushWarningUntil)
@@ -3056,7 +3049,8 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
 	if (RetailFileLayers::enabled() && parms->m_cmdSource == CMD_FROM_PLAYER &&
 		EmotionTrackerUpdate::blocksPlayerCommands(getObject()))
 		return FALSE;
-	if (m_fearUntil > TheGameLogic->getFrame())
+	if ((!m_emotionFearAction && m_fearUntil > TheGameLogic->getFrame()) ||
+		EmotionTrackerUpdate::blocksOrders(getObject()))
 		return FALSE;
 	if (m_rampageUntil)
 		return FALSE;
@@ -3102,6 +3096,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		return;
 	if (!StrafeAreaUpdate::acceptsCommand(*getObject(), parms->m_cmdSource))
 		return;
+	EmotionTrackerUpdate::interruptScriptedFear(getObject());
 	if (parms->m_cmdSource != CMD_FROM_AI && !isFollowingRetailGroupRoute())
 		clearRetailGroupIdentity();
 	m_retailPlannerAttackTarget = INVALID_ID;
@@ -5876,6 +5871,7 @@ void AIUpdateInterface::crcRetailLocomotion(Xfer* xfer)
 {
 	Int preFear = m_preFearLocomotorSet;
 	xfer->xferInt(&preFear);
+	xfer->xferBool(&m_emotionFearAction);
 	Int set = m_curLocomotorSet;
 	xfer->xferInt(&set);
 	AsciiString name = m_curLocomotor ? m_curLocomotor->getTemplateName() : AsciiString();
@@ -6229,6 +6225,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			m_hasArrivalFacing = FALSE;
 			m_arrivalFacing = 0.0f;
+		} },
+		{ "emotion-fear-action", [this](Xfer* x) {
+			x->xferBool(&m_emotionFearAction);
+		}, [this] {
+			m_emotionFearAction = FALSE;
 		} }
 	});
 }
@@ -6306,6 +6307,72 @@ void AIUpdateInterface::enterRetailRampage()
 	m_rampageWeaponPrimed = FALSE;
 	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
 	object->setWeaponSetFlags(flags, TRUE);
+	wakeUpNow();
+}
+
+void AIUpdateInterface::finishFearMovement()
+{
+	const Bool emotionOwned = std::exchange(m_emotionFearAction, FALSE);
+	m_fearUntil = 0;
+	if (emotionOwned)
+	{
+		if (!isIdle() && !getObject()->isEffectivelyDead())
+			idleSelf(CMD_FROM_SCRIPT);
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(getObject())))
+			horde->endBacking();
+	}
+	if (m_curLocomotorSet == LOCOMOTORSET_SCARED || (emotionOwned && m_curLocomotorSet == LOCOMOTORSET_PANIC))
+	{
+		const auto previous = m_preFearLocomotorSet;
+		if (previous == LOCOMOTORSET_INVALID || previous == LOCOMOTORSET_NORMAL_UPGRADED ||
+			!chooseLocomotorSet(previous))
+			chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	}
+	m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
+	if (!emotionOwned)
+	{
+		getObject()->clearModelConditionState(MODELCONDITION_EMOTION_AFRAID);
+		getObject()->clearModelConditionState(MODELCONDITION_EMOTION_TERROR);
+		getObject()->clearModelConditionState(MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID);
+	}
+}
+
+void AIUpdateInterface::endEmotionFear()
+{
+	if (m_emotionFearAction)
+		finishFearMovement();
+}
+
+void AIUpdateInterface::startEmotionFear(const Object& source, UnsignedInt duration, Bool cower, Bool uncontrollable)
+{
+	Object* self = getObject();
+	if (!duration || self->isEffectivelyDead() || !self->isMobile())
+		return;
+	if (m_fearUntil)
+		finishFearMovement();
+
+	idleSelf(CMD_FROM_SCRIPT);
+	m_preFearLocomotorSet = m_curLocomotorSet;
+	m_emotionFearAction = TRUE;
+	m_fearUntil = TheGameLogic->getFrame() + duration;
+	self->clearModelConditionState(MODELCONDITION_ENGAGED);
+	if (cower)
+	{
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(self)))
+			horde->beginBacking(&source, uncontrollable);
+		else
+		{
+			const Real dx = source.getPosition()->x - self->getPosition()->x;
+			const Real dy = source.getPosition()->y - self->getPosition()->y;
+			if (dx != 0.0f || dy != 0.0f)
+				self->setOrientation(WWMath::Atan2Origin(dy, dx));
+		}
+	}
+	else
+	{
+		getStateMachine()->setGoalObject(TheGameLogic->findObjectByID(source.getID()));
+		getStateMachine()->setState(AI_MOVE_AWAY_FROM_REPULSORS);
+	}
 	wakeUpNow();
 }
 

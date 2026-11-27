@@ -26,6 +26,7 @@
 695 lua-events-state Player_1 LuaEventsCower 0
 696 lua-events-hit PlyrCreeps LuaEventsCower 0 Player_1:LuaEventsGate:0
 697 lua-events-state Player_1 LuaEventsCower 0
+698 lua-events-state Player_1 LuaEventsCower 0
 730 lua-events-state Player_1 LuaEventsCower 0
 731 lua-events-state PlyrCreeps LuaEventsCower 0
 734 lua-events-state Player_1 LuaEventsChant 0

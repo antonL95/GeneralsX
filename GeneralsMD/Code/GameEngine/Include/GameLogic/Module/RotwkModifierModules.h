@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 
 #include "Common/ModelState.h"
@@ -174,9 +175,12 @@ public:
 	static void queuePromotionEmotion(Object* object, const AsciiString& name);
 	static void force(Object* victim, Int type, Real seconds);
 	static Bool signalWeaponEmotion(Object* victim, EmotionType type, const Object* source, UnsignedInt duration);
+	static void requestScriptedFear(Object* victim, EmotionType type, const Object* source);
 	static Bool canSufferFear(const Object* object);
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
+	static Bool blocksOrders(const Object* object);
+	static void interruptScriptedFear(Object* object);
 	UpdateSleepTime update() override;
 	void xferEmotionState(Xfer* xfer);
 	Bool hasPromotionEmotions() const { return m_promotionEmotions != 0; }
@@ -184,7 +188,8 @@ public:
 	void clearPromotionEmotions() { m_promotionEmotions = 0; }
 
 private:
-	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration = 0, UnsignedInt weaponDuration = 0);
+	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration = 0,
+		UnsignedInt weaponDuration = 0, Bool scriptedFear = FALSE);
 	void finishEmotion();
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
@@ -196,6 +201,8 @@ private:
 	ModelConditionFlags m_appliedConditions;
 	Int m_pendingForcedType = -1;
 	Bool m_forced = FALSE;
+	std::array<ObjectID, EMOTION_TERROR - EMOTION_FEAR + 1> m_pendingScriptedFear{INVALID_ID, INVALID_ID, INVALID_ID};
+	UnsignedInt m_scriptedFearLockUntil = 0;
 };
 
 class LargeGroupBonusUpdateModuleData : public UpdateModuleData

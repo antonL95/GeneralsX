@@ -767,6 +767,9 @@ EmotionTrackerUpdate::~EmotionTrackerUpdate() = default;
 void EmotionTrackerUpdate::finishEmotion()
 {
 	Object* self = getObject();
+	if (std::exchange(m_scriptedFearLockUntil, 0u))
+		if (auto* ai = self->getAI())
+			ai->endEmotionFear();
 	const auto& entry = getEmotionTrackerUpdateModuleData()->m_emotions[m_activeEntry];
 	if (const auto* nugget = findEmotionNugget(entry.m_name))
 	{
@@ -806,6 +809,21 @@ UpdateSleepTime EmotionTrackerUpdate::update()
 			const Int type = configuredEmotionType(entry, nugget);
 			if (type >= 0 && (promotionEmotions & (1u << type)) &&
 				startEmotion(static_cast<EmotionType>(type), nullptr, -1.0f))
+				break;
+		}
+	}
+	const decltype(m_pendingScriptedFear) noFear{INVALID_ID, INVALID_ID, INVALID_ID};
+	auto pendingFear = std::exchange(m_pendingScriptedFear, noFear);
+	if (pendingFear != noFear && !self->getContainedBy() && !self->isEffectivelyDead())
+	{
+		for (const auto& entry : data->m_emotions)
+		{
+			const Int type = configuredEmotionType(entry, findEmotionNugget(entry.m_name));
+			if (type < EMOTION_FEAR || type > EMOTION_TERROR)
+				continue;
+			const ObjectID sourceID = std::exchange(pendingFear[type - EMOTION_FEAR], INVALID_ID);
+			const Object* source = sourceID == INVALID_ID ? nullptr : TheGameLogic->findObjectByID(sourceID);
+			if (source && !source->isEffectivelyDead() && startEmotion(static_cast<EmotionType>(type), source, -1.0f, 0, 0, TRUE))
 				break;
 		}
 	}
@@ -975,24 +993,41 @@ Bool EmotionTrackerUpdate::signalWeaponEmotion(Object* victim, EmotionType type,
 	return FALSE;
 }
 
+void EmotionTrackerUpdate::requestScriptedFear(Object* victim, EmotionType type, const Object* source)
+{
+	if (!victim || !source || type < EMOTION_FEAR || type > EMOTION_TERROR)
+		return;
+	while (Object* container = victim->getContainedBy())
+		victim = container;
+	if (victim->isEffectivelyDead() || victim->isDestroyed())
+		return;
+	if (auto* tracker = static_cast<EmotionTrackerUpdate*>(victim->findUpdateModule(NAMEKEY("EmotionTrackerUpdate"))))
+	{
+		tracker->m_pendingScriptedFear[type - EMOTION_FEAR] = source->getID();
+		tracker->setWakeFrame(victim, UPDATE_SLEEP_NONE);
+	}
+}
+
 Bool EmotionTrackerUpdate::canSufferFear(const Object* object)
 {
-	for (; object && !object->isEffectivelyDead() && !object->isDestroyed(); object = object->getContainedBy())
-	{
-		const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
-		if (!tracker)
-			continue;
-		const auto& emotions = tracker->getEmotionTrackerUpdateModuleData()->m_emotions;
-		return std::any_of(emotions.begin(), emotions.end(), [](const auto& entry)
-		{
-			const auto* nugget = findEmotionNugget(entry.m_name);
-			if (!nugget)
-				return false;
-			const Int type = configuredEmotionType(entry, nugget);
-			return type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR;
-		});
-	}
-	return FALSE;
+	if (!object || object->isEffectivelyDead() || object->isDestroyed())
+		return FALSE;
+	const Real resistance = AttributeModifiers::value(object, AttributeModifierRules::RESIST_FEAR);
+	const Bool resisted = resistance != 0.0f && GameLogicRandomValue(0, 1) <= resistance;
+	return !resisted && !object->testStatus(OBJECT_STATUS_RAMPAGING);
+}
+
+Bool EmotionTrackerUpdate::blocksOrders(const Object* object)
+{
+	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+	return tracker && TheGameLogic->getFrame() < tracker->m_scriptedFearLockUntil;
+}
+
+void EmotionTrackerUpdate::interruptScriptedFear(Object* object)
+{
+	auto* tracker = static_cast<EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+	if (tracker && tracker->m_activeEntry >= 0 && tracker->m_scriptedFearLockUntil)
+		tracker->finishEmotion();
 }
 
 Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
@@ -1032,7 +1067,8 @@ static Int emotionPriority(Int type)
 	}
 }
 
-Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration, UnsignedInt weaponDuration)
+Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration,
+	UnsignedInt weaponDuration, Bool scriptedFear)
 {
 	Object* self = getObject();
 	const auto* data = getEmotionTrackerUpdateModuleData();
@@ -1054,7 +1090,15 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 	Object* subject = anchor ? anchor : self;
 	auto* ai = subject->getAI();
 	const Bool idle = !ai || ai->isIdle();
-	const UnsignedInt interval = std::max(data->m_tauntInterval, UnsignedInt(LOGICFRAMES_PER_SECOND / 5));
+	constexpr UnsignedInt retailTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	const UnsignedInt interval = std::max(data->m_tauntInterval, retailTick);
+	if (scriptedFear)
+	{
+		const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
+		if (AttributeModifiers::value(subject, resistance) >= 0.5f || subject->testStatus(OBJECT_STATUS_RAMPAGING) ||
+			(!data->m_ignoreVeterancy && data->m_immuneRank > 0 && rankOf(subject) >= data->m_immuneRank))
+			return FALSE;
+	}
 	for (Int index = 0; index < static_cast<Int>(data->m_emotions.size()); ++index)
 	{
 		const auto& entry = data->m_emotions[index];
@@ -1082,13 +1126,14 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 
 		const UnsignedInt aiLock = entry.m_aiLock >= 0 ? static_cast<UnsignedInt>(entry.m_aiLock) : nugget->m_aiLock;
 		UnsignedInt duration = entry.m_duration >= 0 ? static_cast<UnsignedInt>(entry.m_duration) : nugget->m_duration;
+		const Bool retreat = nugget->m_ai == EMOTION_AI_BACK_AWAY || nugget->m_ai == EMOTION_AI_RUN_AWAY_PANIC;
 		if (weaponDuration)
 			duration = weaponDuration;
 		else if (!duration)
-			duration = std::max(aiLock, interval);
+			duration = scriptedFear ? retailTick : std::max(aiLock, interval);
 		if (forcedDuration)
 			duration = forcedDuration;
-		else if (type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR)
+		else if (!scriptedFear && (type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR))
 		{
 			const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
 			const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
@@ -1096,18 +1141,27 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 			duration = static_cast<UnsignedInt>(duration * scale);
 			if (!duration)
 				continue;
-			if (ai && !anchor && source && (nugget->m_ai == EMOTION_AI_BACK_AWAY || nugget->m_ai == EMOTION_AI_AVOID_SCARER ||
-				nugget->m_ai == EMOTION_AI_RUN_AWAY_PANIC))
+			if (ai && !anchor && source && (retreat || nugget->m_ai == EMOTION_AI_AVOID_SCARER))
 				ai->fleeFromFear(source, movementDuration,
 					type == EMOTION_TERROR ? MODELCONDITION_EMOTION_TERROR :
 					(type == EMOTION_UNCONTROLLABLE_FEAR ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID),
 					scale, nugget->m_ai == EMOTION_AI_BACK_AWAY);
 		}
-		if (ai && !anchor && nugget->m_ai == EMOTION_AI_IDLE)
-			ai->aiIdle(CMD_FROM_AI);
-
 		if (m_activeEntry >= 0)
 			finishEmotion();
+		if (ai && !anchor)
+		{
+			if (nugget->m_ai == EMOTION_AI_IDLE)
+			{
+				ai->aiIdle(CMD_FROM_AI);
+				if (scriptedFear)
+					self->clearModelConditionState(MODELCONDITION_ENGAGED);
+			}
+			else if (scriptedFear && retreat && source)
+				ai->startEmotionFear(*source, duration, nugget->m_ai == EMOTION_AI_BACK_AWAY, type == EMOTION_UNCONTROLLABLE_FEAR);
+			if (scriptedFear && (retreat || nugget->m_ai == EMOTION_AI_IDLE))
+				m_scriptedFearLockUntil = now + (aiLock ? std::min(aiLock, duration) : duration);
+		}
 		if (type == EMOTION_BRACE && self->getAI())
 			self->getAI()->clearCrushBrace();
 		m_activeEntry = index;
@@ -1170,6 +1224,14 @@ void EmotionTrackerUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			m_pendingForcedType = -1;
 			m_forced = FALSE;
+		}},
+		{"scripted-fear", [this](Xfer* x) {
+			for (ObjectID& source : m_pendingScriptedFear)
+				x->xferObjectID(&source);
+			x->xferUnsignedInt(&m_scriptedFearLockUntil);
+		}, [this] {
+			m_pendingScriptedFear.fill(INVALID_ID);
+			m_scriptedFearLockUntil = 0;
 		}}
 	});
 }
@@ -1180,7 +1242,10 @@ void EmotionTrackerUpdate::loadPostProcess()
 	if (m_activeEntry >= 0 && m_activeEntry < static_cast<Int>(getEmotionTrackerUpdateModuleData()->m_emotions.size()))
 		getObject()->setModelConditionFlags(m_appliedConditions);
 	else
+	{
 		m_activeEntry = -1;
+		m_scriptedFearLockUntil = 0;
+	}
 }
 
 void LargeGroupBonusUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)

@@ -512,6 +512,8 @@ public:
 	void holdForWeaponUntil(UnsignedInt frame);
 	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f,
 		Bool backAway = TRUE);
+	void startEmotionFear(const Object& source, UnsignedInt duration, Bool cower, Bool uncontrollable);
+	void endEmotionFear();
 	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
 	UnsignedInt getRetailBurningDeathDuration() const { return getAIUpdateModuleData()->m_burningDeathTime; }
 	Bool enterRetailBurningDeath();
@@ -869,6 +871,8 @@ private:
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
 	UnsignedInt m_fearUntil = 0;
 	LocomotorSetType m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
+	Bool m_emotionFearAction = FALSE;
+	void finishFearMovement();
 	UnsignedInt m_burningDeathUntil = 0;
 	UnsignedInt m_crushWarningUntil = 0;
 	Coord3D m_autoAttackOrigin{};

@@ -4723,7 +4723,7 @@ void Object::crc( Xfer *xfer )
 			if (auto* healing = dynamic_cast<AutoHealBehavior*>(*module))
 				healing->crcRetailHealingState(xfer);
 			if (auto* emotion = dynamic_cast<EmotionTrackerUpdate*>(*module))
-				emotion->xferEmotionState(xfer);
+				xfer->xferSnapshot(emotion);
 			if (const auto* grab = dynamic_cast<const GrabPassengerSpecialPower*>(*module))
 			{
 				ObjectID target = grab->getPendingTarget();

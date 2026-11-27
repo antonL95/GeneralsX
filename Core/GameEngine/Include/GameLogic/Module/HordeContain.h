@@ -189,6 +189,7 @@ public:
 	static Object* getAnchor(Object* member);
 	static Bool isFlanked(const Object* victim, const Object* attacker, Bool record = TRUE);
 	Bool beginBacking(const Object* source, Bool uncontrollable);
+	void endBacking();
 	enum class BackingPhase { Available, Backing, Recovered };
 	BackingPhase updateBacking(Object* member);
 	void xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource = TRUE);

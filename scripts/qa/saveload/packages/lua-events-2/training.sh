@@ -35,10 +35,10 @@ check() {
     state_matches 679 'chant=0 enrage=0 ' || return 1
     state_matches 681 'chant=0 enrage=1 ' || return 1
     state_matches 695 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 ' || return 1
-    state_matches 697 'chant=0 enrage=0 fear=1 terror=0 fleeing=1 ' || return 1
-    state_matches 730 'chant=0 enrage=0 fear=1 terror=0 fleeing=1 ' || return 1
+    state_matches 697 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 ' || return 1
+    state_matches 698 'chant=0 enrage=0 fear=1 terror=0 fleeing=1 ' || return 1
+    state_matches 730 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 x=2685\.000 y=2450\.000 ' || return 1
     state_matches 731 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 ' || return 1
-    moved_west 695 730 || return 1
     state_matches 742 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 ' || return 1
     state_matches 793 'chant=0 enrage=0 fear=1 terror=1 fleeing=1 ' || return 1
     state_matches 794 'chant=0 enrage=0 fear=0 terror=0 fleeing=0 ' || return 1

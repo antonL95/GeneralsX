@@ -1047,6 +1047,15 @@ Bool HordeContain::beginBacking(const Object* source, Bool uncontrollable)
 	return TRUE;
 }
 
+void HordeContain::endBacking()
+{
+	for (Object* member : getContainList())
+		if (m_backingMoves.contains(member->getID()))
+			member->clearModelConditionState(MODELCONDITION_BACKING_UP);
+	m_backingMoves.clear();
+	m_backingSource = INVALID_ID;
+}
+
 HordeContain::BackingPhase HordeContain::updateBacking(Object* member)
 {
 	const auto it = m_backingMoves.find(member->getID());

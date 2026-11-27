@@ -2343,8 +2343,9 @@ StateReturnType AIMoveAwayFromRepulsorsState::onEnter()
 {
 	setAdjustsDestination(false);
 	Object *obj = getMachineOwner();
-	Object* enemy = TheAI->findClosestRepulsor(getMachineOwner(), obj->getVisionRange());
-	AIUpdateInterface *ai = getMachineOwner()->getAI();
+	AIUpdateInterface* ai = obj->getAI();
+	const Bool scriptedFear = ai && ai->getRetailFearDeadline() > TheGameLogic->getFrame();
+	Object* enemy = scriptedFear ? getMachine()->getGoalObject() : TheAI->findClosestRepulsor(obj, obj->getVisionRange());
 	if (!enemy || !ai) {
 		return STATE_FAILURE;
 	}
@@ -2374,7 +2375,14 @@ StateReturnType AIMoveAwayFromRepulsorsState::update()
 			m_checkForPath = false;
 		}
 	}
-	return AIInternalMoveToState::update();
+	const auto result = AIInternalMoveToState::update();
+	if ((result == STATE_SUCCESS || result == STATE_FAILURE) &&
+		getMachineOwner()->getAI()->getRetailFearDeadline() > TheGameLogic->getFrame())
+	{
+		getMachine()->setState(AI_IDLE);
+		return STATE_CONTINUE;
+	}
+	return result;
 }
 
 //----------------------------------------------------------------------------------------------------------

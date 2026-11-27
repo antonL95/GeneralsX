@@ -25,6 +25,10 @@
 #include "GameLogic/WeaponSet.h"
 #include "WWMath/wwmath.h"
 
+#if RTS_ZEROHOUR
+#include "GameLogic/Module/RotwkModifierModules.h"
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -271,6 +275,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 	if (!m_updatingAnchor)
 		m_reformUntil = 0;
 #if RTS_ZEROHOUR
+	if (!m_updatingAnchor)
+		EmotionTrackerUpdate::interruptScriptedFear(getObject());
 	if (command == AICMD_GUARD_RETALIATE)
 	{
 		respondToAttack(parms->m_obj, parms->m_intValue, parms->m_cmdSource);

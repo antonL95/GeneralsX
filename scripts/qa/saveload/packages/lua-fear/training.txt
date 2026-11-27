@@ -1,0 +1,48 @@
+221 hordespawn Player_1 LuaFearHorde 0 - 1600 2560 0
+221 create PlyrCreeps LuaFearSource 0 1670,2560,0
+222 create PlyrCreeps LuaFearSource 0 2990,2860,0
+223 create Player_1 LuaFearCower 0 2940,2800,0
+224 create Player_1 LuaFearPanic 0 2940,2860,0
+225 create Player_1 LuaFearUncontrolled 0 2940,2920,0
+226 create Player_1 LuaFearCower 1 2940,2760,0
+226 create Player_1 LuaFearUncontrolledBacks 0 2940,2710,0
+227 modapply Player_1 LuaFearCower 1 LuaFearImmunity
+232 lua-fear-event Player_1 LuaFearCower 0 BeAfraidOfGateDamaged,PlyrCreeps:LuaFearSource:1
+232 lua-fear-state Player_1 LuaFearCower 0
+233 lua-fear-event Player_1 LuaFearPanic 0 BeTerrified,PlyrCreeps:LuaFearSource:1
+234 lua-fear-event Player_1 LuaFearUncontrolled 0 BeAfraidOfPhial,PlyrCreeps:LuaFearSource:1
+235 lua-fear-event Player_1 LuaFearCower 1 BeAfraidOfBalrog,PlyrCreeps:LuaFearSource:1
+236 lua-fear-event Player_1 LuaFearUncontrolledBacks 0 BeUncontrollablyAfraid,PlyrCreeps:LuaFearSource:1
+238 lua-fear-member-event Player_1 LuaFearHorde 0 BeAfraidOfGateDamaged,PlyrCreeps:LuaFearSource:0
+239 move Player_1 LuaFearCower 0 - 2960 2800
+242 lua-fear-state Player_1 LuaFearCower 0
+242 lua-fear-state Player_1 LuaFearPanic 0
+242 lua-fear-state Player_1 LuaFearUncontrolled 0
+243 lua-fear-state Player_1 LuaFearCower 1
+243 locomotor-fields-sample Player_1 LuaFearHorde 0
+246 lua-fear-state Player_1 LuaFearCower 0
+246 lua-fear-state Player_1 LuaFearPanic 0
+246 lua-fear-state Player_1 LuaFearUncontrolled 0
+246 lua-fear-state Player_1 LuaFearUncontrolledBacks 0
+246 locomotor-fields-sample Player_1 LuaFearHorde 0
+247 move Player_1 LuaFearCower 0 - 2960 2800
+248 move Player_1 LuaFearPanic 0 - 2960 2860
+249 move Player_1 LuaFearUncontrolled 0 - 2960 2920
+250 move Player_1 LuaFearCower 1 - 2960 2760
+258 lua-fear-state Player_1 LuaFearCower 0
+258 lua-fear-state Player_1 LuaFearPanic 0
+258 lua-fear-state Player_1 LuaFearUncontrolled 0
+259 lua-fear-state Player_1 LuaFearCower 1
+274 locomotor-fields-sample Player_1 LuaFearHorde 0
+300 lua-fear-event Player_1 LuaFearCower 1 BeAfraidOfBalrog,PlyrCreeps:LuaFearSource:1
+306 lua-fear-state Player_1 LuaFearCower 1
+400 lua-fear-state Player_1 LuaFearPanic 0
+420 lua-fear-state Player_1 LuaFearPanic 0
+450 move Player_1 LuaFearPanic 0 - 2960 2860
+460 lua-fear-state Player_1 LuaFearPanic 0
+675 lua-fear-state Player_1 LuaFearUncontrolled 0
+675 lua-fear-state Player_1 LuaFearUncontrolledBacks 0
+715 lua-fear-state Player_1 LuaFearUncontrolled 0
+715 lua-fear-state Player_1 LuaFearUncontrolledBacks 0
+716 move Player_1 LuaFearUncontrolled 0 - 2960 2920
+726 lua-fear-state Player_1 LuaFearUncontrolled 0
