@@ -213,6 +213,7 @@ protected:
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
 private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_nextReturnScanTime;
 };
 EMPTY_DTOR(AIGuardRetaliateReturnState)

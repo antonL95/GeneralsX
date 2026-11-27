@@ -599,19 +599,29 @@ void AIGuardRetaliateOuterState::onExit( StateExitType status )
 // ------------------------------------------------------------------------------------------------
 void AIGuardRetaliateReturnState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Xfer Method */
-// ------------------------------------------------------------------------------------------------
 void AIGuardRetaliateReturnState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 
 	xfer->xferUnsignedInt(&m_nextReturnScanTime);
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
+}
+
+void AIGuardRetaliateReturnState::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"retaliate-return-move", [this](Xfer* transfer) {
+			AIInternalMoveToState::xfer(transfer);
+		}, {}}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
