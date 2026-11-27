@@ -451,6 +451,12 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 	return height;
 }
 
+Bool Pathfinder::getScalableWallHeightAt(const Coord3D& position, Real& height)
+{
+	const PathfindCell* cell = getCell(LAYER_GROUND, &position);
+	return cell && cell->getScalableObstacleHeightAt(position, height);
+}
+
 Bool Pathfinder::isPointOnWall(const Coord3D *pos)
 {
 	if (RetailFileLayers::enabled() ? m_retailWallPieces.empty() : m_numWallPieces == 0) return false;
@@ -1595,6 +1601,22 @@ static Bool crossesWallHeightBand(const PathfindCell* from, const PathfindCell* 
 		from->getWallHeightBand() != to->getWallHeightBand();
 }
 
+static Bool canTraverseScalableObstacle(const PathfindCell* cell, LocomotorSurfaceTypeMask surfaces, const Object* unit)
+{
+	if (!(surfaces & LOCOMOTORSURFACE_OBSTACLE) || !unit || cell->getType() != PathfindCell::CELL_OBSTACLE)
+		return false;
+	const AIUpdateInterface* ai = unit->getAI();
+	return ai && ai->getLocomotorSet().canScaleWalls(unit) && cell->isScalableObstacle();
+}
+
+static LocomotorSurfaceTypeMask routingSurfaces(const LocomotorSet& locomotors, const Object* unit)
+{
+	const LocomotorSurfaceTypeMask surfaces = locomotors.getValidSurfaces();
+	if ((surfaces & LOCOMOTORSURFACE_OBSTACLE) && !locomotors.canScaleWalls(unit))
+		return surfaces & ~LOCOMOTORSURFACE_OBSTACLE;
+	return surfaces;
+}
+
 Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask acceptableSurfaces,
 																			 PathfindCell *toCell, PathfindCell *fromCell, const Object *unit )
 {
@@ -1610,6 +1632,9 @@ Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask
 	if (isCrusher && toCell->isObstacleFence()) {
 		return true;
 	}
+
+	if (canTraverseScalableObstacle(toCell, acceptableSurfaces, unit))
+		return true;
 
 	// check validity of destination cell
 	LocomotorSurfaceTypeMask cellSurfaces = validLocomotorSurfacesForCellType(toCell->getType());
@@ -1974,11 +1999,11 @@ Bool Pathfinder::checkForAdjust(Object *obj, const LocomotorSet& locomotorSet, B
 		if (obj->isKindOf(KINDOF_AIRCRAFT)) {
 			adjustedPathExists = true;
 		}	else {
-			Bool pathExists = clientSafeQuickDoesPathExist( locomotorSet, obj->getPosition(), dest);
-			if (!pathExists && clientSafeQuickDoesPathExist( locomotorSet, dest, &adjustDest)) {
+			Bool pathExists = clientSafeQuickDoesPathExist(locomotorSet, obj->getPosition(), dest, obj);
+			if (!pathExists && clientSafeQuickDoesPathExist(locomotorSet, dest, &adjustDest, obj)) {
 				adjustedPathExists = true;
 			} else {
-				adjustedPathExists = clientSafeQuickDoesPathExist( locomotorSet, obj->getPosition(), &adjustDest);
+				adjustedPathExists = clientSafeQuickDoesPathExist(locomotorSet, obj->getPosition(), &adjustDest, obj);
 			}
 		}
 		if ( adjustedPathExists	) {
@@ -2750,141 +2775,74 @@ void Pathfinder::checkChangeLayers(PathfindCell *parentCell)
 void Pathfinder::checkScaleWallTransitions(PathfindCell* parentCell, PathfindCell* goalCell,
 	const LocomotorSet& locomotorSet, Bool isHuman, Bool centerInCell, Int radius, const Object* obj)
 {
-	if (!locomotorSet.scalesWalls() || m_layers[LAYER_WALL].isUnused())
+	if (!locomotorSet.canScaleWalls(obj) || m_layers[LAYER_WALL].isUnused())
 		return;
+
 	const PathfindLayerEnum parentLayer = parentCell->getLayer();
 	if (parentLayer != LAYER_GROUND && parentLayer != LAYER_WALL)
 		return;
 
-	const Int px = parentCell->getXIndex();
-	const Int py = parentCell->getYIndex();
-	const Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : FALSE;
-	const Int maxProbeSteps = 7;
-	const ICoord2D dirs[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+	const Int x = parentCell->getXIndex();
+	const Int y = parentCell->getYIndex();
+	const Bool ascending = parentLayer == LAYER_GROUND;
+	if (!ascending && !m_map[x][y].isScalableObstacle())
+		return;
 
-	for (Int d = 0; d < 4; ++d)
+	const PathfindLayerEnum targetLayer = ascending ? LAYER_WALL : LAYER_GROUND;
+	const Bool isCrusher = obj && obj->getCrusherLevel() > 0;
+	const ICoord2D directions[] = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+	for (const auto& direction : directions)
 	{
-		const Int dx = dirs[d].x;
-		const Int dy = dirs[d].y;
-		const Int x1 = px + dx;
-		const Int y1 = py + dy;
-		if (x1 < m_extent.lo.x || x1 > m_extent.hi.x || y1 < m_extent.lo.y || y1 > m_extent.hi.y)
+		ICoord2D coord = {x + direction.x, y + direction.y};
+		PathfindCell* target = getCell(targetLayer, coord.x, coord.y);
+		if (!target || target->getLayer() != targetLayer || (isHuman && checkCellOutsideExtents(coord)))
 			continue;
 
-		if (parentLayer == LAYER_GROUND)
+		if (ascending)
 		{
-			if (m_map[x1][y1].getType() != PathfindCell::CELL_OBSTACLE &&
-				m_layers[LAYER_WALL].getCell(x1, y1) == nullptr)
+			if (target->getType() != PathfindCell::CELL_CLEAR || !m_map[coord.x][coord.y].isScalableObstacle())
 				continue;
-
-			for (Int step = 1; step <= maxProbeSteps; ++step)
-			{
-				ICoord2D coord = { px + dx * step, py + dy * step };
-				if (coord.x < m_extent.lo.x || coord.x > m_extent.hi.x ||
-					coord.y < m_extent.lo.y || coord.y > m_extent.hi.y)
-					break;
-				if (isHuman && checkCellOutsideExtents(coord))
-					break;
-
-				PathfindCell* wallCell = m_layers[LAYER_WALL].getCell(coord.x, coord.y);
-				if (wallCell && wallCell->getLayer() == LAYER_WALL && wallCell->getType() == PathfindCell::CELL_CLEAR)
-				{
-					if (!validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), wallCell, parentCell, obj))
-						break;
-					TCheckMovementInfo info;
-					info.cell = coord;
-					info.layer = LAYER_WALL;
-					info.centerInCell = centerInCell;
-					info.radius = radius;
-					info.considerTransient = FALSE;
-					info.acceptableSurfaces = locomotorSet.getValidSurfaces();
-					if (obj && (!checkForMovement(obj, info) || info.enemyFixed))
-						break;
-
-					const UnsignedInt newCostSoFar = parentCell->getCostSoFar() +
-						static_cast<UnsignedInt>(step + 1) * COST_ORTHOGONAL;
-					if (wallCell->hasInfo() && (wallCell->getOpen() || wallCell->getClosed()))
-					{
-						if (wallCell->getCostSoFar() <= newCostSoFar)
-							break;
-						if (wallCell->getClosed())
-							wallCell->removeFromClosedList(m_closedList);
-						if (wallCell->getOpen())
-							wallCell->removeFromOpenList(m_openList);
-					}
-					else if (!wallCell->allocateInfo(coord))
-					{
-						break;
-					}
-					wallCell->setBlockedByAlly(FALSE);
-					wallCell->setParentCell(parentCell);
-					wallCell->setCostSoFar(newCostSoFar);
-					const Int remaining = goalCell ? wallCell->costToGoal(goalCell) : 0;
-					wallCell->setTotalCost(newCostSoFar + remaining);
-					wallCell->putOnSortedOpenList(m_openList);
-					break;
-				}
-				if (!wallCell && m_map[coord.x][coord.y].getType() != PathfindCell::CELL_OBSTACLE)
-					break;
-			}
 		}
 		else
 		{
-			PathfindCell* adjWall = m_layers[LAYER_WALL].getCell(x1, y1);
-			if (adjWall && adjWall->getType() == PathfindCell::CELL_CLEAR)
+			const PathfindCell* top = m_layers[LAYER_WALL].getCell(coord.x, coord.y);
+			if (top && top->getType() == PathfindCell::CELL_CLEAR)
 				continue;
-
-			for (Int step = 1; step <= maxProbeSteps; ++step)
-			{
-				ICoord2D coord = { px + dx * step, py + dy * step };
-				if (coord.x < m_extent.lo.x || coord.x > m_extent.hi.x ||
-					coord.y < m_extent.lo.y || coord.y > m_extent.hi.y)
-					break;
-				if (isHuman && checkCellOutsideExtents(coord))
-					break;
-
-				PathfindCell* groundCell = &m_map[coord.x][coord.y];
-				if (groundCell->getType() == PathfindCell::CELL_CLEAR &&
-					validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), groundCell, parentCell, obj))
-				{
-					TCheckMovementInfo info;
-					info.cell = coord;
-					info.layer = LAYER_GROUND;
-					info.centerInCell = centerInCell;
-					info.radius = radius;
-					info.considerTransient = FALSE;
-					info.acceptableSurfaces = locomotorSet.getValidSurfaces();
-					if (obj && (!checkForMovement(obj, info) || info.enemyFixed))
-						break;
-
-					const UnsignedInt newCostSoFar = parentCell->getCostSoFar() +
-						static_cast<UnsignedInt>(step + 1) * COST_ORTHOGONAL;
-					if (groundCell->hasInfo() && (groundCell->getOpen() || groundCell->getClosed()))
-					{
-						if (groundCell->getCostSoFar() <= newCostSoFar)
-							break;
-						if (groundCell->getClosed())
-							groundCell->removeFromClosedList(m_closedList);
-						if (groundCell->getOpen())
-							groundCell->removeFromOpenList(m_openList);
-					}
-					else if (!groundCell->allocateInfo(coord))
-					{
-						break;
-					}
-					groundCell->setBlockedByAlly(FALSE);
-					groundCell->setParentCell(parentCell);
-					groundCell->setCostSoFar(newCostSoFar);
-					const Int remaining = goalCell ? groundCell->costToGoal(goalCell) : 0;
-					groundCell->setTotalCost(newCostSoFar + remaining);
-					groundCell->putOnSortedOpenList(m_openList);
-					break;
-				}
-				if (groundCell->getType() != PathfindCell::CELL_OBSTACLE &&
-					m_layers[LAYER_WALL].getCell(coord.x, coord.y) == nullptr)
-					break;
-			}
 		}
+
+		if (!validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), target, parentCell, obj))
+			continue;
+
+		TCheckMovementInfo info;
+		info.cell = coord;
+		info.layer = targetLayer;
+		info.centerInCell = centerInCell;
+		info.radius = radius;
+		info.considerTransient = FALSE;
+		info.acceptableSurfaces = locomotorSet.getValidSurfaces();
+		if (!checkForMovement(obj, info) || info.enemyFixed)
+			continue;
+
+		const UnsignedInt cost = parentCell->getCostSoFar() + COST_ORTHOGONAL;
+		if (target->hasInfo() && (target->getOpen() || target->getClosed()))
+		{
+			if (target->getCostSoFar() <= cost)
+				continue;
+			if (target->getClosed())
+				target->removeFromClosedList(m_closedList);
+			if (target->getOpen())
+				target->removeFromOpenList(m_openList);
+		}
+		else if (!target->allocateInfo(coord))
+		{
+			continue;
+		}
+
+		target->setBlockedByAlly(FALSE);
+		target->setParentCell(parentCell);
+		target->setCostSoFar(cost);
+		target->setTotalCost(cost + (goalCell ? target->costToGoal(goalCell) : 0));
+		target->putOnSortedOpenList(m_openList);
 	}
 }
 
@@ -2899,7 +2857,7 @@ bool Pathfinder::checkCellOutsideExtents(ICoord2D& cell) {
 struct ExamineCellsStruct
 {
 	Pathfinder					*thePathfinder;
-	const LocomotorSet	*theLoco;
+	LocomotorSurfaceTypeMask surfaces;
 	Bool								centerInCell;
 	Bool								isHuman;
 	Bool								isCrusher;
@@ -2915,7 +2873,7 @@ struct ExamineCellsStruct
 	if (from && to) {
 			if (from->getWallHeightBand() && to->getLayer() != LAYER_WALL)
 				return 1;
-			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), to, from, d->obj )) {
+			if (!d->thePathfinder->validMovementPosition(d->isCrusher, d->surfaces, to, from, d->obj)) {
 				return 1;
 			}
 			if ( (to->getLayer() == LAYER_GROUND) && !d->thePathfinder->m_zoneManager.isPassable(to_x, to_y) ) {
@@ -2939,7 +2897,7 @@ struct ExamineCellsStruct
 			info.centerInCell = d->centerInCell;
 			info.radius = d->radius;
 			info.considerTransient = false;
-			info.acceptableSurfaces = d->theLoco->getValidSurfaces();
+			info.acceptableSurfaces = d->surfaces;
 			if (!d->thePathfinder->checkForMovement(d->obj, info)) {
 				return 1; //abort.
 			}
@@ -3009,10 +2967,11 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			canPathThroughUnits = obj->getAIUpdateInterface()->canPathThroughUnits();
 		}
 		Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : false;
+		const LocomotorSurfaceTypeMask surfaces = routingSurfaces(locomotorSet, obj);
 		if (attackDistance==NO_ATTACK && !m_isTunneling && !locomotorSet.isDownhillOnly() && goalCell) {
 			ExamineCellsStruct info;
 			info.thePathfinder = this;
-			info.theLoco = &locomotorSet;
+			info.surfaces = surfaces;
 			info.centerInCell = centerInCell;
 			info.radius = radius;
 			info.obj = obj;
@@ -3102,7 +3061,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 					continue;
 			}
 
-			Bool movementValid = validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell, obj);
+			Bool movementValid = validMovementPosition(isCrusher, surfaces, newCell, parentCell, obj);
 			Bool dozerHack = false;
 			if (!movementValid && obj->isKindOf(KINDOF_DOZER) && newCell->getType() == PathfindCell::CELL_OBSTACLE) {
 				Object* obstacle = TheGameLogic->findObjectByID(newCell->getObstacleID());
@@ -3125,7 +3084,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			info.centerInCell = centerInCell;
 			info.radius = radius;
 			info.considerTransient = false;
-			info.acceptableSurfaces = locomotorSet.getValidSurfaces();
+			info.acceptableSurfaces = surfaces;
 			Int dx = newCellCoord.x-startCellNdx.x;
 			Int dy = newCellCoord.y-startCellNdx.y;
 			if (dx<0) dx = -dx;
@@ -3207,12 +3166,13 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				newCostSoFar += 100*COST_ORTHOGONAL;
 			}
 
-			if (newCell->getType()==PathfindCell::CELL_OBSTACLE && !isPassableGateCell(newCell, obj)) {
+			if (newCell->getType() == PathfindCell::CELL_OBSTACLE && !isPassableGateCell(newCell, obj) &&
+				!canTraverseScalableObstacle(newCell, surfaces, obj)) {
 				newCostSoFar += 100*COST_ORTHOGONAL;
 			}
 
 			if (m_isTunneling) {
-				if (!validMovementPosition( isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell, obj )) {
+				if (!validMovementPosition(isCrusher, surfaces, newCell, parentCell, obj)) {
 					newCostSoFar += 10*COST_ORTHOGONAL;
 				}
 			}
@@ -3247,7 +3207,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 													 const Coord3D *rawTo)
 {
-	if (!clientSafeQuickDoesPathExist(locomotorSet, from, rawTo) &&
+	if (!clientSafeQuickDoesPathExist(locomotorSet, from, rawTo, obj) &&
 		!GateOpenAndCloseBehavior::couldConnect(obj)) {
 		return nullptr;
 	}
@@ -3256,12 +3216,15 @@ Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const
 		isHuman = false; // computer gets to cheat.
 	}
 
-	m_zoneManager.clearPassableFlags();
-	Path *hPat = findHierarchicalPath(isHuman, locomotorSet, from, rawTo, false);
-	if (hPat) {
-		deleteInstance(hPat);
-	}	else {
+	if (locomotorSet.canScaleWalls(obj)) {
 		m_zoneManager.setAllPassable();
+	} else {
+		m_zoneManager.clearPassableFlags();
+		Path* hierarchicalPath = findHierarchicalPath(isHuman, locomotorSet, from, rawTo, false);
+		if (hierarchicalPath)
+			deleteInstance(hierarchicalPath);
+		else
+			m_zoneManager.setAllPassable();
 	}
 
 	Path *pat = internalFindPath(obj, locomotorSet, from, rawTo);
@@ -3362,14 +3325,17 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	// to ignore obstacle cells until it reaches a cell that is no longer
 	// classified as an obstacle.  At that point, the pathfind behaves normally.
 	//
-	m_isTunneling = parentCell->getType() == PathfindCell::CELL_OBSTACLE && !isPassableGateCell(parentCell, obj);
+	const LocomotorSurfaceTypeMask surfaces = routingSurfaces(locomotorSet, obj);
+	m_isTunneling = parentCell->getType() == PathfindCell::CELL_OBSTACLE && !isPassableGateCell(parentCell, obj) &&
+		!canTraverseScalableObstacle(parentCell, surfaces, obj);
 
 	Int zone1, zone2;
 	Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : false;
 	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), isCrusher, parentCell->getZone());
 	zone2 =  m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), isCrusher, goalCell->getZone());
 
-	if ( !locomotorSet.scalesWalls() && ((layer==LAYER_WALL && zone1 == 0) || (destinationLayer==LAYER_WALL && zone2 == 0)) ) {
+	const Bool canScale = locomotorSet.canScaleWalls(obj);
+	if (!canScale && ((layer == LAYER_WALL && zone1 == 0) || (destinationLayer == LAYER_WALL && zone2 == 0))) {
 #if RETAIL_COMPATIBLE_PATHFINDING
 		if (s_useFixedPathfinding)
 #endif
@@ -3391,7 +3357,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 
 	//DEBUG_LOG(("Zones %d to %d", zone1, zone2));
 
-	if ( zone1 != zone2 && !(locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused()) ) {
+	if (zone1 != zone2 && !canScale) {
 		//DEBUG_LOG(("Intense Debug Info - Pathfind Zone screen failed-cannot reach desired location."));
 		goalCell->releaseInfo();
 		parentCell->releaseInfo();
@@ -3407,7 +3373,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	}
 
 	// sanity check - if source is invalid, we have to cheat
-	if (!validMovementPosition( isCrusher, layer, locomotorSet, from ) && !isPassableGateCell(parentCell, obj))	{
+	if (!validMovementPosition(isCrusher, surfaces, parentCell, nullptr, obj)) {
 		// somehow we got to an impassable location.
 		m_isTunneling = true;
 	}
@@ -3465,7 +3431,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 
 			m_isTunneling = false;
 			// construct and return path
-			Path *path =  buildActualPath( obj, locomotorSet.getValidSurfaces(), from, goalCell, centerInCell, false );
+			Path* path = buildActualPath(obj, surfaces, from, goalCell, centerInCell, false);
 #if RETAIL_COMPATIBLE_PATHFINDING
 			if (!s_useFixedPathfinding)
 			{
@@ -4996,9 +4962,8 @@ Bool Pathfinder::findBrokenBridge(const LocomotorSet& locoSet,
  * False means it is impossible to path.
  * True means it is possible given the terrain, but there may be units in the way.
  */
-Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
-																const Coord3D *from,
-																const Coord3D *to )
+Bool Pathfinder::clientSafeQuickDoesPathExist(const LocomotorSet& locomotorSet,
+	const Coord3D* from, const Coord3D* to, const Object* obj)
 {
 	// See if terrain or building is blocking the destination.
 	PathfindLayerEnum destinationLayer = TheTerrainLogic->getLayerForDestination(to);
@@ -5013,7 +4978,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
 	if (goalCell->getType()==PathfindCell::CELL_CLIFF) {
 		return false; // No goals on cliffs.
 	}
-	Bool doingTerrainZone = false;
+	const Bool canScale = locomotorSet.canScaleWalls(obj);
+	Bool doingTerrainZone = canScale;
 	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, parentCell->getZone());
 
 	if (parentCell->getType() == PathfindCell::CELL_OBSTACLE) {
@@ -5040,7 +5006,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
 		zone2 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone2);
 		zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
 	}
-	if (zone1 == zone2 || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+	const Bool canUseWallLayer = obj ? canScale : locomotorSet.scalesWalls();
+	if (zone1 == zone2 || (canUseWallLayer && !m_layers[LAYER_WALL].isUnused() &&
 		(fromLayer == LAYER_WALL || destinationLayer == LAYER_WALL))) {
 		return true;
 	}
@@ -5055,9 +5022,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
  * False means it is impossible to path.
  * True means it is possible given the terrain, but there may be units in the way.
  */
-Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet,
-																const Coord3D *from,
-																const Coord3D *to )
+Bool Pathfinder::clientSafeQuickDoesPathExistForUI(const LocomotorSet& locomotorSet,
+	const Coord3D* from, const Coord3D* to, const Object* obj)
 {
 	// See if terrain or building is blocking the destination.
 	PathfindLayerEnum destinationLayer = TheTerrainLogic->getLayerForDestination(to);
@@ -5096,7 +5062,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		// It is better to return a false positive than a false negative. jba.
 		return true;
 	}
-	if (zone1 == zone2 || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+	const Bool canUseWallLayer = obj ? locomotorSet.canScaleWalls(obj) : locomotorSet.scalesWalls();
+	if (zone1 == zone2 || (canUseWallLayer && !m_layers[LAYER_WALL].isUnused() &&
 		(fromLayer == LAYER_WALL || destinationLayer == LAYER_WALL))) {
 		return true;
 	}
@@ -5120,8 +5087,8 @@ Bool Pathfinder::quickDoesPathExistToObject( const Object *obj, const Coord3D *f
 	PathfindCell *fromCell = getClippedCell(fromLayer, from);
 	PathfindCell *goalCell = getClippedCell(toLayer, &targetPos);
 	if (goalCell->getType() != PathfindCell::CELL_OBSTACLE)
-		return clientSafeQuickDoesPathExist(locomotorSet, from, &targetPos);
-	if (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused() &&
+		return clientSafeQuickDoesPathExist(locomotorSet, from, &targetPos, obj);
+	if (locomotorSet.canScaleWalls(obj) && !m_layers[LAYER_WALL].isUnused() &&
 		(fromLayer == LAYER_WALL || toLayer == LAYER_WALL))
 		return TRUE;
 	const Int startZone = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, fromCell->getZone());
@@ -5587,7 +5554,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	if (goalCell == nullptr)
 		return nullptr;
 
-	if (!locomotorSet.scalesWalls() && goalCell->getZone()==0 && destinationLayer==LAYER_WALL) {
+	if (!locomotorSet.canScaleWalls(obj) && goalCell->getZone() == 0 && destinationLayer == LAYER_WALL) {
 		return nullptr;
 	}
 
@@ -5624,7 +5591,8 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	if (parentCell == nullptr)
 		return nullptr;
 
-	if (validMovementPosition( isCrusher, locomotorSet.getValidSurfaces(), parentCell ) == false) {
+	const LocomotorSurfaceTypeMask surfaces = routingSurfaces(locomotorSet, obj);
+	if (!validMovementPosition(isCrusher, surfaces, parentCell, nullptr, obj)) {
 		m_isTunneling = true; // We can't move from our current location.  So relax the constraints.
 	}
 	TCheckMovementInfo info;
@@ -5639,7 +5607,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	}
 
 	Bool gotHierarchicalPath = false;
-	if (m_isTunneling || (locomotorSet.scalesWalls() && !m_layers[LAYER_WALL].isUnused())) {
+	if (m_isTunneling || locomotorSet.canScaleWalls(obj)) {
 		m_zoneManager.setAllPassable();
 	}	else {
 		m_zoneManager.clearPassableFlags();
@@ -5744,7 +5712,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 				debugShowSearch(true);
 			m_isTunneling = false;
 			// construct and return path
-			Path *path = buildActualPath( obj, locomotorSet.getValidSurfaces(), from, goalCell, centerInCell, blocked);
+			Path* path = buildActualPath(obj, surfaces, from, goalCell, centerInCell, blocked);
 #if RETAIL_COMPATIBLE_PATHFINDING
 			if (!s_useFixedPathfinding) {
 				parentCell->releaseInfo();
@@ -5836,7 +5804,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 		rawTo->x = closesetCell->getXIndex()*PATHFIND_CELL_SIZE_F + PATHFIND_CELL_SIZE_F/2.0f;
 		rawTo->y = closesetCell->getYIndex()*PATHFIND_CELL_SIZE_F + PATHFIND_CELL_SIZE_F/2.0f;
 		// construct and return path
-		Path *path = buildActualPath( obj, locomotorSet.getValidSurfaces(), from, closesetCell, centerInCell, blocked );
+		Path* path = buildActualPath(obj, surfaces, from, closesetCell, centerInCell, blocked);
 #if RETAIL_COMPATIBLE_PATHFINDING
 		if (!s_useFixedPathfinding) {
 			goalCell->releaseInfo();

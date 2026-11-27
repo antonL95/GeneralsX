@@ -1,0 +1,10 @@
+180 create Player_1 WallClimbPalisade 0 2195,2915,0
+180 create Player_1 WallClimbFortification 0 2325,2915,0
+180 create Player_1 WallClimbNoLayerUnit 0 2145,2915,0
+180 create Player_1 WallClimbLayerUnit 0 2265,2915,0
+208 move Player_1 WallClimbNoLayerUnit 0 - 2245 2915
+208 move Player_1 WallClimbLayerUnit 0 - 2385 2915
+194 scales-walls-sample Player_1 WallClimbPalisade 0
+194 scales-walls-sample Player_1 WallClimbFortification 0
+600 scales-walls-sample Player_1 WallClimbNoLayerUnit 0
+600 scales-walls-sample Player_1 WallClimbLayerUnit 0

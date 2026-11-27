@@ -114,5 +114,6 @@ public:
 	LocomotorSurfaceTypeMask getValidSurfaces() const { return m_validLocomotorSurfaces; }
 	Bool isDownhillOnly() const { return m_downhillOnly; };
 	Bool scalesWalls() const;
+	Bool canScaleWalls(const Object* obj) const;
 
 };

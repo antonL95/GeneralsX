@@ -20,6 +20,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindCellInfo.h"
@@ -978,6 +979,68 @@ Bool PathfindCell::isPassableGate(const Object* unit) const
 		return true;
 	const auto& others = sharedObstacles().find(this)->second;
 	return std::all_of(others.begin(), others.end(), [&canPass](const CellObstacle& entry) { return canPass(entry.id); });
+}
+
+Bool PathfindCell::isScalableObstacle() const
+{
+	if (getType() != CELL_OBSTACLE)
+		return false;
+
+	const auto isScalable = [](ObjectID id)
+	{
+		const Object* wall = TheGameLogic->findObjectByID(id);
+		return wall && wall->isKindOf(KINDOF_SCALEABLE_WALL);
+	};
+	if (!isScalable(getObstacleID()))
+		return false;
+	if (!m_hasSharedObstacles)
+		return true;
+	const auto& others = sharedObstacles().find(this)->second;
+	return std::all_of(others.begin(), others.end(), [&isScalable](const CellObstacle& entry) { return isScalable(entry.id); });
+}
+
+Bool PathfindCell::getScalableObstacleHeightAt(const Coord3D& position, Real& height) const
+{
+	if (!isScalableObstacle())
+		return false;
+
+	Bool found = false;
+	const auto sampleObstacle = [&](ObjectID id)
+	{
+		const Object* wall = TheGameLogic->findObjectByID(id);
+		const Coord3D& forward = *wall->getUnitDirectionVector2D();
+		const auto samplePart = [&](const GeometryInfo& shape, const Coord3D& center)
+		{
+			const Real dx = position.x - center.x;
+			const Real dy = position.y - center.y;
+			const Coord3D local = {dx * forward.x + dy * forward.y, dy * forward.x - dx * forward.y, 0.0f};
+			if (!shape.isPointInFootprint(Coord3D{}, local))
+				return;
+			const Real top = center.z + shape.getMaxHeightAbovePosition();
+			if (!found || top > height)
+				height = top;
+			found = true;
+		};
+
+		std::vector<GeometryUpgrade::CollisionPart> parts;
+		if (GeometryUpgrade::collectCollisionParts(*wall, parts, TRUE))
+		{
+			for (const auto& part : parts)
+				samplePart(*part.shape, part.position);
+		}
+		else
+		{
+			samplePart(wall->getGeometryInfo(), *wall->getPosition());
+		}
+	};
+
+	sampleObstacle(getObstacleID());
+	if (m_hasSharedObstacles)
+	{
+		for (const auto& obstacle : sharedObstacles().find(this)->second)
+			sampleObstacle(obstacle.id);
+	}
+	return found;
 }
 
 

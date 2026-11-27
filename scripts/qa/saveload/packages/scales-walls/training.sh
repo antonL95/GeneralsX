@@ -10,7 +10,7 @@ check() {
     if covers 244; then
         awk '
             $1 == "TEST" && $2 == "scales-walls" && $3 == "frame=244" && $4 == "name=ScalesWallsUnit" {
-                split($5, z, "="); if (z[2] + 0 > 65 && z[2] + 0 < 120) midclimb = 1
+                split($5, z, "="); if (z[2] + 0 > 65 && z[2] + 0 < 110) midclimb = 1
             }
             END { if (!midclimb) { print "Wall scaler was not mid-climb at save frame 244"; exit 1 } }
         ' "$log"

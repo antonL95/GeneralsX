@@ -319,6 +319,7 @@ public:
 	Bool usesFloatingZ() const { return m_template->m_behaviorZ == Z_FLOATING_Z; }
 	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
 	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
+	Bool canScaleWalls(const Object* obj) const;
 	Bool isScalingWall() const { return m_retailScalingWall; }
 	void setRetailWallScaleTarget(PathfindLayerEnum layer) { m_retailWallScaleTarget = layer; }
 	void stopScalingWall(Object* obj);

@@ -958,7 +958,7 @@ void Path::computePointOnPath(
 			out.layer = closeNext->getLayer();
 		}
 
-		const Bool scalesWalls = locomotorSet.scalesWalls();
+		const Bool scalesWalls = locomotorSet.canScaleWalls(obj);
 		const Bool isWallScaleSegment = scalesWalls &&
 			((closeNode->getLayer() == LAYER_GROUND && closeNext->getLayer() == LAYER_WALL) ||
 				(closeNode->getLayer() == LAYER_WALL && closeNext->getLayer() == LAYER_GROUND) ||

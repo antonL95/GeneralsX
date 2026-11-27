@@ -146,8 +146,8 @@ public:
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	virtual void loadPostProcess() override;
 
-	Bool clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain & buildings check - fast)
-	Bool clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain only - fast)
+	Bool clientSafeQuickDoesPathExist(const LocomotorSet& locomotorSet, const Coord3D* from, const Coord3D* to, const Object* obj = nullptr);
+	Bool clientSafeQuickDoesPathExistForUI(const LocomotorSet& locomotorSet, const Coord3D* from, const Coord3D* to, const Object* obj = nullptr);
 	Bool quickDoesPathExistToObject( const Object *obj, const Coord3D *from, const Object *target );
 	Bool slowDoesPathExist( Object *obj, const Coord3D *from,
 		const Coord3D *to, ObjectID ignoreObject=INVALID_ID );  ///< Can we build any path at all between the locations	(terrain, buildings & units check - slower)
@@ -276,6 +276,7 @@ public:
 	void dropUnsupportedWallOccupants(const Object& wall);
 	Real getWallHeight() {return m_wallHeight;}
 	Real getWallHeightAt(const Coord3D& position);
+	Bool getScalableWallHeightAt(const Coord3D& position, Real& height);
 	Bool isPointOnWall(const Coord3D *pos);
 
 	void updateLayer(Object *obj, PathfindLayerEnum layer); ///< Updates object's layer.

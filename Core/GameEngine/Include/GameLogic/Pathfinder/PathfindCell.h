@@ -83,6 +83,8 @@ public:
 	Bool isObstacleTransparent() const;
 	Bool isObstacleFence() const;
 	Bool isPassableGate(const Object* unit) const;
+	Bool isScalableObstacle() const;
+	Bool getScalableObstacleHeightAt(const Coord3D& position, Real& height) const;
 
 	/// Return estimated cost from given cell to reach goal cell
 	UnsignedInt costToGoal( PathfindCell *goal );
