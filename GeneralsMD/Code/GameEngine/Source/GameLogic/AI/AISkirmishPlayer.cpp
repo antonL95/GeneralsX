@@ -2982,7 +2982,7 @@ void AISkirmishPlayer::updateRetail()
 						}
 					}
 				}
-				if (score <= 0.0f)
+				if (!(score > 0.0f))
 					continue;
 				const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
 				const auto cash = money->countMoney();
