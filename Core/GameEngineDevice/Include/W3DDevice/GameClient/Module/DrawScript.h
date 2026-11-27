@@ -78,25 +78,6 @@ public:
 		return script;
 	}
 
-	static std::shared_ptr<const DrawScript> compileCallback(std::string_view source)
-	{
-		Parser parser(source);
-		std::shared_ptr<DrawScript> script(new DrawScript);
-		if (!parser.tokenize() || !parser.callback(script->m_parameters, script->m_body) || !parser.atEnd())
-			return nullptr;
-		return script;
-	}
-
-	void runCallback(Host& host, const Value& self, const Value& data) const
-	{
-		Environment arguments;
-		if (!m_parameters.empty())
-			arguments.emplace(m_parameters[0], self);
-		if (m_parameters.size() > 1)
-			arguments.insert_or_assign(m_parameters[1], data);
-		run(host, arguments);
-	}
-
 	Value run(Host& host, Environment& variables) const
 	{
 		Machine machine{host, variables, {}, false};
@@ -201,25 +182,6 @@ private:
 		}
 
 		bool atEnd() const { return peek().kind == Token::Kind::End; }
-
-		bool callback(std::vector<std::string>& parameters, std::vector<Statement>& statements)
-		{
-			if (!accept("function") || peek().kind != Token::Kind::Name || isReserved(peek().text))
-				return false;
-			take();
-			if (!accept("("))
-				return false;
-			if (!isWord(")"))
-			{
-				do
-				{
-					if (peek().kind != Token::Kind::Name || isReserved(peek().text))
-						return false;
-					parameters.push_back(take().text);
-				} while (accept(","));
-			}
-			return accept(")") && block(statements, 0) && accept("end");
-		}
 
 		bool block(std::vector<Statement>& statements, int depth)
 		{
@@ -584,5 +546,4 @@ private:
 	DrawScript() = default;
 
 	std::vector<Statement> m_body;
-	std::vector<std::string> m_parameters;
 };

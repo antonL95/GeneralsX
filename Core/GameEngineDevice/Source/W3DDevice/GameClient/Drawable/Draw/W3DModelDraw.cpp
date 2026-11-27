@@ -1393,6 +1393,9 @@ static void parseShowHideSubObject(INI* ini, void *instance, void *store, const 
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::showSubObject( const AsciiString& name, Bool show )
 {
+#if !RTS_GENERALS
+	std::erase_if(m_clientLuaSubObjects, [&name](const auto& entry) { return entry.subObjName.compareNoCase(name) == 0; });
+#endif
 	if( name.isNotEmpty() )
 	{
 		Bool found = false;
@@ -1441,8 +1444,19 @@ Bool W3DModelDraw::getTemporarySubObjectHidden(const AsciiString& name, Bool& hi
 	hidden = entry->hide;
 	return TRUE;
 }
-#endif
 
+void W3DModelDraw::setClientLuaSubObjectHidden(const AsciiString& name, Bool hidden)
+{
+	const auto found = std::find_if(m_clientLuaSubObjects.begin(), m_clientLuaSubObjects.end(),
+		[&name](const auto& entry) { return entry.subObjName.compareNoCase(name) == 0; });
+	if (found == m_clientLuaSubObjects.end())
+		m_clientLuaSubObjects.push_back({name, hidden});
+	else
+		found->hide = hidden;
+	if (m_renderObject)
+		setSubObjectHidden(name, hidden);
+}
+#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -2763,10 +2777,13 @@ void W3DModelDraw::startAnimationFX(Real frame)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::dispatchAnimationEvents()
 {
+	if (TheGameState && TheGameState->isInLoadGame())
+		return;
+
 	const auto* events = m_curState ? m_curState->m_animationLuaEvents : nullptr;
 	const Bool entered = events != m_lastAnimationLuaEvents;
 	m_lastAnimationLuaEvents = events;
-	if (!m_curState || (TheGameState && TheGameState->isInLoadGame()))
+	if (!m_curState)
 		return;
 
 	if (entered && events)
@@ -5467,6 +5484,8 @@ void W3DModelDraw::updateSubObjects()
 	}
 
 #if !RTS_GENERALS
+	for (const auto& entry : m_clientLuaSubObjects)
+		setSubObjectHidden(entry.subObjName, entry.hide);
 	applyRetailSubObjectFades();
 	const Object* object = getDrawable()->getObject();
 	if (!RetailFileLayers::enabled() || !object || !object->getBodyModule())

@@ -13,7 +13,9 @@
 #include "Common/RetailConditionMatch.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/ClientRandomValue.h"
+#if !RTS_GENERALS
 #include "GameClient/ClientLuaEvents.h"
+#endif
 #include "GameClient/Drawable.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/ParticleSys.h"

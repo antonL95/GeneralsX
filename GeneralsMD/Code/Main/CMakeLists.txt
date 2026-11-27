@@ -4,6 +4,8 @@ include(lua)
 find_package(EXPAT REQUIRED)
 target_link_libraries(z_generals PRIVATE EXPAT::EXPAT z_lua)
 target_sources(z_generals PRIVATE
+    ../GameEngine/Include/GameClient/ClientLuaEvents.h
+    ../GameEngine/Source/GameClient/ClientLuaEvents.cpp
     ../GameEngine/Include/GameLogic/LuaDispatchProbe.h
     ../GameEngine/Include/GameLogic/LuaEventTables.h
     ../GameEngine/Include/GameLogic/LuaLogicBindings.h

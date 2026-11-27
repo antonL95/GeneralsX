@@ -505,6 +505,7 @@ public:
 #if !RTS_GENERALS
 	void showSubObjectForCurrentModel(const AsciiString& name, Bool show) override;
 	Bool getTemporarySubObjectHidden(const AsciiString& name, Bool& hidden) const;
+	void setClientLuaSubObjectHidden(const AsciiString& name, Bool hidden) override;
 #endif
 	Bool getSubObjectHidden(const AsciiString& name, Bool& hidden) const
 	{
@@ -625,6 +626,7 @@ private:
 	std::vector<ModelConditionInfo::HideShowSubObjInfo>		m_subObjectVec;
 #if !RTS_GENERALS
 	std::vector<ModelConditionInfo::HideShowSubObjInfo> m_temporarySubObjects;
+	std::vector<ModelConditionInfo::HideShowSubObjInfo> m_clientLuaSubObjects;
 #endif
 	Bool													m_hideHeadlights;
 	Bool													m_hasHeadlights;								///< the model has a HEADLIGHT sub-object

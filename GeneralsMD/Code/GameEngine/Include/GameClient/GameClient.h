@@ -37,8 +37,11 @@
 #include "GameClient/Drawable.h"
 #include "Lib/RGBColor.h"
 
+#include <memory>
+
 // forward declarations
 class AsciiString;
+class ClientLuaEvents;
 class Display;
 class DisplayStringManager;
 class Drawable;
@@ -194,6 +197,8 @@ private:
 
 	ScriptWorldLight m_scriptWorldLight;
 
+	friend class ClientLuaEvents;
+	std::unique_ptr<ClientLuaEvents> m_clientLuaEvents;
 	Intro* m_intro;
 	UnsignedInt m_renderedObjectCount;													///< Keeps track of the number of rendered objects -- resets each frame.
 
