@@ -72,6 +72,8 @@ struct Video
 	AsciiString m_filename;																	///< should be filled with the filename on disk
 	AsciiString m_internalName;															///< should be our internal reference name
 	AsciiString m_commentForWB;
+	Real m_volume = -1.0f;
+	Bool m_isDefault = FALSE;
 };
 
 //===============================
@@ -262,6 +264,7 @@ class VideoPlayer : public VideoPlayerInterface
 {
 	protected:
 		VecVideo mVideosAvailableForPlay;
+		Real m_defaultVideoVolume = -1.0f;
 		VideoStream		*m_firstStream;
 		static const FieldParse m_videoFieldParseTable[];
 
@@ -292,6 +295,7 @@ class VideoPlayer : public VideoPlayerInterface
 		virtual Int getNumVideos() override;											///< Retrieve info about the number of videos currently listed
 		virtual const Video* getVideo( AsciiString movieTitle ) override;	///< Retrieve info about a movie based on internal name
 		virtual const Video* getVideo( Int index ) override;						///< Retrieve info about a movie based on index
+		Real getVideoVolume(const Video &video, Real fallback = 1.0f) const;
 		virtual const FieldParse *getFieldParse() const override { return m_videoFieldParseTable; }		///< Return the field parse info
 
 		virtual void notifyVideoPlayerOfNewProvider( Bool nowHasValid ) override { }

@@ -7,5 +7,6 @@ check() {
         expect "TEST ui-ini-fonts frame=$frame sacha=1 fixed=0 courier=0" || return 1
         expect "TEST ui-ini-button-border frame=$frame altered=1" || return 1
         expect "TEST ui-ini-post-load-sound frame=$frame active=1" || return 1
+        expect "TEST ui-ini-default-video frame=$frame playable=0 volume=0.80" || return 1
     done
 }

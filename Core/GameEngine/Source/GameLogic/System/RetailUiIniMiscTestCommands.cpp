@@ -11,6 +11,7 @@
 #include "GameClient/GameWindowTransitions.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/VideoPlayer.h"
 
 namespace
 {
@@ -61,6 +62,15 @@ void checkPostLoadSound(const RetailTestCommands::Context &ctx)
 	TheTransitionHandler->remove(name, TRUE);
 	std::fprintf(stderr, "TEST ui-ini-post-load-sound frame=%u active=%d\n", ctx.frame, active);
 }
+
+void checkVideoDefault(const RetailTestCommands::Context &ctx)
+{
+	const auto *player = dynamic_cast<const VideoPlayer *>(TheVideoPlayer);
+	const Video *clip = TheVideoPlayer->getVideo("AOTRLogo");
+	const Bool playable = TheVideoPlayer->getVideo("DefaultVideoData") != nullptr;
+	const Real volume = player && clip ? player->getVideoVolume(*clip) : -1.0f;
+	std::fprintf(stderr, "TEST ui-ini-default-video frame=%u playable=%d volume=%.2f\n", ctx.frame, playable, volume);
+}
 }
 #endif
 
@@ -75,6 +85,7 @@ void registerRetailUiIniMiscTestCommands()
 	registerAction("ui-ini-fonts-check", checkFontDefaults);
 	registerAction("ui-ini-border-check", checkAlteredBorder);
 	registerAction("ui-ini-post-load-sound-check", checkPostLoadSound);
+	registerAction("ui-ini-default-video-check", checkVideoDefault);
 #endif
 }
 }

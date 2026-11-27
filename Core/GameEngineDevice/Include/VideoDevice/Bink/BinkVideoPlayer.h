@@ -75,7 +75,8 @@ class BinkVideoStream : public VideoStream
 		HBINK					m_handle;														///< Bink streaming handle;
 		Char					*m_memFile;													///< Pointer to memory resident file
 
-		BinkVideoStream();																///< only BinkVideoPlayer can create these
+		BinkVideoStream();
+		Real m_authoredVolume = 1.0f;
 		virtual ~BinkVideoStream() override;
 
 	public:
@@ -131,7 +132,7 @@ class BinkVideoPlayer : public VideoPlayer
 
 	protected:
 
-		VideoStreamInterface* createStream( HBINK handle );
+		VideoStreamInterface* createStream(HBINK handle, Real authoredVolume);
 
 	private:
 

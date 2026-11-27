@@ -196,7 +196,7 @@ void	BinkVideoPlayer::regainFocus()
 // BinkVideoPlayer::createStream
 //============================================================================
 
-VideoStreamInterface* BinkVideoPlayer::createStream( HBINK handle )
+VideoStreamInterface* BinkVideoPlayer::createStream(HBINK handle, Real authoredVolume)
 {
 
 	if ( handle == nullptr )
@@ -210,13 +210,14 @@ VideoStreamInterface* BinkVideoPlayer::createStream( HBINK handle )
 	{
 
 		stream->m_handle = handle;
+		stream->m_authoredVolume = authoredVolume;
 		stream->m_next = m_firstStream;
 		stream->m_player = this;
 		m_firstStream = stream;
 
 		// TheSuperHackers @bugfix BinkWait must run first or Bink ignores the initial volume.
 		BinkWait( stream->m_handle );
-		Int volume = calculateMovieAudioVolume( TheAudio->getVolume(AudioAffect_Speech) );
+		Int volume = calculateMovieAudioVolume(TheAudio->getVolume(AudioAffect_Speech) * authoredVolume);
 		BinkSetVolume( stream->m_handle, 0, volume );
 	}
 
@@ -230,7 +231,7 @@ VideoStreamInterface* BinkVideoPlayer::createStream( HBINK handle )
 Int BinkVideoPlayer::calculateMovieAudioVolume( Real volume )
 {
 	// Never let volume go to 0, as Bink will interpret that as "play at full volume".
-	Int mod = (Int) ((volume * 0.8f) * 100) + 1;
+	Int mod = (Int)(volume * 100) + 1;
 	return (32768*mod)/100;
 }
 
@@ -241,10 +242,10 @@ Int BinkVideoPlayer::calculateMovieAudioVolume( Real volume )
 void BinkVideoPlayer::setVolume( Real volume )
 {
 	// Push the new volume to every open stream's audio output.
-	Int binkVolume = calculateMovieAudioVolume( volume );
 	for ( VideoStreamInterface* stream = firstStream(); stream != nullptr; stream = stream->next() )
 	{
-		BinkSetVolume( static_cast<BinkVideoStream*>( stream )->m_handle, 0, binkVolume );
+		auto *video = static_cast<BinkVideoStream *>(stream);
+		BinkSetVolume(video->m_handle, 0, calculateMovieAudioVolume(volume * video->m_authoredVolume));
 	}
 }
 
@@ -268,7 +269,7 @@ VideoStreamInterface*	BinkVideoPlayer::open( AsciiString movieTitle )
 			DEBUG_ASSERTLOG(!handle, ("opened bink file %s", filePath));
 			if (handle)
 			{
-				return createStream( handle );
+				return createStream(handle, getVideoVolume(*pVideo, 0.8f));
 			}
 		}
 
@@ -285,7 +286,7 @@ VideoStreamInterface*	BinkVideoPlayer::open( AsciiString movieTitle )
 		}
 
 		DEBUG_LOG(("BinkVideoPlayer::createStream() - About to create stream"));
-		stream = createStream( handle );
+		stream = createStream(handle, getVideoVolume(*pVideo, 0.8f));
 	}
 
 	return stream;
@@ -524,7 +525,7 @@ void BinkVideoPlayer::regainFocus(void)
 	fprintf(stderr, "INFO: BinkVideoPlayer::regainFocus() - Linux stub\n");
 }
 
-VideoStreamInterface* BinkVideoPlayer::createStream(HBINK handle)
+VideoStreamInterface* BinkVideoPlayer::createStream(HBINK handle, Real)
 {
 	fprintf(stderr, "WARNING: BinkVideoPlayer::createStream() - Bink codec not available on Linux\n");
 	return nullptr;

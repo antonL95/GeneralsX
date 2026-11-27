@@ -69,7 +69,8 @@ class FFmpegVideoStream : public VideoStream
 		UnsignedInt64	m_startTime = 0;		///< Time the stream started
 		UnsignedByte *	m_audioBuffer = nullptr;///< Audio buffer for the stream
 
-		FFmpegVideoStream(FFmpegFile* file);																///< only BinkVideoPlayer can create these
+		FFmpegVideoStream(FFmpegFile* file, Real authoredVolume);
+		Real m_authoredVolume;
 		virtual ~FFmpegVideoStream();
 
 		static void onFrame(AVFrame *frame, int stream_idx, int stream_type, void *user_data);
@@ -103,7 +104,7 @@ class FFmpegVideoPlayer : public VideoPlayer
 
 	protected:
 
-		VideoStreamInterface* createStream( File* file );
+		VideoStreamInterface* createStream(File* file, Real authoredVolume);
 
 	public:
 

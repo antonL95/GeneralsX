@@ -185,7 +185,7 @@ void	FFmpegVideoPlayer::regainFocus()
 // FFmpegVideoPlayer::createStream
 //============================================================================
 
-VideoStreamInterface* FFmpegVideoPlayer::createStream( File* file )
+VideoStreamInterface* FFmpegVideoPlayer::createStream(File* file, Real authoredVolume)
 {
 
 	if ( file == nullptr )
@@ -200,7 +200,7 @@ VideoStreamInterface* FFmpegVideoPlayer::createStream( File* file )
 		return nullptr;
 	}
 
-	FFmpegVideoStream *stream = NEW FFmpegVideoStream(ffmpegHandle);
+	FFmpegVideoStream *stream = NEW FFmpegVideoStream(ffmpegHandle, authoredVolume);
 
 	if ( stream )
 	{
@@ -244,14 +244,14 @@ VideoStreamInterface*	FFmpegVideoPlayer::open( AsciiString movieTitle )
 		if (TheGlobalData->m_modDir.isNotEmpty())
 		{
 			path.format("%sData\\Movies\\%s.%s", TheGlobalData->m_modDir.str(), name, extension);
-			if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+			if (auto* stream = createStream(TheFileSystem->openFile(path.str()), getVideoVolume(*pVideo)))
 				return stream;
 		}
 		path.format("Data\\%s\\Movies\\%s.%s", language.str(), name, extension);
-		if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+		if (auto* stream = createStream(TheFileSystem->openFile(path.str()), getVideoVolume(*pVideo)))
 			return stream;
 		path.format("Data\\Movies\\%s.%s", name, extension);
-		if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+		if (auto* stream = createStream(TheFileSystem->openFile(path.str()), getVideoVolume(*pVideo)))
 			return stream;
 	}
 
@@ -285,7 +285,11 @@ void FFmpegVideoPlayer::setVolume(Real volume)
 {
 #ifdef SAGE_USE_MINIAUDIO
 	if (m_firstStream && TheAudio)
-		static_cast<MiniAudioStream *>(TheAudio->getHandleForBink())->setVolume(volume);
+	{
+		auto *audio = static_cast<MiniAudioStream *>(TheAudio->getHandleForBink());
+		if (audio)
+			audio->setVolume(volume * static_cast<FFmpegVideoStream *>(m_firstStream)->m_authoredVolume);
+	}
 #endif
 }
 
@@ -308,8 +312,8 @@ void FFmpegVideoPlayer::initializeBinkWithMiles()
 // FFmpegVideoStream::FFmpegVideoStream
 //============================================================================
 
-FFmpegVideoStream::FFmpegVideoStream(FFmpegFile* file)
-: m_ffmpegFile(file)
+FFmpegVideoStream::FFmpegVideoStream(FFmpegFile* file, Real authoredVolume)
+: m_ffmpegFile(file), m_authoredVolume(authoredVolume)
 {
 	m_videoStreamIndex = file->getVideoStreamIndex();
 	m_alphaStreamIndex = file->getAlphaStreamIndex();
@@ -331,13 +335,13 @@ FFmpegVideoStream::FFmpegVideoStream(FFmpegFile* file)
 		m_good = m_ffmpegFile->decodePacket();
 
 #ifdef SAGE_USE_MINIAUDIO
-	audioStream->setVolume(TheAudio->getMoviePlaybackVolume());
+	audioStream->setVolume(TheAudio->getMoviePlaybackVolume() * m_authoredVolume);
 	audioStream->play();
 #elif defined(SAGE_USE_OPENAL)
 	// Start audio playback
 	// GeneralsX @bugfix fbraz3 23/04/2026 Ensure video stream starts with audible gain even after prior source reuse.
 	// Issue: https://github.com/fbraz3/GeneralsX/issues/38
-	audioStream->setVolume(1.0f);
+	audioStream->setVolume(m_authoredVolume);
 	audioStream->play();
 #endif
 

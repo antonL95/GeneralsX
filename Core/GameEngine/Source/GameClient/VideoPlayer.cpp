@@ -311,6 +311,12 @@ void VideoPlayer::remove( VideoStream *stream_to_remove )
 //============================================================================
 void VideoPlayer::addVideo( Video* videoToAdd )
 {
+	if (videoToAdd->m_isDefault)
+	{
+		m_defaultVideoVolume = videoToAdd->m_volume;
+		removeVideo(videoToAdd);
+		return;
+	}
 	for (VecVideoIt it = mVideosAvailableForPlay.begin(); it != mVideosAvailableForPlay.end(); ++it) {
 		if (it->m_internalName == videoToAdd->m_internalName) {
 			(*it) = (*videoToAdd);
@@ -506,6 +512,14 @@ const FieldParse VideoPlayer::m_videoFieldParseTable[] =
 {
 	{ "Filename",								INI::parseAsciiString,							nullptr, offsetof( Video, m_filename) },
 	{ "Comment",								INI::parseAsciiString,							nullptr, offsetof( Video, m_commentForWB) },
+	{ "Volume", INI::parsePercentToReal, nullptr, offsetof(Video, m_volume) },
+	{ "IsDefault", INI::parseBool, nullptr, offsetof(Video, m_isDefault) },
 	{ nullptr,											nullptr,																nullptr, 0 },
 };
+
+Real VideoPlayer::getVideoVolume(const Video &video, Real fallback) const
+{
+	const Real configured = video.m_volume >= 0.0f ? video.m_volume : m_defaultVideoVolume;
+	return configured >= 0.0f ? std::min(configured, 1.0f) : fallback;
+}
 
