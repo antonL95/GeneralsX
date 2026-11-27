@@ -1,4 +1,4 @@
 440 create Player_1 ArnorFarmerMaggot 0 1400,700,0
 520 builderscriptmove Player_1 ArnorFarmerMaggot 0 - 1700 700
-649 steering-path Player_1 ArnorFarmerMaggot 0
-650 destroy Player_1 ArnorFarmerMaggot 0
+690 steering-path Player_1 ArnorFarmerMaggot 0
+691 destroy Player_1 ArnorFarmerMaggot 0

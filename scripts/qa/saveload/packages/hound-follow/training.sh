@@ -1,21 +1,21 @@
 prepare() {
-    seq 441 649 | awk -v end="$end" '$1 <= end {
+    seq 441 690 | awk -v end="$end" '$1 <= end {
         print $1, "maggot-dogs-trace Player_1 ArnorFarmerMaggot 0"
     }'
 }
 
 check() {
-    if ! covers 649; then
+    if ! covers 690; then
         return 0
     fi
     awk '
-        $1 == "TEST" && $2 == "steering" && $3 == 649 && $4 == "ArnorFarmerMaggot" {
+        $1 == "TEST" && $2 == "steering" && $3 == 690 && $4 == "ArnorFarmerMaggot" {
             split($5, p, "[=,]")
             mx = p[2]
             my = p[3]
         }
         $1 == "TEST" && $2 == "maggot-dog" && $3 == 519 { startX[$5] = $6 }
-        $1 == "TEST" && $2 == "maggot-dog" && $3 == 649 { endX[$5] = $6; endY[$5] = $7 }
+        $1 == "TEST" && $2 == "maggot-dog" && $3 == 690 { endX[$5] = $6; endY[$5] = $7 }
         END {
             if (mx < 1550)
                 exit 1
