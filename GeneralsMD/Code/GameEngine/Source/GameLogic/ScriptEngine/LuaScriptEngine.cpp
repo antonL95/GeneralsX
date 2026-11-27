@@ -330,7 +330,10 @@ bool LogicLua::triggerModelEvent(Object& object, std::string_view name)
 		object.clearAndSetModelConditionFlags(original, inactive);
 	}
 	if (!object.isDestroyed() && !object.isEffectivelyDead())
-		object.clearAndSetModelConditionFlags(object.getLogicModelConditions(), active);
+	{
+		const auto current = object.getLogicModelConditions();
+		object.clearAndSetModelConditionFlags(current, active);
+	}
 	return true;
 }
 

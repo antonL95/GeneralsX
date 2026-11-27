@@ -5,6 +5,7 @@
 #include "Common/File.h"
 #include "Common/FileSystem.h"
 #include "Common/Player.h"
+#include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -14,6 +15,7 @@
 #include "GameLogic/LuaEventTables.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "../../../../GameEngineDevice/Include/W3DDevice/GameClient/Module/W3DModelDraw.h"
 
@@ -68,11 +70,14 @@ Templates templatesByEventList(const LuaEventTables& tables)
 	Templates result;
 	for (const ThingTemplate* type = TheThingFactory->firstTemplate(); type; type = type->friend_getNextTemplate())
 	{
+		if (type->isKindOf(KINDOF_DRAWABLE_ONLY))
+			continue;
 		const auto& modules = type->getBehaviorModuleInfo();
 		std::string_view list;
 		for (size_t index = 0; index < modules.getCount(); ++index)
 		{
-			if (const auto* data = dynamic_cast<const AIUpdateModuleData*>(modules.getNthData(index)))
+			if (const auto* data = dynamic_cast<const AIUpdateModuleData*>(modules.getNthData(index));
+				data && data->m_luaEventsList.isNotEmpty())
 			{
 				list = data->m_luaEventsList.str();
 				break;
@@ -163,7 +168,13 @@ bool pairedVisibility(const Object& object, const char* first, const char* secon
 	return false;
 }
 
-const char* checkEffect(const Object& object, std::string_view handler)
+const SpecialPowerModuleInterface* getLibraryPower(const Object& object)
+{
+	const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityLibraryDisabled");
+	return power ? object.getSpecialPowerModule(power) : nullptr;
+}
+
+const char* checkEffect(Object& object, std::string_view handler, bool powerWasReady)
 {
 	bool verified;
 	if (handler == "OnFaramirCreated")
@@ -173,6 +184,27 @@ const char* checkEffect(const Object& object, std::string_view handler)
 		verified = hasUpgrade(object, "Upgrade_MountedBodyGuard") && !hasUpgrade(object, "Upgrade_DismountedBodyGuard");
 	else if (handler == "TDArcherTowerUpgrade01")
 		verified = hasUpgrade(object, "Upgrade_ElvenSilverthornArrows");
+	else if (handler == "OnNecromancerGetTheRing")
+		verified = hasUpgrade(object, "Upgrade_NecromancerRingHero");
+	else if (handler == "OnRetreat")
+		verified = hasUpgrade(object, "Upgrade_AIRetreatON") && !hasUpgrade(object, "Upgrade_AIRetreatOFF");
+	else if (handler == "OnLibraryIdle" || handler == "OnTwinsDeathEggCreated")
+	{
+		const auto* power = getLibraryPower(object);
+		verified = power && (handler == "OnLibraryIdle" ? powerWasReady && !power->isReady() :
+			power->getPercentReady() < 1.0f);
+	}
+	else if (handler == "DragonStrikeDragonCreated")
+	{
+		verified = false;
+		if (auto* ai = object.getAIUpdateInterface())
+		{
+			ai->aiIdle(CMD_FROM_SCRIPT);
+			const bool acceptedScript = ai->getLastCommandSource() == CMD_FROM_SCRIPT;
+			ai->aiIdle(CMD_FROM_PLAYER);
+			verified = acceptedScript && ai->getLastCommandSource() == CMD_FROM_SCRIPT;
+		}
+	}
 	else
 		return "";
 	return verified ? "effect verified" : "effect missing";
@@ -192,7 +224,14 @@ ProbeResult probe(const RetailTestCommands::Context& ctx, const ThingTemplate* t
 		result.reason = "no loaded template uses this list";
 		return result;
 	}
+	if (type->isKindOf(KINDOF_DRAWABLE_ONLY))
+	{
+		result.reason = "template can only instantiate a drawable";
+		return result;
+	}
 	Object* object = nullptr;
+	const bool checkEffects = std::string_view(ctx.argument) != "sweep";
+	bool powerWasReady = false;
 	std::map<ObjectID, ProbeResult> observed;
 	observeLuaDispatch([&](const LuaDispatchResult& call)
 	{
@@ -209,14 +248,20 @@ ProbeResult probe(const RetailTestCommands::Context& ctx, const ThingTemplate* t
 			return;
 		const Coord3D point = ctx.groundLocation();
 		object->setPosition(&point);
+		if (checkEffects && handler == "OnMountedBodyguard")
+			if (const auto* upgrade = TheUpgradeCenter->findUpgrade("Upgrade_DismountedBodyGuard"))
+				object->giveUpgrade(upgrade);
+		if (checkEffects && handler == "OnLibraryIdle")
+			if (const auto* power = getLibraryPower(*object))
+				powerWasReady = power->isReady();
 		fireEvent(*object, event, result);
 	});
 	if (!object)
 		return result;
 	if (const auto hit = observed.find(object->getID()); hit != observed.end())
 		result = std::move(hit->second);
-	if (std::string_view(result.status) == "ran" && !object->isDestroyed())
-		result.effect = checkEffect(*object, handler);
+	if (checkEffects && std::string_view(result.status) == "ran" && !object->isDestroyed())
+		result.effect = checkEffect(*object, handler, powerWasReady);
 	if (!object->isDestroyed())
 		TheGameLogic->destroyObject(object);
 	return result;
@@ -276,6 +321,15 @@ void runBulk(const RetailTestCommands::Context& ctx)
 	if (sweep && first <= index && index < first + batchSize)
 		std::fprintf(stderr, "TEST lua bulk sweep pairs=%zu\n", index);
 }
+
+void logModelCondition(const RetailTestCommands::Context& ctx)
+{
+	const Object* object = ctx.requireObject(true);
+	const Int flag = ModelConditionFlags::getSingleBitFromName(ctx.argument);
+	if (object && flag >= 0)
+		std::fprintf(stderr, "TEST lua bulk condition frame=%u player=%.*s set=%d\n", ctx.frame,
+			static_cast<int>(ctx.playerName.size()), ctx.playerName.data(), object->getLogicModelConditions().test(flag));
+}
 }
 #endif
 
@@ -285,6 +339,7 @@ void registerRetailLuaBulkTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("lua-bulk", runBulk);
+	registerAction("lua-bulk-model-condition", logModelCondition);
 #endif
 }
 }
