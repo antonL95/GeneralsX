@@ -209,4 +209,18 @@
 386 destroy Player_1 AiPowers3FearTarget 1
 386 destroy Player_1 AiPowers3FearTarget 2
 386 destroy Player_1 AiPowers3FearBanner 0
+400 create Player_2 AiPowers3FreezeCaster 0 2800,1410,0
+400 create Player_2 AiPowers3FreezeCaster 1 2870,2390,0
+401 create Player_1 AiPowers3FreezeEnemy 0 2825,1410,0
+401 create Player_1 AiPowers3FreezeEnemy 1 2900,2390,0
+401 create Player_2 AiPowers3FreezeAlly 0 2900,2430,0
+660 powers-fire-state Player_2 AiPowers3FreezeCaster 1 AiPowers3Freeze
+660 powers-fire-state Player_2 AiPowers3FreezeMarker 0
+660 health Player_2 AiPowers3FreezeMarker 0
+661 destroy Player_2 AiPowers3FreezeMarker 0
+661 destroy Player_2 AiPowers3FreezeCaster 1
+661 destroy Player_2 AiPowers3FreezeCaster 0
+661 destroy Player_2 AiPowers3FreezeAlly 0
+661 destroy Player_1 AiPowers3FreezeEnemy 1
+661 destroy Player_1 AiPowers3FreezeEnemy 0
 1436 destroy Player_1 AiPowers2DominateFootman 0

@@ -574,6 +574,115 @@ std::optional<Coord3D> findSummonLocation(const Object& source, const CommandBut
 	return std::nullopt;
 }
 
+Bool teamHasActivePower(const Object& source, const SpecialPowerTemplate& power)
+{
+	for (const Object* member = TheGameLogic->getFirstObject(); member; member = member->getNextObject())
+	{
+		if (member == &source || member->getTeam() != source.getTeam() || member->isEffectivelyDead())
+			continue;
+		for (BehaviorModule** part = member->getBehaviorModules(); *part; ++part)
+		{
+			const auto* update = (*part)->getSpecialPowerUpdateInterface();
+			if (update && update->isSpecialAbility() && update->isActive() &&
+				static_cast<const SpecialAbilityUpdate*>(update)->getAuthoredAbilityData()->m_specialPowerTemplate == &power)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+std::optional<Coord3D> selectBattleFreezeLocation(const Object& source, Real range)
+{
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return std::nullopt;
+
+	constexpr Int sectorsPerAxis = 3;
+	const Real sectorWidth = WWMath::Floor(range * (2.0f / sectorsPerAxis));
+	if (sectorWidth < 1.0f)
+		return std::nullopt;
+	const Coord3D& center = *source.getPosition();
+	const Coord3D origin{center.x - range, center.y - range, center.z};
+	struct Sector
+	{
+		Int64 alliedCost = 0;
+		Int64 enemyCost = 0;
+	};
+	std::array<Sector, sectorsPerAxis * sectorsPerAxis> sectors{};
+	Int64 alliedCost = 0;
+	Int64 enemyCost = 0;
+	Real alliedHealth = 0.0f;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&center, range, FROM_CENTER_2D,
+		nullptr, ITER_SORTED_BY_ID);
+	MemoryPoolObjectHolder hold(nearby);
+	for (const Object* object = nearby->first(); object; object = nearby->next())
+	{
+		if (object->isEffectivelyDead() || object->isKindOf(KINDOF_STRUCTURE) || object->isKindOf(KINDOF_IGNORES_SELECT_ALL) ||
+			!(object->isKindOf(KINDOF_CAN_ATTACK) || object->isKindOf(KINDOF_HERO)))
+			continue;
+
+		const Relationship relationship = source.getRelationship(object);
+		if (relationship == NEUTRAL)
+			continue;
+
+		const Coord3D delta = *object->getPosition() - origin;
+		constexpr Real lastSector = static_cast<Real>(sectorsPerAxis - 1);
+		const Int x = static_cast<Int>(std::clamp(delta.x / sectorWidth, 0.0f, lastSector));
+		const Int y = static_cast<Int>(std::clamp(delta.y / sectorWidth, 0.0f, lastSector));
+		Sector& sector = sectors[x * sectorsPerAxis + y];
+		const Int cost = object->getTemplate()->friend_getBuildCost();
+		const Int aggregateCost = object->isKindOf(KINDOF_SUPPORT) ? cost / 2 : cost;
+		if (relationship == ALLIES)
+		{
+			sector.alliedCost += cost;
+			alliedCost += aggregateCost;
+			alliedHealth += bodyHealthFraction(*object);
+		}
+		else
+		{
+			sector.enemyCost += cost;
+			enemyCost += aggregateCost;
+		}
+	}
+
+	if (enemyCost <= 0 || (enemyCost <= alliedCost * 2 && !combatVictim(source)))
+		return std::nullopt;
+
+	Int bestSector = sectors.size() / 2;
+	Int64 bestAdvantage = 0;
+	for (Int i = 0; i < static_cast<Int>(sectors.size()); ++i)
+	{
+		const Int64 advantage = sectors[i].enemyCost - sectors[i].alliedCost;
+		if (advantage > bestAdvantage)
+		{
+			bestSector = i;
+			bestAdvantage = advantage;
+		}
+	}
+
+	if (sectors[bestSector].enemyCost < sectors[bestSector].alliedCost * 2)
+	{
+		constexpr Real alliedHealthLimit = 0.65f;
+		if (alliedHealth >= alliedHealthLimit)
+			return std::nullopt;
+
+		Int64 highestCost = 0;
+		bestSector = sectors.size() / 2;
+		for (Int i = 0; i < static_cast<Int>(sectors.size()); ++i)
+		{
+			const Int64 totalCost = sectors[i].enemyCost + sectors[i].alliedCost;
+			if (totalCost > highestCost)
+			{
+				bestSector = i;
+				highestCost = totalCost;
+			}
+		}
+	}
+
+	return Coord3D{origin.x + (bestSector / sectorsPerAxis) * range,
+		origin.y + (bestSector % sectorsPerAxis) * range, origin.z};
+}
+
 std::optional<Coord3D> selectClusterLocation(const Object& source, const Player& player, const CommandButton& button,
 	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data, Real range, Int minimumTargets,
 	const PowerClusterFilter& filter)
@@ -790,7 +899,7 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
 	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
-		policy == "AI_SPECIAL_POWER_ELENDIL")
+		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -904,6 +1013,21 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 			!rollRetailPolicyActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPower(power, options);
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_SOUL_FREEZE")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f || teamHasActivePower(*source, *power))
+			return retailPolicyPoll;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		const auto target = selectBattleFreezeLocation(*source, range);
+		if (!target)
+			return retailPolicyPoll;
+		const auto location = findSummonLocation(*source, *button, *power, *data, *target);
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
 		return retailPolicyCooldown;
 	}
 

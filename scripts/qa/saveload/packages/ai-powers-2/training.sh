@@ -24,6 +24,15 @@ check() {
         expect_heal_health 385 AiPowers3FearCaster 0 850.00 || return 1
         expect_heal_health 385 AiPowers3FearCaster 1 550.00 || return 1
     fi
+    if covers 660; then
+        expect 'TEST powers-fire-state frame=660 template=AiPowers3FreezeCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=660 template=AiPowers3FreezeMarker alive=1' || return 1
+        if ! grep -F 'TEST health 660 Player_2 AiPowers3FreezeMarker 0 ' "$log" | grep -Fq ' pos=2860.0,1410.0'; then
+            printf 'Expected the freeze cast at the enemy sector sample\n' >&2
+            grep -F 'TEST health 660 Player_2 AiPowers3FreezeMarker 0 ' "$log" >&2 || true
+            return 1
+        fi
+    fi
     if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2Healer ' "$log" | awk '
         /cond=.*UNPACKING/ { pending++ }
         END { exit (pending != 2) }
