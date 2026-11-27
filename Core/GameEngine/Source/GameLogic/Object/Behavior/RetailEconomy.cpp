@@ -8,7 +8,6 @@
 #include "Common/Xfer.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/GameLogic.h"
-#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailEconomyRules.h"
@@ -44,19 +43,6 @@ PillageModule::~PillageModule() = default;
 
 void PillageModule::onDamageDealt(const Object& source, const Object& victim)
 {
-	if (victim.isKindOf(KINDOF_STRUCTURE) && source.getRelationship(&victim) == ENEMIES)
-	{
-		Player* player = source.getControllingPlayer();
-		const Real bonus = AttributeModifiers::value(&source, AttributeModifierRules::DAMAGE_STRUCTURE_BOUNTY_ADD);
-		if (player && bonus >= 1.0f)
-		{
-			const Int payout = bonus >= static_cast<Real>(INT_MAX) ? INT_MAX : static_cast<Int>(bonus);
-			player->getMoney()->deposit(payout, FALSE);
-			player->getScoreKeeper()->addMoneyEarned(payout);
-			RetailWorldUI::showPayout(source, payout, FALSE);
-		}
-	}
-
 	static const NameKeyType key = NAMEKEY("PillageModule");
 	for (BehaviorModule** module = source.getBehaviorModules(); *module; ++module)
 		if ((*module)->getModuleNameKey() == key)
