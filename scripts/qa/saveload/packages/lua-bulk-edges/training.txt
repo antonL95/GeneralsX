@@ -1,0 +1,13 @@
+8 create Player_1 LuaBulkEdgePorter 0 3250,500,0
+9 lua-bulk-model-condition Player_1 LuaBulkEdgePorter 0 ACTIVELY_CONSTRUCTING
+20 construct Player_1 LuaBulkEdgePorter 0 GuldurSlaveMill 3350 500
+220 lua-bulk-model-condition Player_1 LuaBulkEdgePorter 0 ACTIVELY_CONSTRUCTING
+220 bcaravan-census Player_1 GuldurSlaveMill 0
+245 lua-bulk-model-condition Player_1 LuaBulkEdgePorter 0 ACTIVELY_CONSTRUCTING
+900 bcaravan-census Player_1 LuaBulkEdgePorter 0
+900 bcaravan-census Player_1 GuldurSlaveMill 0
+920 create PlyrCreeps LuaBulkEdgeFaramir 0 3310,2900,0
+920 lua-bulk-model-condition PlyrCreeps LuaBulkEdgeFaramir 0 REALLYDAMAGED
+920 checkobjupgrade PlyrCreeps LuaBulkEdgeFaramir 0 Upgrade_AIRetreatON
+921 lua-bulk-reenter-model PlyrCreeps LuaBulkEdgeFaramir 0 ReallyDamaged
+921 checkobjupgrade PlyrCreeps LuaBulkEdgeFaramir 0 Upgrade_AIRetreatON

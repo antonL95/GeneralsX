@@ -123,3 +123,4 @@
 3 lua-events-2
 3 lua-bulk
 3 lua-bulk-effects
+3 lua-bulk-edges

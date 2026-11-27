@@ -96,6 +96,12 @@ struct EventList
 	std::vector<const ModelEvent*> modelEvents;
 };
 
+struct Registration
+{
+	const EventList* list;
+	LuaScriptEngine::ModelEventState modelEvents;
+};
+
 struct PushArgument
 {
 	lua_State* state;
@@ -137,7 +143,8 @@ public:
 	bool load(Xfer& crc) override;
 	void reset() override;
 	void clearObjects() override { m_objects.clear(); }
-	void registerObject(Object& object) override;
+	void registerObject(Object& object, ModelEventState state) override;
+	void finishObjectCreation(const Object& object) override;
 	void onDestroyed(Object& object) override;
 	bool dispatch(Object& object, std::string_view event, Argument second, Argument third) override;
 	bool dispatchScripted(Object& object, std::string_view event, Argument second, Argument third) override;
@@ -147,8 +154,8 @@ public:
 	bool triggerModelEvent(Object& object, std::string_view name);
 
 private:
-	const EventList* registeredList(const Object& object) const;
-	const EventList* getList(const Object& object) const;
+	const Registration* registeredObject(const Object& object) const;
+	const Registration* getRegistration(const Object& object) const;
 	bool invoke(Object& object, const EventList& list, std::string_view event, Argument second, Argument third);
 
 	std::string m_source;
@@ -156,7 +163,7 @@ private:
 	std::map<std::string, EventList, std::less<>> m_lists;
 	std::vector<ModelEvent> m_modelEvents;
 	std::set<std::string, std::less<>> m_scriptedEvents;
-	std::map<ObjectID, const EventList*> m_objects;
+	std::map<ObjectID, Registration> m_objects;
 	const LuaDispatchObserver* m_observer = nullptr;
 };
 
@@ -230,7 +237,7 @@ void LogicLua::reset()
 		bindLogicLua(*m_state);
 }
 
-void LogicLua::registerObject(Object& object)
+void LogicLua::registerObject(Object& object, ModelEventState state)
 {
 	const auto* ai = object.getAIUpdateInterface();
 	auto list = ai ? m_lists.find(ai->getRetailLuaEventList().str()) : m_lists.end();
@@ -238,31 +245,39 @@ void LogicLua::registerObject(Object& object)
 	if (forced && list == m_lists.end())
 		list = m_lists.find("BaseScriptFunctions");
 	if (list != m_lists.end() || forced)
-		m_objects.emplace(object.getID(), list != m_lists.end() ? &list->second : nullptr);
+		m_objects.emplace(object.getID(), Registration{list != m_lists.end() ? &list->second : nullptr, state});
 }
 
-const EventList* LogicLua::registeredList(const Object& object) const
+void LogicLua::finishObjectCreation(const Object& object)
 {
 	const auto registered = m_objects.find(object.getID());
-	return registered != m_objects.end() ? registered->second : nullptr;
+	if (registered != m_objects.end())
+		registered->second.modelEvents = ModelEventState::Transitions;
 }
 
-const EventList* LogicLua::getList(const Object& object) const
+const Registration* LogicLua::registeredObject(const Object& object) const
+{
+	const auto registered = m_objects.find(object.getID());
+	return registered != m_objects.end() ? &registered->second : nullptr;
+}
+
+const Registration* LogicLua::getRegistration(const Object& object) const
 {
 	if (!m_state || object.isDestroyed() || (TheGameState && TheGameState->isInLoadGame()))
 		return nullptr;
-	return registeredList(object);
+	return registeredObject(object);
 }
 
 bool LogicLua::dispatch(Object& object, std::string_view event, Argument second, Argument third)
 {
-	const EventList* list = getList(object);
-	return list && invoke(object, *list, event, second, third);
+	const auto* registration = getRegistration(object);
+	return registration && registration->list && invoke(object, *registration->list, event, second, third);
 }
 
 void LogicLua::onDestroyed(Object& object)
 {
-	const EventList* list = getList(object);
+	const auto* registration = getRegistration(object);
+	const EventList* list = registration ? registration->list : nullptr;
 	m_objects.erase(object.getID());
 	if (list)
 		invoke(object, *list, "OnDestroyed", {}, {});
@@ -347,10 +362,10 @@ void LogicLua::modelConditionsChanged(Object& object, const ModelConditionFlags&
 	const ModelConditionFlags current = object.getLogicModelConditions();
 	if (previous == current)
 		return;
-	const EventList* list = getList(object);
-	if (!list || object.isEffectivelyDead())
+	const auto* registration = getRegistration(object);
+	if (!registration || !registration->list || registration->modelEvents != ModelEventState::Transitions || object.isEffectivelyDead())
 		return;
-	for (const ModelEvent* event : list->modelEvents)
+	for (const ModelEvent* event : registration->list->modelEvents)
 	{
 		if (!event->matches(previous) && event->matches(current))
 			dispatch(object, event->name, {}, {});
@@ -401,7 +416,8 @@ void LogicLua::restoreHordeConditions()
 					object->setModelConditionState(static_cast<ModelConditionFlagType>(condition));
 				previous.set(condition, FALSE);
 			}
-		const EventList* list = registeredList(*object);
+		const auto* registration = registeredObject(*object);
+		const EventList* list = registration ? registration->list : nullptr;
 		if (!canRestoreUpgrades || !list)
 			continue;
 		const ModelConditionFlags current = object->getLogicModelConditions();

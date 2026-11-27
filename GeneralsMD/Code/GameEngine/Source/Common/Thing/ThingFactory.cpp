@@ -375,12 +375,14 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 			obj->getExperienceTracker()->setVeterancyLevel(controller->getProductionVeterancyLevel(obj->getTemplate()->getName()));
 		}
 		if (lua)
-			lua->registerObject(*obj);
+			lua->registerObject(*obj, LuaScriptEngine::ModelEventState::InitialConditions);
 		ExperienceLevelStore::onObjectCreated(obj);
 		TheGameLogic->applyRetailWeatherModifier(*obj);
 		if (lua)
 			lua->dispatch(*obj, "OnCreated");
 		CreateAHeroSystem::applyToHero(obj);
+		if (lua)
+			lua->finishObjectCreation(*obj);
 	}
 
 	return obj;
