@@ -85,4 +85,18 @@ check() {
             fi
         done
     fi
+    if covers 580; then
+        expect 'TEST powers-fire-state frame=580 template=AiPowers2TrainCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=580 template=AiPowers2FrenzyCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=580 template=AiPowers2TrainMarker alive=1' || return 1
+        expect 'TEST powers-fire-state frame=580 template=AiPowers2FrenzyMarker alive=1' || return 1
+        if ! grep -F 'TEST health 580 Player_2 AiPowers2TrainMarker 0 ' "$log" | grep -Fq ' pos=2842.4,1362.4'; then
+            printf 'Expected archer training on the allied archer sample\n' >&2
+            return 1
+        fi
+        if ! grep -F 'TEST health 580 Player_2 AiPowers2FrenzyMarker 0 ' "$log" | grep -Fq ' pos=3202.4,1492.4'; then
+            printf 'Expected battle frenzy on the allied sample during combat\n' >&2
+            return 1
+        fi
+    fi
 }

@@ -459,8 +459,15 @@ std::array<Coord3D, 4> diagonalPowerLocations(const Object& source, Real radius)
 	}};
 }
 
-Int countVisiblePowerEnemies(const Object& source, const Player& player, const Coord3D& center, Real radius,
-	Bool includeHordeMembers)
+struct PowerClusterFilter
+{
+	Relationship relationship;
+	std::optional<KindOfType> requiredKind;
+	Bool includeHordeMembers = FALSE;
+};
+
+Int countPowerTargets(const Object& source, const Player& player, const Coord3D& center, Real radius,
+	const PowerClusterFilter& filter)
 {
 	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&center, radius, FROM_CENTER_2D);
 	MemoryPoolObjectHolder hold(nearby);
@@ -468,9 +475,16 @@ Int countVisiblePowerEnemies(const Object& source, const Player& player, const C
 	for (const Object* object = nearby->first(); object; object = nearby->next())
 	{
 		const Object* container = object->getContainedBy();
-		if (source.getRelationship(object) != ENEMIES || object->isEffectivelyDead() ||
-			(container && (!includeHordeMembers || !container->isKindOf(KINDOF_HORDE))) || object->isKindOf(KINDOF_INERT) ||
-			(object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED)))
+		if (source.getRelationship(object) != filter.relationship || object->isEffectivelyDead() ||
+			(container && (!filter.includeHordeMembers || !container->isKindOf(KINDOF_HORDE))) || object->isKindOf(KINDOF_INERT) ||
+			(filter.requiredKind && !object->isKindOf(*filter.requiredKind)))
+			continue;
+		if (filter.relationship == ALLIES)
+		{
+			++count;
+			continue;
+		}
+		if (object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))
 			continue;
 		const auto shroud = object->getShroudedStatus(player.getPlayerIndex());
 		if (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR)
@@ -501,7 +515,7 @@ std::optional<Coord3D> selectWizardBlastLocation(const Object& source, const Pla
 	std::optional<Coord3D> best;
 	for (const Coord3D& location : diagonalPowerLocations(source, radius))
 	{
-		const Int count = countVisiblePowerEnemies(source, player, location, radius, TRUE);
+		const Int count = countPowerTargets(source, player, location, radius, {ENEMIES, std::nullopt, TRUE});
 		if (count > bestCount)
 		{
 			bestCount = count;
@@ -536,19 +550,17 @@ std::optional<Coord3D> findSummonLocation(const Object& source, const CommandBut
 	return std::nullopt;
 }
 
-std::optional<Coord3D> selectSummonLocation(const Object& source, const Player& player, const CommandButton& button,
-	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data, Real defaultRange)
+std::optional<Coord3D> selectClusterLocation(const Object& source, const Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data, Real range, Int minimumTargets,
+	const PowerClusterFilter& filter)
 {
-	const Real configuredRange = specialPowerSearchRange(source, power, data.m_specialPowerRange);
-	const Real range = configuredRange > 0.0f ? configuredRange : defaultRange;
-	if (!std::isfinite(range))
+	if (!(range >= 0.0f) || !std::isfinite(range))
 		return std::nullopt;
-	constexpr Int minimumEnemies = 2;
-	Int bestCount = minimumEnemies - 1;
+	Int bestCount = minimumTargets - 1;
 	std::optional<Coord3D> best;
 	for (const Coord3D& location : diagonalPowerLocations(source, range))
 	{
-		const Int count = countVisiblePowerEnemies(source, player, location, range, FALSE);
+		const Int count = countPowerTargets(source, player, location, range, filter);
 		if (count > bestCount)
 		{
 			if (const auto validLocation = findSummonLocation(source, button, power, data, location))
@@ -860,15 +872,27 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 
 	const Bool wizardBlast = policy == "AI_SPECIAL_POWER_GANDALF_WIZARD_BLAST";
 	const Bool callOfTheDeep = policy == "AI_SPECIAL_POWER_GOBLINKING_CALLOFTHEDEEP";
-	if (wizardBlast || callOfTheDeep || targetAreaSummon)
+	const Bool trainArchers = policy == "AI_SPECIAL_POWER_LEGOLAS_TRAINARCHERS";
+	const Bool battleFrenzy = policy == "AI_SPECIAL_POWER_GOBLINKING_BATTLEFRENZY";
+	if (wizardBlast || callOfTheDeep || targetAreaSummon || trainArchers || battleFrenzy)
 	{
-		if (!combatVictim(*source) || GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+		const Bool hasVictim = combatVictim(*source) != nullptr;
+		if ((trainArchers ? hasVictim : !hasVictim) || GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
 			return retailPolicyPoll;
 		constexpr Real defaultSummonRange = 149.0f;
-		constexpr Real callOfTheDeepRange = 200.0f;
+		constexpr Real defaultGroupRange = 200.0f;
+		const Real defaultRange = targetAreaSummon ? defaultSummonRange : defaultGroupRange;
+		const Real configuredRange = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		const Real range = trainArchers ? data->m_specialPowerRadius
+			: (configuredRange > 0.0f ? configuredRange : defaultRange);
+		const PowerClusterFilter filter{
+			trainArchers || battleFrenzy ? ALLIES : ENEMIES,
+			trainArchers ? std::optional<KindOfType>(KINDOF_ARCHER) : std::nullopt,
+			trainArchers
+		};
 		const auto location = wizardBlast
 			? selectWizardBlastLocation(*source, *player, *button, *power, data->m_specialPowerRadius)
-			: selectSummonLocation(*source, *player, *button, *power, *data, callOfTheDeep ? callOfTheDeepRange : defaultSummonRange);
+			: selectClusterLocation(*source, *player, *button, *power, *data, range, trainArchers ? 1 : 2, filter);
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());

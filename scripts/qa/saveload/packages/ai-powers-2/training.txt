@@ -84,6 +84,37 @@
 421 destroy Player_1 AiPowers2ClusterTarget 2
 421 destroy Player_1 AiPowers2ClusterTarget 1
 421 destroy Player_1 AiPowers2ClusterTarget 0
+450 create Player_2 AiPowers2TrainCaster 0 2800,1320,0
+450 create Player_2 AiPowers2TrainCaster 1 2800,1550,0
+450 create Player_2 AiPowers2FrenzyCaster 0 3160,1450,0
+450 create Player_2 AiPowers2FrenzyCaster 1 3160,1250,0
+451 create Player_2 AiPowers2TrainArcher 0 2840,1360,0
+451 create Player_2 AiPowers2BuffTarget 0 2840,1590,0
+451 create Player_2 AiPowers2BuffTarget 1 3200,1490,0
+451 create Player_2 AiPowers2BuffTarget 2 3190,1495,0
+451 create Player_2 AiPowers2BuffTarget 3 3200,1290,0
+451 create Player_2 AiPowers2BuffTarget 4 3190,1295,0
+451 create Player_1 AiPowers2ClusterTarget 0 3200,1440,0
+452 attack Player_2 AiPowers2FrenzyCaster 0 Player_1:AiPowers2ClusterTarget:0
+580 powers-fire-state Player_2 AiPowers2TrainCaster 1 AiPowers2TrainPower
+580 powers-fire-state Player_2 AiPowers2FrenzyCaster 1 AiPowers2FrenzyPower
+580 powers-fire-state Player_2 AiPowers2TrainMarker 0
+580 powers-fire-state Player_2 AiPowers2FrenzyMarker 0
+580 health Player_2 AiPowers2TrainMarker 0
+580 health Player_2 AiPowers2FrenzyMarker 0
+581 destroy Player_2 AiPowers2TrainCaster 1
+581 destroy Player_2 AiPowers2TrainCaster 0
+581 destroy Player_2 AiPowers2FrenzyCaster 1
+581 destroy Player_2 AiPowers2FrenzyCaster 0
+581 destroy Player_2 AiPowers2TrainMarker 0
+581 destroy Player_2 AiPowers2FrenzyMarker 0
+581 destroy Player_2 AiPowers2TrainArcher 0
+581 destroy Player_2 AiPowers2BuffTarget 4
+581 destroy Player_2 AiPowers2BuffTarget 3
+581 destroy Player_2 AiPowers2BuffTarget 2
+581 destroy Player_2 AiPowers2BuffTarget 1
+581 destroy Player_2 AiPowers2BuffTarget 0
+581 destroy Player_1 AiPowers2ClusterTarget 0
 690 create Player_2 AiPowers2DeepCaster 0 2800,1380,0
 690 create Player_2 AiPowers2DeepCaster 1 2800,1640,0
 691 create Player_1 AiPowers2ClusterTarget 0 2850,1430,0
