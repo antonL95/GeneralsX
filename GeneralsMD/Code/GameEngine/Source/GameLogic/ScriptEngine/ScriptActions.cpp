@@ -7461,6 +7461,23 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				retailTeleportObjectWithMembers(unit, *waypoint->getLocation());
 			return;
 		}
+		case ScriptAction::TEAM_TELEPORT_TO_WAYPOINT:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(1)->getString());
+			if (!team || !waypoint)
+				return;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				Object* unit = member.cur();
+				const Object* container = unit->getContainedBy();
+				if (container && container->getTeam() == team && HordeContain::get(container) &&
+					!container->isEffectivelyDead() && !container->isDestroyed())
+					continue;
+				retailTeleportObjectWithMembers(unit, *waypoint->getLocation());
+			}
+			return;
+		}
 		case ScriptAction::TEAM_ATTACK_MOVE_FOLLOW_WAYPOINTS:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());

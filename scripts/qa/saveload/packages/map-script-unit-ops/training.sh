@@ -1,4 +1,9 @@
 check() {
+    for frame in 242 246; do
+        if covers "$frame"; then
+            expect "TEST map-unit-ops team teleport frame=$frame moved=1 missing=1"
+        fi
+    done
     if covers 248; then
         expect "TEST map-unit-ops guard from frame=248 area=1 matched=1 fallback=1"
     fi

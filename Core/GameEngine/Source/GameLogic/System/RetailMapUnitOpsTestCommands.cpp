@@ -588,6 +588,55 @@ void teleportProbe(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST map-unit-ops teleport frame=%u moved=%d missing=%d\n", ctx.frame, moved, missing);
 }
 
+void teamTeleportProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* first = ctx.requireObject();
+	Object* second = ctx.findTarget();
+	if (!first || !second)
+		return;
+	const Coord3D firstOrigin = *first->getPosition();
+	const Coord3D secondOrigin = *second->getPosition();
+	const char* waypoint = "SpawnPoint_SkirmishGollum_3";
+	const auto at = [](const Object* unit, const Coord3D& point) {
+		return unit->getPosition()->x == point.x && unit->getPosition()->y == point.y;
+	};
+	const Waypoint* destination = TheTerrainLogic->getWaypointByName(waypoint);
+	Bool moved = FALSE;
+	Bool missing = FALSE;
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(503);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	if (definition && destination && definition->m_internalName == "TEAM_TELEPORT_TO_WAYPOINT" &&
+		definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::TEAM &&
+		definition->getParameterType(1) == Parameter::WAYPOINT)
+	{
+		Team* firstTeam = first->getTeam();
+		Team* secondTeam = second->getTeam();
+		Team* team = newInstance(Team)(const_cast<TeamPrototype*>(firstTeam->getPrototype()), TEAM_ID_INVALID);
+		first->setTemporaryTeam(team);
+		second->setTemporaryTeam(team);
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString("<This Team>");
+		action->getParameter(1)->friend_setString("MapUnitOpsMissingWaypoint");
+		TheScriptEngine->friend_executeAction(action, team);
+		missing = at(first, firstOrigin) && at(second, secondOrigin);
+		action->getParameter(0)->friend_setString("MapUnitOpsMissingTeam");
+		action->getParameter(1)->friend_setString(waypoint);
+		TheScriptEngine->friend_executeAction(action, team);
+		missing = missing && at(first, firstOrigin) && at(second, secondOrigin);
+		if (ctx.frame == 242)
+		{
+			action->getParameter(0)->friend_setString("<This Team>");
+			TheScriptEngine->friend_executeAction(action, team);
+		}
+		moved = at(first, *destination->getLocation()) && at(second, *destination->getLocation());
+		deleteInstance(action);
+		first->setTemporaryTeam(firstTeam);
+		second->setTemporaryTeam(secondTeam);
+		deleteInstance(team);
+	}
+	std::fprintf(stderr, "TEST map-unit-ops team teleport frame=%u moved=%d missing=%d\n", ctx.frame, moved, missing);
+}
+
 void probe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -613,6 +662,7 @@ void registerRetailMapUnitOpsTestCommands()
 #if RTS_ZEROHOUR
 	registerAction("map-unit-ops-attack", probe);
 	registerAction("map-unit-ops-teleport", teleportProbe);
+	registerAction("map-unit-ops-team-teleport", teamTeleportProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);
 	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
