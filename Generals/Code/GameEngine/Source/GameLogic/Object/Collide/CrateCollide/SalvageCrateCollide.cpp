@@ -38,8 +38,6 @@
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
-#include "Common/PlayerTemplate.h"
-#include "Common/ThingFactory.h"
 #include "Common/Upgrade.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -47,8 +45,6 @@
 #include "GameClient/InGameUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
-#include "GameLogic/PartitionManager.h"
-#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 
 #include <algorithm>
@@ -133,70 +129,26 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 {
 	const auto* data = getSalvageCrateCollideModuleData();
 	Player* player = other->getControllingPlayer();
-	Object* anchor = HordeContain::get(other) ? other : HordeContain::getAnchor(other);
 	Int money = 0;
 	Int levels = 0;
-	Int banner = 0;
 	const char* reward = nullptr;
 
-	if (data->m_bannerChance > 0.0f && anchor && HordeContain::canAddCrateBanner(anchor) &&
-		(data->m_bannerChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_bannerChance) &&
-		HordeContain::addCrateBanner(anchor))
+	if (GameLogicRandomValueReal(0.0f, 1.0f) < data->m_levelUpChance)
 	{
-		banner = 1;
-		reward = "banner";
-	}
-	else if (data->m_levelUpChance > 0.0f &&
-		(data->m_levelUpChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_levelUpChance))
-	{
-		std::vector<ObjectID> units{anchor ? anchor->getID() : other->getID()};
-		if (data->m_levelUpRadius > 0.0f)
-		{
-			PartitionFilterSamePlayer filter(player);
-			PartitionFilter* filters[] = { &filter, nullptr };
-			ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other->getPosition(),
-				data->m_levelUpRadius, FROM_CENTER_2D, filters, ITER_FASTEST);
-			MemoryPoolObjectHolder hold(iter);
-			for (Object* unit = iter->first(); unit; unit = iter->next())
-			{
-				if (unit->isEffectivelyDead() || unit->isKindOf(KINDOF_STRUCTURE))
-					continue;
-				Object* horde = HordeContain::getAnchor(unit);
-				units.push_back(horde ? horde->getID() : unit->getID());
-			}
-		}
-		std::sort(units.begin(), units.end());
-		units.erase(std::unique(units.begin(), units.end()), units.end());
-		for (ObjectID id : units)
-		{
-			Object* unit = TheGameLogic->findObjectByID(id);
-			if (unit && !unit->isEffectivelyDead() && unit->getControllingPlayer() == player)
-			{
-				if (ExperienceTracker* tracker = unit->getExperienceTracker())
-					levels += tracker->gainRetailLevels(1);
-			}
-		}
+		if (ExperienceTracker* tracker = other->getExperienceTracker())
+			levels = tracker->gainRetailLevels(1);
 		reward = "experience";
 	}
 	else if (data->m_pickupUpgrade.isNotEmpty())
 	{
 		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_pickupUpgrade);
-		if (upgrade)
+		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
 		{
-			if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
-			{
-				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
-				reward = "upgrade";
-			}
-			else if (Object* recipient = anchor ? anchor : other)
-			{
-				recipient->giveUpgrade(upgrade);
-				reward = "upgrade";
-			}
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+			reward = "upgrade";
 		}
 	}
-	else if (data->m_resourceChance > 0.0f &&
-		(data->m_resourceChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_resourceChance))
+	else
 	{
 		const Int low = std::min(data->m_minResource, data->m_maxResource);
 		const Int high = std::max(data->m_minResource, data->m_maxResource);
@@ -206,9 +158,9 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 	}
 
 	if (std::getenv("GENERALSX_TEST_COMMANDS"))
-		fprintf(stderr, "TEST crate frame=%u crate=%s id=%u collector=%s id=%u reward=%s resources=%d levels=%d banner=%d\n",
+		fprintf(stderr, "TEST crate frame=%u crate=%s id=%u collector=%s id=%u reward=%s resources=%d levels=%d banner=0\n",
 			TheGameLogic->getFrame(), getObject()->getTemplate()->getName().str(), static_cast<unsigned>(getObject()->getID()),
-			other->getTemplate()->getName().str(), static_cast<unsigned>(other->getID()), reward ? reward : "none", money, levels, banner);
+			other->getTemplate()->getName().str(), static_cast<unsigned>(other->getID()), reward ? reward : "none", money, levels);
 	return TRUE;
 }
 

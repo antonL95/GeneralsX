@@ -7,6 +7,6 @@ check() {
     fi
     if covers 125; then
         grep -E '^TEST crate frame=[0-9]+ crate=FollowupTreasureControl .*reward=resources resources=100 levels=0 banner=0$' "$log" &&
-        grep -E '^TEST crate frame=[0-9]+ crate=FollowupTreasureZero .*reward=none resources=0 levels=0 banner=0$' "$log"
+        grep -E '^TEST crate frame=[0-9]+ crate=FollowupTreasureZero .*reward=resources resources=100 levels=0 banner=0$' "$log"
     fi
 }

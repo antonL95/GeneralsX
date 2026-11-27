@@ -140,8 +140,6 @@ public:
 	Object* findAttackTarget(const Object* attacker, AbleToAttackType attackType, CommandSourceType source,
 		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
 	Object* findNearestLivingMember(const Coord3D& fromPos) const;
-	static Bool canAddCrateBanner(const Object* anchor);
-	static Bool addCrateBanner(Object* anchor);
 	void onRankAdvanced(Int rank, Bool feedback = FALSE);
 	Bool isBannerCarrier(const Object* member) const;
 	struct FormationGoal

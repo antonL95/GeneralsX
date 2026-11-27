@@ -1,0 +1,11 @@
+67 create Player_1 GondorFighterHorde 0 1430,1000,0
+78 create PlyrCreeps SalvageParityBanner 0 1490,1000,0
+81 move Player_1 GondorFighterHorde 0 at 1560 1000
+197 destroy Player_1 GondorFighterHorde 0
+220 create Player_1 GondorFaramir 0 1430,1000,0
+220 create Player_1 GondorBoromir 0 1460,1110,0
+220 create PlyrCreeps SalvageParityResources 0 1460,1000,0
+220 create PlyrCreeps SalvageParityExperience 0 1500,1000,0
+220 create PlyrCreeps SalvageParityPlayer 0 1540,1000,0
+220 create PlyrCreeps SalvageParityObject 0 1580,1000,0
+222 move Player_1 GondorFaramir 0 at 1600 1000
