@@ -41,12 +41,15 @@ enum PlayingAudioType
 	PAT_INVALID
 };
 
+class AudioLoopSource;
+
 struct PlayingAudio
 {
 	ma_sound* m_sound;
 	ma_audio_buffer* m_audioBuffer;
 	ma_sound_group* m_dryGroup = nullptr;
 	std::unique_ptr<ma_splitter_node> m_reverbSends;
+	AudioLoopSource* m_loopSource = nullptr;
 	PlayingAudioType m_type;
 	RefCountPtr<DynamicAudioEventRTS> m_audioEventRTS;
 	Bool m_requestStop;
@@ -59,6 +62,7 @@ struct PlayingAudio
 	Int m_completedLoops;
 	ma_uint64 m_lastCursor;
 	UnsignedInt m_virtualLastFrame;
+	UnsignedInt m_virtualSampleRemainder = 0;
 	Real m_virtualDurationMs;
 	Real m_virtualElapsedMs;
 
@@ -203,6 +207,7 @@ protected:
 	void processRequest(AudioRequest *req);
 
 	void playAudioEvent(AudioRequest *req);
+	void traceLoopSegments(AudioEventRTS& event, AudioLoopSource& loop) const;
 	void stopAudioEvent(AudioHandle handle);
 	void pauseAudioEvent(AudioHandle handle);
 

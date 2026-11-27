@@ -1,0 +1,5 @@
+10 audio-loop-trace - - 0 virtual
+12 create Player_1 AudioControlRandom 0 2520,1010,0
+12 create Player_1 AudioControlSequential 0 2540,1010,0
+13 reveal Player_1 AudioControlRandom 0
+16 audio-loop-music - - 0 AudioControlFiniteSound

@@ -42,6 +42,7 @@
 
 #include "Common/AudioAffect.h"
 #include "Common/AudioHandleSpecialValues.h"
+#include "Common/AudioRandomValue.h"
 #include "Common/AudioRequest.h"
 #include "Common/AudioSettings.h"
 #include "Common/AsciiString.h"
@@ -68,7 +69,9 @@
 #include "Common/file.h"
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
 
+#include <atomic>
 #include <cmath>
+#include <random>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -101,6 +104,225 @@ static ObjectID audioOwnerObject(AudioEventRTS *event)
 	}
 	return INVALID_ID;
 }
+
+namespace
+{
+struct AudioPcm
+{
+	std::vector<uint8_t> bytes;
+	ma_format format = ma_format_unknown;
+	ma_uint32 rate = 0;
+	ma_uint32 channels = 0;
+
+	ma_uint32 frameBytes() const { return ma_get_bytes_per_frame(format, channels); }
+	ma_uint64 frames() const { return bytes.size() / frameBytes(); }
+};
+
+Bool decodeAudioPcm(const AsciiString& filename, AudioPcm& pcm)
+{
+	File* file = TheFileSystem->openFile(filename.str());
+	if (!file)
+		return FALSE;
+
+	FFmpegFile decoder;
+	if (!decoder.open(file))
+		return FALSE;
+
+	decoder.setFrameCallback([&](AVFrame* frame, int, int streamType, void*) {
+		if (streamType != AVMEDIA_TYPE_AUDIO)
+			return;
+
+		const auto format = static_cast<AVSampleFormat>(frame->format);
+		switch (av_get_packed_sample_fmt(format))
+		{
+			case AV_SAMPLE_FMT_U8: pcm.format = ma_format_u8; break;
+			case AV_SAMPLE_FMT_S16: pcm.format = ma_format_s16; break;
+			case AV_SAMPLE_FMT_S32: pcm.format = ma_format_s32; break;
+			case AV_SAMPLE_FMT_FLT: pcm.format = ma_format_f32; break;
+			default: return;
+		}
+		pcm.rate = frame->sample_rate;
+		pcm.channels = frame->ch_layout.nb_channels;
+		const int frameSize = av_samples_get_buffer_size(nullptr, pcm.channels, frame->nb_samples, format, 1);
+		if (frameSize <= 0)
+			return;
+
+		if (av_sample_fmt_is_planar(format))
+		{
+			const int sampleBytes = av_get_bytes_per_sample(format);
+			for (int sample = 0; sample < frame->nb_samples; ++sample)
+				for (ma_uint32 channel = 0; channel < pcm.channels; ++channel)
+				{
+					const uint8_t* start = frame->extended_data[channel] + sample * sampleBytes;
+					pcm.bytes.insert(pcm.bytes.end(), start, start + sampleBytes);
+				}
+		}
+		else
+			pcm.bytes.insert(pcm.bytes.end(), frame->data[0], frame->data[0] + frameSize);
+	});
+	while (decoder.decodePacket()) {}
+	return pcm.rate > 0 && pcm.channels > 0 && pcm.channels <= MA_MAX_CHANNELS &&
+		!pcm.bytes.empty() && pcm.bytes.size() % pcm.frameBytes() == 0;
+}
+}
+
+class AudioLoopSource : public ma_data_source_base
+{
+public:
+	struct Segment
+	{
+		PortionToPlay portion;
+		ma_uint64 offset;
+		ma_uint64 frames;
+	};
+
+	AudioLoopSource(const AudioPcm& first, Bool sequential, Int count, Int initialIndex, Bool record)
+		: m_format(first.format), m_rate(first.rate), m_channels(first.channels),
+		  m_frameBytes(first.frameBytes()), m_sequential(sequential), m_remaining(count),
+		  m_index(initialIndex), m_record(record),
+		  m_rng(sequential ? std::minstd_rand::default_seed :
+			  static_cast<unsigned int>(GameAudioRandomValue(1, std::minstd_rand::max() - 1)))
+	{
+		static const ma_data_source_vtable callbacks = {read, nullptr, getFormat, nullptr, nullptr, nullptr, 0};
+		ma_data_source_config config = ma_data_source_config_init();
+		config.vtable = &callbacks;
+		ma_data_source_init(&config, this);
+	}
+
+	~AudioLoopSource() { ma_data_source_uninit(this); }
+
+	Bool init(AudioEventRTS& event, const AudioPcm& first)
+	{
+		const auto size = event.getAudioEventInfo()->m_sounds.size();
+		if (m_index >= size || m_remaining < 0)
+			return FALSE;
+		m_variants.resize(size);
+		m_portion = event.getNextPlayPortion();
+		for (size_t i = 0; i < size; ++i)
+		{
+			if (i == m_index && m_portion == PP_Sound)
+				m_variants[i] = first.bytes;
+			else if (!load(event.getSoundVariantFilename(i), m_variants[i]))
+				return FALSE;
+		}
+		if (m_portion == PP_Attack)
+			m_attack = first.bytes;
+		if (m_remaining > 0 && !event.getDecayFilename().isEmpty() && !load(event.getDecayFilename(), m_decay))
+			return FALSE;
+		return TRUE;
+	}
+
+	ma_uint32 rate() const { return m_rate; }
+	ma_uint32 channels() const { return m_channels; }
+	ma_uint32 frameBytes() const { return m_frameBytes; }
+	Bool playingDecay() const { return m_playingDecay.load(std::memory_order_relaxed); }
+	std::vector<Segment> segments;
+
+private:
+	Bool load(const AsciiString& filename, std::vector<uint8_t>& into)
+	{
+		AudioPcm clip;
+		if (!decodeAudioPcm(filename, clip))
+			return FALSE;
+		if (clip.format == m_format && clip.rate == m_rate && clip.channels == m_channels)
+		{
+			into = std::move(clip.bytes);
+			return TRUE;
+		}
+		const auto frames = ma_convert_frames(nullptr, 0, m_format, m_channels, m_rate,
+			clip.bytes.data(), clip.frames(), clip.format, clip.channels, clip.rate);
+		into.resize(frames * m_frameBytes);
+		const auto written = ma_convert_frames(into.data(), frames, m_format, m_channels, m_rate,
+			clip.bytes.data(), clip.frames(), clip.format, clip.channels, clip.rate);
+		into.resize(written * m_frameBytes);
+		return written > 0;
+	}
+
+	const std::vector<uint8_t>& currentClip() const
+	{
+		if (m_portion == PP_Attack)
+			return m_attack;
+		if (m_portion == PP_Decay)
+			return m_decay;
+		return m_variants[m_index];
+	}
+
+	void advance()
+	{
+		if (m_portion == PP_Attack)
+			m_portion = PP_Sound;
+		else if (m_portion == PP_Decay)
+			m_portion = PP_Done;
+		else if (m_remaining > 0 && --m_remaining == 0)
+		{
+			if (m_decay.empty())
+				m_portion = PP_Done;
+			else
+			{
+				m_portion = PP_Decay;
+				m_playingDecay.store(TRUE, std::memory_order_relaxed);
+			}
+		}
+		else if (m_sequential)
+			m_index = (m_index + 1) % m_variants.size();
+		else if (m_variants.size() > 1)
+		{
+			const auto next = std::uniform_int_distribution<size_t>(0, m_variants.size() - 2)(m_rng);
+			m_index = next + (next >= m_index);
+		}
+		m_clipOffset = 0;
+	}
+
+	static ma_result read(ma_data_source* source, void* output, ma_uint64 requested, ma_uint64* count)
+	{
+		ScopedFPUGuard fpuGuard;
+		auto& loop = *static_cast<AudioLoopSource*>(static_cast<ma_data_source_base*>(source));
+		*count = 0;
+		while (*count < requested && loop.m_portion != PP_Done)
+		{
+			const auto& clip = loop.currentClip();
+			const ma_uint64 length = clip.size() / loop.m_frameBytes;
+			if (loop.m_record && loop.m_clipOffset == 0)
+				loop.segments.push_back({loop.m_portion, loop.m_outputOffset, length});
+			const auto frames = std::min(requested - *count, length - loop.m_clipOffset);
+			std::memcpy(static_cast<uint8_t*>(output) + *count * loop.m_frameBytes,
+				clip.data() + loop.m_clipOffset * loop.m_frameBytes, frames * loop.m_frameBytes);
+			*count += frames;
+			loop.m_clipOffset += frames;
+			loop.m_outputOffset += frames;
+			if (loop.m_clipOffset == length)
+				loop.advance();
+		}
+		return *count ? MA_SUCCESS : MA_AT_END;
+	}
+
+	static ma_result getFormat(ma_data_source* source, ma_format* format, ma_uint32* channels,
+		ma_uint32* rate, ma_channel* channelMap, size_t capacity)
+	{
+		const auto& loop = *static_cast<AudioLoopSource*>(static_cast<ma_data_source_base*>(source));
+		if (format) *format = loop.m_format;
+		if (channels) *channels = loop.m_channels;
+		if (rate) *rate = loop.m_rate;
+		if (channelMap)
+			ma_channel_map_init_standard(ma_standard_channel_map_default, channelMap, capacity, loop.m_channels);
+		return MA_SUCCESS;
+	}
+
+	ma_format m_format;
+	ma_uint32 m_rate, m_channels, m_frameBytes;
+	Bool m_sequential;
+	Int m_remaining;
+	size_t m_index;
+	Bool m_record;
+	std::minstd_rand m_rng;
+	PortionToPlay m_portion = PP_Done;
+	std::vector<std::vector<uint8_t>> m_variants;
+	std::vector<uint8_t> m_attack;
+	std::vector<uint8_t> m_decay;
+	ma_uint64 m_clipOffset = 0;
+	ma_uint64 m_outputOffset = 0;
+	std::atomic<Bool> m_playingDecay{FALSE};
+};
 
 //-------------------------------------------------------------------------------------------------
 MiniAudioManager::MiniAudioManager() :
@@ -465,100 +687,47 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		return;
 	}
 
-	// Use FFmpeg to decode the file into PCM, then feed to miniaudio.
-	// This avoids miniaudio's built-in decoders which hang on MP3 via VFS.
-	File *file = TheFileSystem->openFile(fileToPlay.str());
-	if (!file) {
-		if (m_headlessVirtualPlayback) {
-			std::fprintf(stderr, "AUDIO TRACE missing file event=%s\n", event->getEventName().str());
-			std::abort();
-		}
-		DEBUG_LOG(("MiniAudio: Failed to open file: %s\n", fileToPlay.str()));
-		releasePlayingAudio(audio);
-		return;
-	}
-
-	FFmpegFile *ffmpegFile = NEW FFmpegFile();
-	if (!ffmpegFile->open(file)) {
+	AudioPcm pcm;
+	if (!decodeAudioPcm(fileToPlay, pcm)) {
 		if (m_headlessVirtualPlayback) {
 			std::fprintf(stderr, "AUDIO TRACE cannot decode event=%s\n", event->getEventName().str());
 			std::abort();
 		}
-		DEBUG_LOG(("MiniAudio: Failed to open FFmpeg file: %s\n", fileToPlay.str()));
-		delete ffmpegFile;
+		DEBUG_LOG(("MiniAudio: Failed to decode: %s\n", fileToPlay.str()));
 		releasePlayingAudio(audio);
 		return;
 	}
 
-	// Decode all audio frames into a buffer
-	std::vector<uint8_t> pcmData;
-	int sampleRate = 0;
-	int channels = 0;
-	int bytesPerSample = 0;
-
-	auto onFrame = [&](AVFrame *frame, int stream_idx, int stream_type, void *user_data) {
-		if (stream_type != AVMEDIA_TYPE_AUDIO) return;
-
-		sampleRate = frame->sample_rate;
-		channels = frame->ch_layout.nb_channels;
-		bytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
-
-		const int frameSize = av_samples_get_buffer_size(NULL, channels, frame->nb_samples,
-			static_cast<AVSampleFormat>(frame->format), 1);
-		if (frameSize <= 0) return;
-
-		if (av_sample_fmt_is_planar(static_cast<AVSampleFormat>(frame->format))) {
-			// Interleave planar audio
-			for (int s = 0; s < frame->nb_samples; s++) {
-				for (int c = 0; c < channels; c++) {
-					const uint8_t *src = frame->data[c] + s * bytesPerSample;
-					pcmData.insert(pcmData.end(), src, src + bytesPerSample);
-				}
-			}
-		} else {
-			pcmData.insert(pcmData.end(), frame->data[0], frame->data[0] + frameSize);
-		}
-	};
-
-	ffmpegFile->setFrameCallback(onFrame);
-	ffmpegFile->setUserData(NULL);
-
-	while (ffmpegFile->decodePacket()) {}
-
-	// Always delete ffmpegFile after decoding is complete
-	delete ffmpegFile;
-	ffmpegFile = NULL;
-
-	if (pcmData.empty() || sampleRate <= 0 || channels <= 0 || bytesPerSample <= 0) {
-		if (m_headlessVirtualPlayback) {
-			std::fprintf(stderr, "AUDIO TRACE unknown duration event=%s\n", event->getEventName().str());
-			std::abort();
-		}
-		DEBUG_LOG(("MiniAudio: No audio data decoded from: %s\n", fileToPlay.str()));
-		releasePlayingAudio(audio);
-		return;
+	const auto portionToPlay = event->getNextPlayPortion();
+	if (!req->m_isContinuation && info->m_soundType == AT_SoundEffect && (info->m_control & AC_LOOP) &&
+		info->m_delayMin <= 0 && info->m_delayMax <= 0 && !event->getIsLogicalAudio() &&
+		(portionToPlay == PP_Attack || portionToPlay == PP_Sound))
+	{
+		const Bool sequential = (info->m_control & AC_SEQUENTIAL) && !(info->m_control & AC_RANDOM);
+		auto loop = std::make_unique<AudioLoopSource>(pcm, sequential, event->getLoopCount(),
+			event->getPlayingAudioIndex(), m_headlessVirtualPlayback && m_traceEnabled);
+		if (loop->init(*event, pcm))
+			audio->m_loopSource = loop.release();
 	}
 
-	const auto pcmFrames = pcmData.size() / (channels * bytesPerSample);
+	const auto pcmFrames = pcm.frames();
 	const bool ambientStream = info->m_soundType == AT_AmbientStream;
 	const ma_uint64 startFrame = ambientStream && pcmFrames > 1 && (info->m_control & AC_RANDOMSTART)
 		? static_cast<ma_uint64>(static_cast<double>(pcmFrames - 1) * GameAudioRandomValueReal(0.0f, 1.0f))
 		: 0;
 	if (m_headlessVirtualPlayback)
 	{
-		audio->m_virtualDurationMs = static_cast<Real>(pcmData.size()) * 1000.0f /
-			(static_cast<Real>(sampleRate * channels * bytesPerSample) * pitch);
-		audio->m_virtualElapsedMs = static_cast<Real>(startFrame) * 1000.0f / (sampleRate * pitch);
+		audio->m_virtualDurationMs = static_cast<Real>(pcm.frames()) * static_cast<Real>(MSEC_PER_SECOND) / (static_cast<Real>(pcm.rate) * pitch);
+		audio->m_virtualElapsedMs = static_cast<Real>(startFrame) * static_cast<Real>(MSEC_PER_SECOND) / (static_cast<Real>(pcm.rate) * pitch);
 		audio->m_virtualLastFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
-		if (m_traceEnabled)
-			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%d channels=%d samplebytes=%d\n",
-				static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
-				pcmData.size(), sampleRate, channels, bytesPerSample);
 		audio->m_type = info->m_soundType == AT_Music || info->m_soundType == AT_Streaming ? PAT_Stream :
 			(event->isPositionalAudio() ? PAT_3DSample : ambientStream ? PAT_Stream : PAT_Sample);
 		audio->m_fadeIn = event->getShouldFade();
 		m_playingSounds.push_back(audio);
-		if (m_traceEnabled) {
+		if (m_traceEnabled && !audio->m_loopSource) {
+			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%u channels=%u samplebytes=%u\n",
+				static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
+				pcm.bytes.size(), pcm.rate, pcm.channels, ma_get_bytes_per_sample(pcm.format));
 			const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
 			const char *portion = info->m_soundType != AT_SoundEffect ? nullptr :
 				(event->getNextPlayPortion() == PP_Attack ? "attack" :
@@ -568,46 +737,30 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		return;
 	}
 
-	// Map FFmpeg bytes-per-sample to miniaudio format
-	ma_format maFmt = ma_format_unknown;
-	if (bytesPerSample == 1) maFmt = ma_format_u8;
-	else if (bytesPerSample == 2) maFmt = ma_format_s16;
-	else if (bytesPerSample == 4) maFmt = ma_format_f32;
-
-	if (maFmt == ma_format_unknown) {
-		DEBUG_LOG(("MiniAudio: Unsupported format (%d bps) for: %s\n", bytesPerSample, fileToPlay.str()));
-		releasePlayingAudio(audio);
-		return;
+	ma_data_source* source = audio->m_loopSource;
+	if (!source)
+	{
+		auto* buffer = static_cast<ma_audio_buffer*>(malloc(sizeof(ma_audio_buffer)));
+		const auto config = ma_audio_buffer_config_init(pcm.format, pcm.channels, pcm.frames(), pcm.bytes.data(), nullptr);
+		if (!buffer || ma_audio_buffer_init_copy(&config, buffer) != MA_SUCCESS)
+		{
+			free(buffer);
+			releasePlayingAudio(audio);
+			return;
+		}
+		buffer->ref.sampleRate = pcm.rate;
+		audio->m_audioBuffer = buffer;
+		source = buffer;
 	}
-
-	// Create audio buffer — init_copy copies data into internal storage
-	// so it's safe when pcmData goes out of scope after this function returns.
-	ma_audio_buffer *audioBuffer = (ma_audio_buffer *)malloc(sizeof(ma_audio_buffer));
-	ma_audio_buffer_config abConfig = ma_audio_buffer_config_init(maFmt, channels, pcmFrames, pcmData.data(), nullptr);
-
-	ma_result result = ma_audio_buffer_init_copy(&abConfig, audioBuffer);
-	if (result != MA_SUCCESS) {
-		DEBUG_LOG(("MiniAudio: Failed to create audio buffer: %d for '%s'\n", result, fileToPlay.str()));
-		free(audioBuffer);
-		releasePlayingAudio(audio);
-		return;
-	}
-	audioBuffer->ref.sampleRate = sampleRate;
 
 	ma_sound *sound = (ma_sound *)malloc(sizeof(ma_sound));
-	result = ma_sound_init_from_data_source(&m_engine, audioBuffer, flags, groupToUse, sound);
-	if (result != MA_SUCCESS) {
-		DEBUG_LOG(("MiniAudio: Failed to init sound: %d for '%s'\n", result, fileToPlay.str()));
-		ma_audio_buffer_uninit(audioBuffer);
-		free(audioBuffer);
+	if (!sound || ma_sound_init_from_data_source(&m_engine, source, flags, groupToUse, sound) != MA_SUCCESS) {
 		free(sound);
 		releasePlayingAudio(audio);
 		return;
 	}
 
-	// Assign to PlayingAudio before any early returns below
 	audio->m_sound = sound;
-	audio->m_audioBuffer = audioBuffer;
 	audio->m_dryGroup = groupToUse;
 	if (pitch != 1.0f)
 		ma_sound_set_pitch(sound, pitch);
@@ -670,7 +823,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	if (startFrame > 0)
 		ma_sound_seek_to_pcm_frame(sound, startFrame);
-	result = ma_sound_start(sound);
+	const ma_result result = ma_sound_start(sound);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to start sound: %d for '%s'\n", result, fileToPlay.str()));
 		releasePlayingAudio(audio);
@@ -688,6 +841,27 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		traceEvent(req->m_isContinuation ? "segment" : "start", owner, event->getPlayingHandle(), event->getEventName(),
 			portion);
 	}
+}
+
+void MiniAudioManager::traceLoopSegments(AudioEventRTS& event, AudioLoopSource& loop) const
+{
+	const ObjectID owner = event.getOwnerType() == OT_Object ? event.getObjectID() : INVALID_ID;
+	const auto handle = static_cast<UnsignedInt>(event.getPlayingHandle());
+	for (const auto& segment : loop.segments)
+	{
+		const char* portion = segment.portion == PP_Attack ? "attack" :
+			(segment.portion == PP_Decay ? "decay" : "sound");
+		const auto duration = static_cast<Real>(segment.frames) * static_cast<Real>(MSEC_PER_SECOND) / loop.rate();
+		std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%llu rate=%u channels=%u samplebytes=%u\n",
+			handle, duration, static_cast<unsigned long long>(segment.frames * loop.frameBytes()),
+			loop.rate(), loop.channels(), loop.frameBytes() / loop.channels());
+		traceEvent(segment.offset == 0 ? "start" : "segment", owner, event.getPlayingHandle(), event.getEventName(), portion);
+		std::fprintf(stderr, "AUDIO PCM SEGMENT event=%s handle=%u start=%llu length=%llu\n",
+			event.getEventName().str(), handle, static_cast<unsigned long long>(segment.offset),
+			static_cast<unsigned long long>(segment.frames));
+	}
+	std::fflush(stderr);
+	loop.segments.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -824,6 +998,8 @@ void MiniAudioManager::releaseMiniAudioHandles(PlayingAudio *release)
 		free(release->m_audioBuffer);
 		release->m_audioBuffer = NULL;
 	}
+	delete release->m_loopSource;
+	release->m_loopSource = nullptr;
 	release->m_type = PAT_INVALID;
 }
 
@@ -1167,6 +1343,8 @@ void MiniAudioManager::notifyOfAudioCompletion(UnsignedInt audioCompleted, Unsig
 	AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 	const AudioEventInfo *info = event->getAudioEventInfo();
 	if (info->m_soundType != AT_SoundEffect)
+		return;
+	if (playing->m_loopSource && (!playing->m_requestStop || playing->m_loopSource->playingDecay()))
 		return;
 	if (playing->m_requestStop) {
 		if (!(info->m_control & AC_LOOP) || event->getDecayFilename().isEmpty() ||
@@ -1574,7 +1752,33 @@ void MiniAudioManager::processPlayingList(void)
 		const AudioEventInfo *info = playing->m_audioEventRTS ? playing->m_audioEventRTS->getAudioEventInfo() : nullptr;
 		Bool finished = FALSE;
 		if (info && !playing->m_paused && !playing->m_requestStop) {
-			if (!playing->m_sound && m_headlessVirtualPlayback) {
+			if (!playing->m_sound && playing->m_loopSource) {
+				auto& loop = *playing->m_loopSource;
+				const UnsignedInt frame = TheGameLogic ? TheGameLogic->getFrame() : playing->m_virtualLastFrame;
+				if (frame > playing->m_virtualLastFrame)
+				{
+					const auto scaledFrames = static_cast<ma_uint64>(frame - playing->m_virtualLastFrame) * loop.rate()
+						+ playing->m_virtualSampleRemainder;
+					auto remaining = scaledFrames / LOGICFRAMES_PER_SECOND;
+					playing->m_virtualSampleRemainder = scaledFrames % LOGICFRAMES_PER_SECOND;
+					uint8_t pcm[4096];
+					while (remaining > 0)
+					{
+						const auto requested = std::min(remaining, static_cast<ma_uint64>(sizeof(pcm) / loop.frameBytes()));
+						ma_uint64 count = 0;
+						ma_data_source_read_pcm_frames(&loop, pcm, requested, &count);
+						if (count < requested)
+						{
+							finished = TRUE;
+							break;
+						}
+						remaining -= count;
+					}
+					if (m_traceEnabled)
+						traceLoopSegments(*playing->m_audioEventRTS, loop);
+				}
+				playing->m_virtualLastFrame = frame;
+			} else if (!playing->m_sound && m_headlessVirtualPlayback) {
 				const UnsignedInt frame = TheGameLogic ? TheGameLogic->getFrame() : playing->m_virtualLastFrame;
 				if (frame >= playing->m_virtualLastFrame)
 					playing->m_virtualElapsedMs += (frame - playing->m_virtualLastFrame) * MSEC_PER_LOGICFRAME_REAL;

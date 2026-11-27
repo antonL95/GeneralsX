@@ -328,71 +328,74 @@ void AudioEventRTS::setEventName( AsciiString name )
 //-------------------------------------------------------------------------------------------------
 void AudioEventRTS::generateFilename(Bool randomByDefault, Bool forTiming)
 {
-	// A Logic Random Value is used because we may ask "How long will it take to play this sound?"
-	// In that case, we need the same answer across all pcs.
-
-	if (!m_eventInfo) {
+	if (!m_eventInfo)
 		return;
-	}
 
 	m_filePitch = m_eventInfo->m_perFilePitchMin == m_eventInfo->m_perFilePitchMax
 		? m_eventInfo->m_perFilePitchMin
 		: GameAudioRandomValueReal(m_eventInfo->m_perFilePitchMin, m_eventInfo->m_perFilePitchMax);
 	const Real volumeFloor = std::clamp(1.0f + m_eventInfo->m_perFileVolumeShift, 0.0f, 1.0f);
 	m_fileVolume = volumeFloor < 1.0f ? GameAudioRandomValueReal(volumeFloor, 1.0f) : 1.0f;
-	m_filenameToLoad = generateFilenamePrefix(m_eventInfo->m_soundType, false);
-
-	Int which = 0;
 
 	if (m_eventInfo->m_soundType == AT_Music || m_eventInfo->m_soundType == AT_Streaming ||
 		m_eventInfo->m_soundType == AT_AmbientStream ||
 		(m_eventInfo->m_sounds.empty() && m_eventInfo->m_filename.isNotEmpty())) {
+		m_filenameToLoad = generateFilenamePrefix(m_eventInfo->m_soundType, FALSE);
 		m_filenameToLoad.concat(m_eventInfo->m_filename);
 		adjustForLocalization(m_filenameToLoad);
 		return;
-	} else {
-		if (m_eventInfo->m_sounds.empty()) {
-			m_filenameToLoad = AsciiString::TheEmptyString;
-			return;
-		}
+	}
 
+	const auto& sounds = m_eventInfo->m_sounds;
+	const Int count = static_cast<Int>(sounds.size());
+	if (!count) {
+		m_filenameToLoad = AsciiString::TheEmptyString;
+		return;
+	}
 
-
-		const auto& sounds = m_eventInfo->m_sounds;
-		const Bool authoredRandom = BitIsSet(m_eventInfo->m_control, AC_RANDOM);
-		if (authoredRandom || (randomByDefault && !BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL)))
+	Int which;
+	const Bool authoredRandom = BitIsSet(m_eventInfo->m_control, AC_RANDOM);
+	if (authoredRandom || (randomByDefault && !BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL)))
+	{
+		const bool weighted = !forTiming && std::any_of(sounds.begin(), sounds.end(),
+			[](const WeightedAudioName& name) { return !name.authoredName.isEmpty(); });
+		if (weighted)
 		{
-			const bool weighted = !forTiming && std::any_of(sounds.begin(), sounds.end(),
-				[](const WeightedAudioName& name) { return !name.authoredName.isEmpty(); });
-			if (weighted)
+			which = pickWeightedAudioName(sounds, count > 2 ? m_playingAudioIndex : -1);
+		}
+		else
+		{
+			const Bool useLogicRandom = m_isLogicalAudio && authoredRandom;
+			if (useLogicRandom || !randomByDefault || forTiming)
 			{
-				which = pickWeightedAudioName(sounds, sounds.size() > 2 ? m_playingAudioIndex : -1);
+				which = useLogicRandom ? GameLogicRandomValueUnchanged(0, count - 1) : GameAudioRandomValue(0, count - 1);
+				if (which == m_playingAudioIndex && count > 2)
+					which = (which + 1) % count;
 			}
 			else
 			{
-				which = m_isLogicalAudio && authoredRandom
-					? GameLogicRandomValueUnchanged(0, sounds.size() - 1)
-					: GameAudioRandomValue(0, sounds.size() - 1);
-				if (which == m_playingAudioIndex && sounds.size() > 2)
-					which = (which + 1) % sounds.size();
+				const Bool skipPrevious = count > 1 && m_playingAudioIndex >= 0 && m_playingAudioIndex < count;
+				which = GameAudioRandomValue(0, count - 1 - skipPrevious);
+				if (skipPrevious && which >= m_playingAudioIndex)
+					++which;
 			}
-
-			m_playingAudioIndex = which;
-
 		}
-		else
-			which = (++m_playingAudioIndex) % m_eventInfo->m_sounds.size();
-
-
 	}
+	else
+		which = (m_playingAudioIndex + 1) % count;
 
-	m_filenameToLoad.concat(m_eventInfo->m_sounds[which].getName(forTiming));
-	m_filenameToLoad.concat(generateFilenameExtension(m_eventInfo->m_soundType));
-	adjustForLocalization(m_filenameToLoad);
-
-	// Note: Also generate Delay when generating a filename, cause
-	// we want delay to apply between every loop of a sound.
+	m_playingAudioIndex = which;
+	m_filenameToLoad = getSoundVariantFilename(which, forTiming);
 	m_delay = GameAudioRandomValueReal(m_eventInfo->m_delayMin, m_eventInfo->m_delayMax);
+}
+
+AsciiString AudioEventRTS::getSoundVariantFilename(Int index, Bool forTiming)
+{
+	AsciiString filename = generateFilenamePrefix(m_eventInfo->m_soundType, FALSE);
+	filename.concat(m_eventInfo->m_sounds[index].getName(forTiming));
+	filename.concat(generateFilenameExtension(m_eventInfo->m_soundType));
+	adjustForLocalization(filename);
+	return filename;
 }
 
 //-------------------------------------------------------------------------------------------------

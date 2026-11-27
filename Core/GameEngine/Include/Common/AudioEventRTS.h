@@ -159,6 +159,7 @@ public:
 	void setPlayerIndex( Int playerNdx );
 
 	Int getPlayingAudioIndex() const { return m_playingAudioIndex; }
+	AsciiString getSoundVariantFilename(Int index, Bool forTiming = FALSE);
 	void setPlayingAudioIndex( Int pai ) const { m_playingAudioIndex = pai; } // is mutable
 
 	Bool getUninterruptible() const { return m_uninterruptible; }
