@@ -151,6 +151,13 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 			ctx.argument, event.getPitchShift(), event.getVolumeShift());
 		return;
 	}
+	if (cmd == "beacon")
+	{
+		if (!TheMessageStream || !ctx.hasPosition)
+			return;
+		TheMessageStream->appendMessage(GameMessage::MSG_PLACE_BEACON)->appendLocationArgument(ctx.groundLocation());
+		return;
+	}
 	if (cmd == "advance-music")
 	{
 		if (TheAudio)

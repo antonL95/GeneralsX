@@ -1,0 +1,4 @@
+10 audio-loop-trace - - 0 virtual
+12 create Player_1 GondorEarnur 0 2520,1010,0
+25 audio-loop-beacon Player_1 GondorEarnur 0 - 2510 1030
+28 list Player_1 MultiplayerBeacon 0
