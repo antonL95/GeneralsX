@@ -180,7 +180,7 @@ std::span<const NormalMappedVertex> poseMesh(MeshClass &mesh, const PackedMesh &
 	runtime->positions.resize(count);
 	runtime->normals.resize(count);
 	mesh.Get_Deformed_Vertices(runtime->positions.data(), runtime->normals.data());
-	const auto *influences = model.Peek_Second_Skin_Influences();
+	const auto *influences = geometry.source.fx ? model.Peek_Second_Skin_Influences() : nullptr;
 	auto &bindPose = runtime->bindPose;
 	auto &inverseBindPose = runtime->inverseBindPose;
 	if (influences)
@@ -224,8 +224,11 @@ std::span<const NormalMappedVertex> poseMesh(MeshClass &mesh, const PackedMesh &
 		vertex.normal[0] = normal.X;
 		vertex.normal[1] = normal.Y;
 		vertex.normal[2] = normal.Z;
-		rotateBasis(geometry.vertices[i].tangent, vertex.tangent);
-		rotateBasis(geometry.vertices[i].bitangent, vertex.bitangent);
+		if (geometry.source.fx)
+		{
+			rotateBasis(geometry.vertices[i].tangent, vertex.tangent);
+			rotateBasis(geometry.vertices[i].bitangent, vertex.bitangent);
+		}
 	}
 	return runtime->posed;
 }
@@ -255,7 +258,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	if (!materialId || (normalMapped && (*materialId >= fx->materials.size() ||
 		fx->materials[*materialId].effect != "normalmapped.fx")))
 		return false;
-	if (!normalMapped && (model.Get_Pass_Count() != 1 || model.Get_Flag(MeshGeometryClass::SKIN) ||
+	if (!normalMapped && (model.Get_Pass_Count() != 1 ||
 		secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
 		vertexMaterial->Get_Opacity() != 1.0f || shader.Get_Depth_Compare() != ShaderClass::PASS_LEQUAL ||
 		shader.Get_Depth_Mask() != ShaderClass::DEPTH_WRITE_ENABLE ||
