@@ -697,6 +697,11 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		return;
 	}
 
+	if (fileToPlay.isEmpty()) {
+		releasePlayingAudio(audio);
+		return;
+	}
+
 	AudioPcm pcm;
 	if (!decodeAudioPcm(fileToPlay, pcm)) {
 		if (m_headlessVirtualPlayback) {
