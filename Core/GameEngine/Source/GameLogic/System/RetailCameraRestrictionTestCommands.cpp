@@ -15,11 +15,15 @@ const char *const areaName = "CameraRestrictionFixture";
 
 PolygonTrigger *makeArea()
 {
-	auto *area = newInstance(PolygonTrigger)(4, 78002);
+	auto *area = newInstance(PolygonTrigger)(8, 78002);
 	area->setTriggerName(areaName);
 	area->addPoint({200, 200, 0});
 	area->addPoint({400, 200, 0});
 	area->addPoint({400, 400, 0});
+	area->addPoint({350, 400, 0});
+	area->addPoint({350, 250, 0});
+	area->addPoint({250, 250, 0});
+	area->addPoint({250, 400, 0});
 	area->addPoint({200, 400, 0});
 	PolygonTrigger::addPolygonTrigger(area);
 	return area;

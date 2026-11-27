@@ -339,9 +339,23 @@ Bool View::enforceScriptCameraArea()
 		return FALSE;
 	}
 	if (!area->pointInTrigger(m_scriptCameraAnchor))
-		area->getCenterPoint(&m_scriptCameraAnchor);
-	if (m_pos.x == m_scriptCameraAnchor.x && m_pos.y == m_scriptCameraAnchor.y)
-		return FALSE;
+	{
+		Coord3D anchor;
+		area->getCenterPoint(&anchor);
+		const Int pointCount = area->getNumPoints();
+		for (Int i = 0; i < pointCount && !area->pointInTrigger(anchor); ++i)
+		{
+			const auto &first = *area->getPoint(i);
+			const auto &second = *area->getPoint((i + 1) % pointCount);
+			const auto &third = *area->getPoint((i + 2) % pointCount);
+			anchor.x = static_cast<Real>((static_cast<Int64>(first.x) + second.x + third.x) / 3.0);
+			anchor.y = static_cast<Real>((static_cast<Int64>(first.y) + second.y + third.y) / 3.0);
+		}
+		if (!area->pointInTrigger(anchor))
+			return FALSE;
+		anchor.z = TheTerrainLogic->getGroundHeight(anchor.x, anchor.y);
+		m_scriptCameraAnchor = anchor;
+	}
 	setPosition(m_scriptCameraAnchor);
 	return TRUE;
 }
