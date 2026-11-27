@@ -5,7 +5,7 @@ prepare() {
             print frame, "cavalry-c1-probe Player_1 CavalryC1Hero 0"
         }
         for (frame = 620; frame <= 920 && frame <= end; ++frame)
-            print frame, "cavalry-c1-quarter-probe Player_1 CavalryC1Quarter 0"
+            print frame, "cavalry-c1-quarter-probe Player_1 GondorPinnathGelinRiderHorde_WotR 0"
     }'
 }
 

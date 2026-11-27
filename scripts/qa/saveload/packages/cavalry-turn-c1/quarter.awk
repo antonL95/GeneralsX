@@ -30,9 +30,10 @@ $1 == "TEST" && $2 == "cavalry-c1-quarter" {
         if (frame == first) ids[++riders] = id
         riderX[frame, id] = x
         riderY[frame, id] = y
+        riderYaw[frame, id] = $9
+        riderTurnStep[id] = $12
         riderRank[frame, id] = ($6 < 5) ? 1 : 2
         ++samples[frame]
-        if (headingError($9, -pi/2) > $12) ++turning[frame]
         slotError[frame] = max(slotError[frame], distance($10 - x, $11 - y))
     }
 }
@@ -48,10 +49,12 @@ END {
             exit 1
         }
         if (aligned) continue
+        turning = 0
         for (i = 1; i <= riders; ++i) {
             id = ids[i]
             x = riderX[frame, id]
             y = riderY[frame, id]
+            if (headingError(riderYaw[frame, id], anchorYaw[last]) > riderTurnStep[id]) ++turning
             riderTravel = max(riderTravel, distance(x - riderX[first, id], y - riderY[first, id]))
             for (j = i + 1; j <= riders; ++j) {
                 other = ids[j]
@@ -61,28 +64,34 @@ END {
             }
         }
         if (frame == first) initialGap = minGap
-        if (!turning[frame]) aligned = frame
+        if (!turning) aligned = frame
     }
 
     turnEnd = aligned ? aligned : last
-    printf "Pinnath Gelin quarter turn: aligned=%d anchor travel=%.3f max rider displacement=%.3f min rider spacing=%.3f initially=%.3f\n",
-        aligned, distance(anchorX[turnEnd] - anchorX[first], anchorY[turnEnd] - anchorY[first]), riderTravel, minGap, initialGap
+    printf "Pinnath Gelin quarter turn: aligned=%d anchor travel=%.3f max rider displacement=%.3f min rider spacing=%.3f initially=%.3f banner travel=%.3f\n",
+        aligned, distance(anchorX[turnEnd] - anchorX[first], anchorY[turnEnd] - anchorY[first]), riderTravel, minGap, initialGap,
+        distance(bannerX[turnEnd] - bannerX[first], bannerY[turnEnd] - bannerY[first])
 
+    forwardX = cos(anchorYaw[last])
+    forwardY = sin(anchorYaw[last])
     for (i = 1; i <= riders; ++i) {
         id = ids[i]
         rank = riderRank[last, id]
         x = riderX[last, id]
         y = riderY[last, id]
+        forward = x*forwardX + y*forwardY
         if (++rankSize[rank] == 1) {
-            rankLow[rank] = rankHigh[rank] = y
+            rankLow[rank] = rankHigh[rank] = forward
         } else {
-            rankLow[rank] = min(rankLow[rank], y)
-            rankHigh[rank] = max(rankHigh[rank], y)
+            rankLow[rank] = min(rankLow[rank], forward)
+            rankHigh[rank] = max(rankHigh[rank], forward)
         }
-        if (rank == 1) frontX += x
+        if (rank == 1) frontSide += y*forwardX - x*forwardY
     }
-    if (rankSize[1] > 0) frontX /= rankSize[1]
+    if (rankSize[1] > 0) frontSide /= rankSize[1]
+    bannerSide = bannerY[last]*forwardX - bannerX[last]*forwardY
+    bannerForward = bannerX[last]*forwardX + bannerY[last]*forwardY
     printf "Pinnath Gelin finish: ranks=%d+%d yaw=%.4f moving=%d row span=%.3f/%.3f slot error=%.3f banner center offset=%.3f ahead=%.3f\n",
         rankSize[1], rankSize[2], anchorYaw[last], anchorMoving[last], rankHigh[1] - rankLow[1], rankHigh[2] - rankLow[2],
-        slotError[last], bannerX[last] - frontX, rankLow[1] - bannerY[last]
+        slotError[last], bannerSide - frontSide, bannerForward - rankHigh[1]
 }
