@@ -56,6 +56,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Object.h"
@@ -3234,7 +3235,7 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 						current += contain->getContainCount();
 					}
 				}
-				else
+				else if (!unit->testStatus(OBJECT_STATUS_HORDE_MEMBER) && !HordeContain::get(unit->getContainedBy()))
 				{
 					++maximum;
 					++current;

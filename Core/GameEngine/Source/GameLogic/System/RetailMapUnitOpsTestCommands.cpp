@@ -376,6 +376,9 @@ void teamHealthProbe(const RetailTestCommands::Context& ctx)
 	Object* unit = ctx.findTarget(std::string_view("Player_1:MapScriptVeterancyProbe:0"));
 	if (!horde || !horde->getContain() || !unit)
 		return;
+	const ContainedItemsList* members = horde->getContain()->getContainedItemsList();
+	if (!members || members->empty())
+		return;
 	const Int count = horde->getContain()->getContainCount();
 	const Int maximum = horde->getContain()->getContainMax();
 	Team* original = horde->getTeam();
@@ -388,8 +391,14 @@ void teamHealthProbe(const RetailTestCommands::Context& ctx)
 	const Bool reject = !teamHealthCondition(team, 2, expected + 1);
 	horde->setTemporaryTeam(original);
 	unit->setTemporaryTeam(original);
+	Object* soldier = members->front();
+	Team* soldierTeam = soldier->getTeam();
+	soldier->setTemporaryTeam(team);
+	const Bool memberExcluded = teamHealthCondition(team, 2, 0) && !teamHealthCondition(team, 2, 100);
+	soldier->setTemporaryTeam(soldierTeam);
 	deleteInstance(team);
-	std::fprintf(stderr, "TEST map-unit-ops health frame=%u partial=%d match=%d reject=%d\n", ctx.frame, partial, match, reject);
+	std::fprintf(stderr, "TEST map-unit-ops health frame=%u partial=%d match=%d reject=%d member-excluded=%d\n",
+		ctx.frame, partial, match, reject, memberExcluded);
 }
 
 Bool veteranCondition(const char* owner, const char* type, Int comparison, Int rank)
