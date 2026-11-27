@@ -141,6 +141,7 @@ struct NoteMessage
 struct NoteState
 {
 	GameWindow *window = nullptr;
+	GameWindow *hudParent = nullptr;
 	std::unique_ptr<AptScene> scene;
 	AptScene::Box artBounds;
 	AptScene::Box topBounds;
@@ -723,12 +724,23 @@ static void dismiss()
 	s_note.portrait = nullptr;
 	if (s_note.window)
 		s_note.window->winHide(TRUE);
+	if (s_note.hudParent)
+	{
+		s_note.window->winSetParent(s_note.hudParent);
+		s_note.hudParent = nullptr;
+	}
 }
 
 void reset()
 {
 	s_note.pending.clear();
 	dismiss();
+}
+
+void releaseWindow()
+{
+	reset();
+	s_note.window = nullptr;
 }
 
 static void openNext()
@@ -787,6 +799,17 @@ static void enqueue(const AsciiString &type, const UnicodeString &message, Real 
 void showType(const AsciiString &type, const UnicodeString &message, Real seconds, const Image *icon)
 {
 	enqueue(type, message, seconds, icon, TRUE);
+}
+
+void showScriptVictory(const UnicodeString &message)
+{
+	showType("Generic", message, 0.0f);
+	if (s_note.window && s_note.open)
+	{
+		s_note.hudParent = s_note.window->winGetParent();
+		if (s_note.hudParent)
+			s_note.window->winSetParent(nullptr);
+	}
 }
 
 void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award, const Image *awardIcon)

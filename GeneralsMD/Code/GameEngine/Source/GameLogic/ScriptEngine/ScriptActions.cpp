@@ -7716,6 +7716,11 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::QUICKVICTORY:
 			doQuickVictory();
 			return;
+		case ScriptAction::VICTORY_SCREEN:
+			if (!m_suppressNewWindows && TheGameText && TheVictoryConditions && !TheVictoryConditions->amIObserver())
+				RetailNotification::showScriptVictory(TheGameText->fetch("GUI:Victory"));
+			return;
+
 		case ScriptAction::VICTORY:
 			doVictory();
 			return;

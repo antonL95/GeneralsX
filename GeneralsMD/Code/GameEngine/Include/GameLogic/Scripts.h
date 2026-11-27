@@ -650,6 +650,7 @@ public:
 		CAMERA_REMOVE_AREA_RESTRICTION,
 		HIDE_UI,
 		SHOW_UI,
+		VICTORY_SCREEN,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

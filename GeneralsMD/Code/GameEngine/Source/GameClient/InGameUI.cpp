@@ -4453,6 +4453,7 @@ void InGameUI::destroyControlBar()
 {
 	if (m_controlBarWindow != nullptr)
 	{
+		RetailNotification::releaseWindow();
 		TheWindowManager->winDestroy(m_controlBarWindow);
 		m_controlBarWindow = nullptr;
 		m_idleWorkerWin = nullptr; // This window belongs to the Control Bar and is implicitly deleted as well.

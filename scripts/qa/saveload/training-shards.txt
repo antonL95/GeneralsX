@@ -137,3 +137,4 @@
 3 map-camera-entered-area
 3 map-camera-restriction
 3 map-script-hide-ui
+3 map-script-victory-screen

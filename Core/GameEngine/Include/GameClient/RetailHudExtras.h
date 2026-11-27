@@ -52,6 +52,8 @@ void init(GameWindow *master);
 void reset();
 void update();
 void showType(const AsciiString &type, const UnicodeString &message, Real seconds = 5.0f, const Image *icon = nullptr);
+void showScriptVictory(const UnicodeString &message);
+void releaseWindow();
 void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award = nullptr, const Image *awardIcon = nullptr);
 Bool handleInput(UnsignedInt msg, Int x, Int y);
 }
