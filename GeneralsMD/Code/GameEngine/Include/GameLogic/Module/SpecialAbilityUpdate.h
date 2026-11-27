@@ -350,6 +350,7 @@ protected:
 private:
 
 	void applyAbilityConditions(Bool includeAbilityAnimation);
+	void applyCustomAnimation();
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	enum PackingState
@@ -383,4 +384,5 @@ private:
 	Int m_timedCondition = -1;
 	UnsignedInt m_timedConditionEndFrame = 0;
 	Bool m_hasTargetPos = FALSE;
+	UnsignedInt m_customAnimationStartFrame = 0;
 };

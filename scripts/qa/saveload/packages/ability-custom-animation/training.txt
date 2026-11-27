@@ -1,0 +1,21 @@
+220 create Player_1 AbilityCustomDelayed 0 1860,900,0
+220 create Player_1 AbilityCustomNoUnpack 0 2050,900,0
+221 reveal Player_1 AbilityCustomDelayed 0
+231 objupgrade Player_1 AbilityCustomDelayed 0 AbilityCustomAnimationProbe
+233 pkg24-cast Player_1 AbilityCustomDelayed 0 AbilityCustomAnimationCast
+237 pkg24-cast Player_1 AbilityCustomNoUnpack 0 AbilityCustomAnimationCast
+242 ability Player_1 AbilityCustomDelayed 0
+242 ability Player_1 AbilityCustomNoUnpack 0
+254 ability Player_1 AbilityCustomDelayed 0
+260 ability Player_1 AbilityCustomDelayed 0
+264 ability Player_1 AbilityCustomDelayed 0
+274 ability Player_1 AbilityCustomDelayed 0
+285 ability Player_1 AbilityCustomDelayed 0
+300 ability Player_1 AbilityCustomDelayed 0
+301 create Player_1 AbilityCustomLatched 0 2100,950,0
+304 pkg24-cast Player_1 AbilityCustomLatched 0 AbilityCustomAnimationCast
+309 ability Player_1 AbilityCustomLatched 0
+328 ability Player_1 AbilityCustomLatched 0
+330 destroy Player_1 AbilityCustomDelayed 0
+330 destroy Player_1 AbilityCustomNoUnpack 0
+330 destroy Player_1 AbilityCustomLatched 0

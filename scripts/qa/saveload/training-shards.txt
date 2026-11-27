@@ -141,3 +141,4 @@
 3 map-script-deselect
 3 map-script-world-lights
 3 pkg-ini-ui-misc
+4 ability-custom-animation

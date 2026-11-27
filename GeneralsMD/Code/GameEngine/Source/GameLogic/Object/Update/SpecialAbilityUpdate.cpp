@@ -68,6 +68,7 @@
 #include "Common/AbilityRules.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -233,6 +234,12 @@ UpdateSleepTime SpecialAbilityUpdate::update()
 
   if( !m_active ) // Not active.
     return calcSleepTime();
+
+  if (m_customAnimationStartFrame && TheGameLogic->getFrame() >= m_customAnimationStartFrame)
+  {
+    m_customAnimationStartFrame = 0;
+    applyCustomAnimation();
+  }
 
   AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
   if( !ai )
@@ -651,8 +658,14 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
 	{
 		traceRetailWeaponAbility(*this, getObject(), getTemplate(), "exit", 0);
 		if (usesRotwkRules())
+		{
 			onAbilityExit();
+			const auto& animation = getSpecialAbilityUpdateModuleData()->m_customAnimAndDuration;
+			if (animation.m_condition >= 0 && animation.m_duration == 0)
+				getObject()->clearModelConditionState(static_cast<ModelConditionFlagType>(animation.m_condition));
+		}
 	}
+	m_customAnimationStartFrame = 0;
 	if (m_active && RetailFileLayers::enabled() &&
 		getSpecialAbilityUpdateModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING)
 	{
@@ -895,8 +908,27 @@ void SpecialAbilityUpdate::startUnpacking()
   {
     applyAbilityConditions(TRUE);
     onStartWindup();
-    getObject()->applyUpgradeAnimation(data->m_customAnimAndDuration);
+    const auto& animation = data->m_customAnimAndDuration;
+    if (animation.m_condition >= 0)
+    {
+      if (animation.m_triggerTime == 0)
+        applyCustomAnimation();
+      else
+        m_customAnimationStartFrame = TheGameLogic->getFrame() +
+          RotwkDuration::engineFrames(RotwkDuration::retailFrames(animation.m_triggerTime) + 1, LOGICFRAMES_PER_SECOND);
+    }
   }
+}
+
+void SpecialAbilityUpdate::applyCustomAnimation()
+{
+  const auto& animation = getSpecialAbilityUpdateModuleData()->m_customAnimAndDuration;
+  const auto condition = static_cast<ModelConditionFlagType>(animation.m_condition);
+  if (animation.m_duration == 0)
+    getObject()->setModelConditionState(condition);
+  else
+    getObject()->setTimedModelCondition(condition,
+      RotwkDuration::engineFrames(RotwkDuration::retailFrames(animation.m_duration), LOGICFRAMES_PER_SECOND));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1077,8 +1109,6 @@ void SpecialAbilityUpdate::startPreparation()
   //Set the preparation timer
   m_prepFrames = data->m_preparationFrames;
   traceRetailWeaponAbility(*this, getObject(), spTemplate, "prepare", m_prepFrames);
-  if (usesRotwkRules() && data->m_unpackTime == 0)
-    getObject()->applyUpgradeAnimation(data->m_customAnimAndDuration);
 
   switch( spTemplate->getSpecialPowerType() )
   {
@@ -2187,7 +2217,8 @@ void SpecialAbilityUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
-
+	if (usesRotwkRules())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 void SpecialAbilityUpdate::crcRetailAbilityPhase(Xfer* xfer)
@@ -2218,7 +2249,10 @@ void SpecialAbilityUpdate::crcRetailAbilityPhase(Xfer* xfer)
 void SpecialAbilityUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{"target-pos-flag", [this](Xfer* block) { block->xferBool(&m_hasTargetPos); }, [this] { m_hasTargetPos = FALSE; }}
+		{"target-pos-flag", [this](Xfer* block) { block->xferBool(&m_hasTargetPos); }, [this] { m_hasTargetPos = FALSE; }},
+		{"custom-animation-start", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_customAnimationStartFrame);
+		}, [this] { m_customAnimationStartFrame = 0; }}
 	});
 }
 
