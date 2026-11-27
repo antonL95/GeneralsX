@@ -39,8 +39,10 @@
 #include "Common/MapObject.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -367,6 +369,11 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	auto* lua = LuaScriptEngine::active();
 	if (!TheGameState || !TheGameState->isInLoadGame())
 	{
+		if (RetailFileLayers::enabled())
+		{
+			const Player* controller = obj->getControllingPlayer();
+			obj->getExperienceTracker()->setVeterancyLevel(controller->getProductionVeterancyLevel(obj->getTemplate()->getName()));
+		}
 		if (lua)
 			lua->registerObject(*obj);
 		ExperienceLevelStore::onObjectCreated(obj);

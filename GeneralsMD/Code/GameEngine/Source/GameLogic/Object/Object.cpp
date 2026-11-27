@@ -622,7 +622,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 				static_cast<WeaponModeSpecialPowerUpdate*>(*module)->resolveCastOwner();
 	}
 
-	if (!RetailFileLayers::enabled() || !TheGameState || !TheGameState->isInLoadGame())
+	if (!retailLayers)
 	{
 		const Player* controller = getControllingPlayer();
 		m_experienceTracker->setVeterancyLevel(controller->getProductionVeterancyLevel(getTemplate()->getName()));
