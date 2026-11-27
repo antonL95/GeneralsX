@@ -60,3 +60,55 @@
 876 destroy Player_1 AiPowersCombatTarget 2
 876 destroy Player_1 AiPowersCombatTarget 1
 876 destroy Player_1 AiPowersCombatTarget 0
+890 create Player_2 AiPowersWeaponToggle 0 3100,1450,0
+890 create Player_2 AiPowersWeaponToggle 1 3100,1750,0
+890 create Player_2 AiPowersSiegeToggle 0 3390,1450,0
+891 create Player_1 AiPowersCombatTarget 0 3135,1450,0
+891 create Player_1 AiPowersCombatTarget 1 3200,1750,0
+891 create Player_1 AiPowersCombatTarget 2 3265,1450,0
+891 create Player_1 AiPowersCombatTarget 3 3430,1490,0
+891 create Player_1 AiPowersSiegeTarget 0 3430,1450,0
+892 attack Player_2 AiPowersWeaponToggle 0 Player_1:AiPowersCombatTarget:0
+892 attack Player_2 AiPowersWeaponToggle 1 Player_1:AiPowersCombatTarget:1
+892 attack Player_2 AiPowersSiegeToggle 0 Player_1:AiPowersSiegeTarget:0
+965 ability Player_2 AiPowersWeaponToggle 0
+965 ability Player_2 AiPowersWeaponToggle 1
+965 ability Player_2 AiPowersSiegeToggle 0
+970 attack Player_2 AiPowersWeaponToggle 0 Player_1:AiPowersCombatTarget:2
+970 attack Player_2 AiPowersSiegeToggle 0 Player_1:AiPowersCombatTarget:3
+1195 ability Player_2 AiPowersWeaponToggle 0
+1195 ability Player_2 AiPowersSiegeToggle 0
+1196 destroy Player_2 AiPowersWeaponToggle 1
+1196 destroy Player_2 AiPowersWeaponToggle 0
+1196 destroy Player_2 AiPowersSiegeToggle 0
+1196 destroy Player_1 AiPowersCombatTarget 3
+1196 destroy Player_1 AiPowersCombatTarget 2
+1196 destroy Player_1 AiPowersCombatTarget 1
+1196 destroy Player_1 AiPowersCombatTarget 0
+1196 destroy Player_1 AiPowersSiegeTarget 0
+895 create Player_2 AiPowersMountCaster 0 3390,1780,0
+895 create Player_2 AiPowersMountCaster 1 3390,1860,0
+896 create Player_2 AiPowersMountCavalry 0 3430,1780,0
+896 create Player_2 AiPowersMountCavalry 1 3430,1830,0
+897 ai-powers-mount-team Player_2 AiPowersMountCaster 0 AiPowersMountTeam
+897 ai-powers-mount-team Player_2 AiPowersMountCavalry 0 AiPowersMountTeam
+897 ai-powers-mount-team Player_2 AiPowersMountCavalry 1 AiPowersMountTeam
+965 ability Player_2 AiPowersMountCaster 0
+965 ability Player_2 AiPowersMountCaster 1
+1040 destroy Player_2 AiPowersMountCavalry 1
+1040 destroy Player_2 AiPowersMountCavalry 0
+1195 ability Player_2 AiPowersMountCaster 0
+1196 destroy Player_2 AiPowersMountCaster 1
+1196 destroy Player_2 AiPowersMountCaster 0
+998 create Player_2 AiPowersPoweredWeaponToggle 0 3650,1750,0
+998 create Player_2 AiPowersFormationToggle 0 3000,1250,0
+999 create Player_1 AiPowersFormationTarget 0 3680,1750,0
+999 create Player_1 AiPowersFormationTarget 1 3160,1250,0
+1006 attack Player_2 AiPowersPoweredWeaponToggle 0 Player_1:AiPowersFormationTarget:0
+1006 attack Player_2 AiPowersFormationToggle 0 Player_1:AiPowersFormationTarget:1
+1035 formation-state Player_2 AiPowersFormationToggle 0
+1075 ability Player_2 AiPowersPoweredWeaponToggle 0
+1076 destroy Player_2 AiPowersPoweredWeaponToggle 0
+1076 destroy Player_2 AiPowersFormationToggle 0
+1076 destroy Player_1 AiPowersFormationTarget 1
+1076 destroy Player_1 AiPowersFormationTarget 0

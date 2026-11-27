@@ -19,11 +19,13 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #if RTS_ZEROHOUR
+#include "Common/Team.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "GameLogic/Weapon.h"
 #endif
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
@@ -164,6 +166,42 @@ Bool canPoisonVictim(const Object& source, const Object& victim)
 	return !victim.isKindOf(KINDOF_STRUCTURE) && !victim.isKindOf(KINDOF_MACHINE) &&
 		!victim.isKindOf(KINDOF_SHIP) &&
 		ThePartitionManager->getDistanceSquared(&source, &victim, FROM_CENTER_2D) < poisonDistanceSquared;
+}
+
+Bool canToggleWeapon(const Object& source, const Object& victim, Bool siege)
+{
+	const Weapon* weapon = source.getCurrentWeapon();
+	if (!weapon)
+		return FALSE;
+
+	constexpr Real meleeDistanceSquared = 50.0f * 50.0f;
+	constexpr Real rangedDistanceSquared = 150.0f * 150.0f;
+	const Bool melee = weapon->getTemplate()->isMeleeWeapon();
+	const Bool structure = victim.isKindOf(KINDOF_STRUCTURE);
+	const Real distance = ThePartitionManager->getDistanceSquared(&source, &victim, FROM_CENTER_3D);
+	if (siege)
+		return melee ? structure : !structure && distance <= rangedDistanceSquared;
+	return melee ? distance >= rangedDistanceSquared : distance <= meleeDistanceSquared;
+}
+
+Bool shouldToggleMount(Object& source, const Player& player)
+{
+	Team* team = source.getTeam();
+	if (!team || team == player.getDefaultTeam())
+		return FALSE;
+
+	Int cavalryBalance = 0;
+	team->iterateObjects([](Object* member, void* state) {
+		const Object* container = member->getContainedBy();
+		if (container && container->isKindOf(KINDOF_HORDE))
+			return;
+		constexpr Int cavalryThreatKind = 3;
+		const auto& threats = member->getTemplate()->getRotWKObjectData().threatBreakdowns;
+		const Bool cavalry = !threats.empty() && threats.back().aiKindOf == cavalryThreatKind;
+		*static_cast<Int*>(state) += cavalry ? 1 : -1;
+	}, &cavalryBalance);
+
+	return source.getLogicModelConditions().test(MODELCONDITION_MOUNTED) ? cavalryBalance < 0 : cavalryBalance > 0;
 }
 
 Real bodyHealthFraction(const Object& object)
@@ -515,6 +553,25 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (stance != AttributeModifierRules::STANCE_UNINITIALIZED)
 		return updateStancePolicy(*source, *player, *button, stance);
 
+	const Bool siege = policy == "AI_SPECIAL_POWER_TOGGLE_SIEGE";
+	const Bool weaponToggle = siege || policy == "AI_SPECIAL_POWER_TOGGLE_MELEE_AND_RANGE";
+	const Bool formationButton = button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION;
+	if (weaponToggle && (formationButton || button->getCommandType() == GUI_COMMAND_TOGGLE_WEAPONSET))
+	{
+		const Object* victim = combatVictim(*source);
+		if (!victim || !canToggleWeapon(*source, *victim, siege) || !button->canUseRetailToggle(source, -1) ||
+			!rollRetailPolicyActivation(*player))
+			return retailPolicyPoll;
+		if (formationButton)
+		{
+			auto* horde = const_cast<HordeContain*>(HordeContain::get(source));
+			horde->setAlternateFormation(!horde->isAlternateFormation());
+		}
+		else
+			source->doCommandButton(button, CMD_FROM_AI);
+		return retailPolicyCooldown;
+	}
+
 	const Bool selfBuff = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF";
 	if (button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
 	{
@@ -530,6 +587,29 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
 		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
+
+	if (weaponToggle || policy == "AI_SPECIAL_POWER_TOGGLE_MOUNTED")
+	{
+		if (weaponToggle)
+		{
+			const Object* victim = combatVictim(*source);
+			if (!victim || !canToggleWeapon(*source, *victim, siege))
+				return retailPolicyPoll;
+		}
+		else if (!shouldToggleMount(*source, *player))
+			return retailPolicyPoll;
+
+		const UnsignedInt options = button->getOptions();
+		const Coord3D* location = BitIsSet(options, NEED_TARGET_POS) ? source->getPosition() : nullptr;
+		if (!button->isValidToUseOn(source, nullptr, location, CMD_FROM_AI) ||
+			!power->isValidRetailTarget(source, nullptr, location, CMD_FROM_AI) || !rollRetailPolicyActivation(*player))
+			return retailPolicyPoll;
+		if (location)
+			source->doSpecialPowerAtLocation(power, location, INVALID_ANGLE, options);
+		else
+			source->doSpecialPower(power, options);
+		return retailPolicyCooldown;
+	}
 
 	if (policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
 	{

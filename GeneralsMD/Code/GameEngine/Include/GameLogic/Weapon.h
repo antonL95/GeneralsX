@@ -384,6 +384,7 @@ public:
 	void friend_setNextTemplate(WeaponTemplate *nextTemplate) { m_nextTemplate = nextTemplate; }
 	WeaponTemplate *friend_clearNextTemplate() {	WeaponTemplate *ret = m_nextTemplate; m_nextTemplate = nullptr; return ret; }
 	Bool isOverride() { return m_nextTemplate != nullptr; }
+	Bool isMeleeWeapon() const { return m_meleeWeapon; }
 
 	/// field table for loading the values from an INI
 	const FieldParse *getFieldParse() const { return TheWeaponTemplateFieldParseTable; }

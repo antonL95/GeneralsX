@@ -46,6 +46,29 @@ expect_combat_impacts() {
     fi
 }
 
+expect_weapon() {
+    observation_frame=$1
+    actor=$2
+    ordinal=$3
+    weapon=$4
+    if covers "$observation_frame" && ! grep -F "TEST ability $observation_frame Player_2 $actor " "$log" | sed -n "${ordinal}p" | grep -Fq " weapon=$weapon "; then
+        printf '%s should have weapon %s at frame %s\n' "$actor" "$weapon" "$observation_frame" >&2
+        grep -F "TEST ability $observation_frame Player_2 $actor " "$log" >&2 || true
+        return 1
+    fi
+}
+
+expect_mounted() {
+    observation_frame=$1
+    ordinal=$2
+    mounted=$3
+    if covers "$observation_frame" && ! grep -F "TEST ability $observation_frame Player_2 AiPowersMountCaster " "$log" | sed -n "${ordinal}p" | grep -Fq " mounted=$mounted "; then
+        printf 'Expected mount state %s for AiPowersMountCaster %s at frame %s\n' "$mounted" "$ordinal" "$observation_frame" >&2
+        grep -F "TEST ability $observation_frame Player_2 AiPowersMountCaster " "$log" >&2 || true
+        return 1
+    fi
+}
+
 check() {
     expect_pending AiPowersChargeCaster || return 1
     expect_pending AiPowersMorgulCaster || return 1
@@ -72,5 +95,19 @@ check() {
             grep -F 'TEST health 875 Player_2 AiPowersSummonMarker 0 ' "$log" >&2 || true
             return 1
         fi
+    fi
+    expect_weapon 965 AiPowersWeaponToggle 1 AiPowersToggleMeleeWeapon || return 1
+    expect_weapon 965 AiPowersWeaponToggle 2 AiPowersToggleRangedWeapon || return 1
+    expect_weapon 965 AiPowersSiegeToggle 1 AiPowersToggleRangedWeapon || return 1
+    expect_weapon 1195 AiPowersWeaponToggle 1 AiPowersToggleRangedWeapon || return 1
+    expect_weapon 1195 AiPowersSiegeToggle 1 AiPowersToggleMeleeWeapon || return 1
+    expect_mounted 965 1 1 || return 1
+    expect_mounted 965 2 0 || return 1
+    expect_mounted 1195 1 0 || return 1
+    expect_weapon 1075 AiPowersPoweredWeaponToggle 1 AiPowersToggleMeleeWeapon || return 1
+    if covers 1035 && ! grep -Eq '^TEST formation-state 1035 AiPowersFormationToggle 0 .* active=1$' "$log"; then
+        printf 'Expected the AI horde to enter its alternate formation at frame 1035\n' >&2
+        grep -F 'TEST formation-state 1035 AiPowersFormationToggle ' "$log" >&2 || true
+        return 1
     fi
 }
