@@ -235,7 +235,11 @@ struct RetailAITuning
 	Bool disableUnitUpgrading = FALSE;
 	Bool disableScienceUpgrading = FALSE;
 	Bool disableTacticalAI = FALSE;
+	Bool disableTeamBuilding = FALSE;
 	Bool disableWallBuilding = FALSE;
+	Bool controlHumanSkirmishSides = FALSE;
+	Real teamIdleCheckRadius = 50.0f;
+	Real teamTimeUntilConsideredIdle = 3.0f;
 	Real defenseTreeNodeRadius = 300.0f;
 };
 
@@ -1117,11 +1121,20 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "DisableUnitUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitUpgrading) },
 		{ "DisableScienceUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableScienceUpgrading) },
 		{ "DisableTacticalAI", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTacticalAI) },
+		{ "DisableTeamBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTeamBuilding) },
 		{ "DisableWallBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableWallBuilding) },
+		{ "MakeAllSkirmishSidesAIControlled", INI::parseBool, nullptr, offsetof(RetailAITuning, controlHumanSkirmishSides) },
+		{ "TeamIdleCheckRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, teamIdleCheckRadius) },
+		{ "TeamTimeUntilConsideredIdle", INI::parseReal, nullptr, offsetof(RetailAITuning, teamTimeUntilConsideredIdle) },
 		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&retailTuning, fields);
+}
+
+Bool AISkirmishPlayer::controlsHumanSkirmishSides()
+{
+	return retailTuning.controlHumanSkirmishSides;
 }
 
 Bool AISkirmishPlayer::hasRetailCombatChain(const ThingTemplate& attacker)
@@ -1840,6 +1853,8 @@ Bool AISkirmishPlayer::checkBridges(Object *unit, Waypoint *way)
 	*/
 void AISkirmishPlayer::buildSpecificAITeam( TeamPrototype *teamProto, Bool priorityBuild)
 {
+	if (RetailFileLayers::enabled() && retailTuning.disableTeamBuilding)
+		return;
 	AIPlayer::buildSpecificAITeam(teamProto, priorityBuild);
 }
 
@@ -1849,6 +1864,8 @@ void AISkirmishPlayer::buildSpecificAITeam( TeamPrototype *teamProto, Bool prior
 	*/
 void AISkirmishPlayer::recruitSpecificAITeam(TeamPrototype *teamProto, Real recruitRadius)
 {
+	if (RetailFileLayers::enabled() && retailTuning.disableTeamBuilding)
+		return;
 	if (recruitRadius < 1) recruitRadius = 99999.0f;
 	//
 	// Create "Team in queue" based on team population
@@ -2171,6 +2188,8 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 			raid.target = INVALID_ID;
 			raid.members.fill(INVALID_ID);
 			raid.issuedFrame = 0;
+			raid.lastIdlePosition = {};
+			raid.idleSince = 0;
 			raid.nextFrame = frame + GameLogicRandomValue(10 * LOGICFRAMES_PER_SECOND, 60 * LOGICFRAMES_PER_SECOND);
 		}
 		return FALSE;
@@ -2180,6 +2199,11 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 		m_player->getRelationship(previousTarget->getTeam()) == ENEMIES;
 	if (raid.issuedFrame != 0)
 	{
+		std::array<Object*, 3> executingMembers{};
+		size_t executingCount = 0;
+		size_t liveCount = 0;
+		Coord3D center{};
+		Bool engaged = FALSE;
 		for (ObjectID id : raid.members)
 		{
 			Object* unit = TheGameLogic->findObjectByID(id);
@@ -2187,15 +2211,34 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 				continue;
 			const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
 			AIUpdateInterface* ai = unit->getAI();
+			center = center + *unit->getPosition();
+			++liveCount;
+			engaged = engaged || unit->isKindOf(KINDOF_NO_FREEWILL_ENTER) ||
+				(horde ? horde->isEngaging() : ai && ai->getCurrentVictim());
 			const Bool executing = horde ? horde->isExecutingPlannerOrder(raid.target, raid.issuedFrame)
 				: ai && ai->isExecutingRetailPlannerOrder(raid.target, raid.issuedFrame);
-			if (!executing)
-				continue;
-			if (targetHeld)
+			if (executing && ai)
+				executingMembers[executingCount++] = unit;
+		}
+		if (targetHeld && executingCount > 0)
+		{
+			center.scale(1.0f / static_cast<Real>(liveCount));
+			const Bool moved = raid.idleSince == 0 ||
+				tacticalDistanceSquared(center, raid.lastIdlePosition) > sqr(retailTuning.teamIdleCheckRadius);
+			if (moved)
+				raid.lastIdlePosition = center;
+			if (moved || engaged)
+				raid.idleSince = frame;
+			if (static_cast<Real>(frame - raid.idleSince) <
+					retailTuning.teamTimeUntilConsideredIdle * static_cast<Real>(LOGICFRAMES_PER_SECOND))
 				return TRUE;
-			ai->aiIdle(CMD_FROM_AI);
-			if (previousTarget)
-				m_retailObjectives.erase({id, raid.target, previousTarget->getTeam()->getID()});
+		}
+		for (size_t i = 0; i < executingCount; ++i)
+		{
+			Object* unit = executingMembers[i];
+			unit->getAI()->aiIdle(CMD_FROM_AI);
+			if (previousTarget && !targetHeld)
+				m_retailObjectives.erase({unit->getID(), raid.target, previousTarget->getTeam()->getID()});
 		}
 	}
 	if ((!canStart && !raid.issuedFrame) || frame < raid.nextFrame)
@@ -2312,6 +2355,8 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 		return endRaid();
 	raid.target = target->getID();
 	raid.issuedFrame = frame;
+	raid.lastIdlePosition = {};
+	raid.idleSince = 0;
 	if (trace)
 		std::fprintf(stderr, "AI_FARM_RAID\t%u\t%d\t%d\t%zu\n", frame, m_player->getPlayerIndex(), raid.target, recruited);
 	return TRUE;
@@ -4384,6 +4429,13 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferInt(&m_retailFarmRaid.rushPolicy);
 		}, [this] {
 			m_retailFarmRaid = {};
+		}},
+		{"skirmish-farm-raid-idle", [this](Xfer* x) {
+			x->xferCoord3D(&m_retailFarmRaid.lastIdlePosition);
+			x->xferUnsignedInt(&m_retailFarmRaid.idleSince);
+		}, [this] {
+			m_retailFarmRaid.lastIdlePosition = {};
+			m_retailFarmRaid.idleSince = 0;
 		}},
 		{"skirmish-roaming-defense", [this](Xfer* x) {
 			x->xferUnsignedInt(&m_retailRoamNextFrame);

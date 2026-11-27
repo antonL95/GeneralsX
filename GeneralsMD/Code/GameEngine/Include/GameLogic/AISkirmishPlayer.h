@@ -54,6 +54,7 @@ public:	 // AISkirmish specific methods.
 	static void parseRetailArmy(INI* ini);
 	static void parseRetailBase(INI* ini);
 	static void parseRetailTuning(INI* ini);
+	static Bool controlsHumanSkirmishSides();
 	static Bool rollRetailSpecialPowerActivation(const Player& player);
 	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
 	static Real getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target);
@@ -165,6 +166,8 @@ protected:
 		UnsignedInt issuedFrame = 0;
 		UnsignedInt nextFrame = 0;
 		Int rushPolicy = 0;
+		Coord3D lastIdlePosition{};
+		UnsignedInt idleSince = 0;
 	};
 	RetailFarmRaid m_retailFarmRaid;
 	Bool updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,

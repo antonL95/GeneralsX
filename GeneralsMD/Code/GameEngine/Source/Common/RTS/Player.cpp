@@ -867,6 +867,12 @@ void Player::initFromDict(const Dict* d)
 	if (d->getBool(TheKey_playerIsHuman) || forceHuman)
 	{
 		setPlayerType(PLAYER_HUMAN, false);
+		if (rotwk && skirmish && isPlayableSide() && !isPlayerObserver() &&
+			AISkirmishPlayer::controlsHumanSkirmishSides())
+		{
+			m_ai = newInstance(AISkirmishPlayer)(this);
+			m_ai->setAIDifficulty(TheScriptEngine->getGlobalDifficulty());
+		}
 		if (d->getBool(TheKey_playerIsPreorder, &exists))
 		{
 			m_isPreorder = TRUE;
