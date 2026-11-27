@@ -87,7 +87,7 @@ Bool GateOpenAndCloseBehavior::canPass(const Object* obstacle, const Object* uni
 		return FALSE;
 	if (const auto* gate = find(obstacle))
 		return gate->permits(*unit, planning);
-	if (DynamicPortalBehaviour::find(obstacle))
+	if (DynamicPortalBehaviour::find(obstacle) && !SiegeAIUpdate::find(obstacle))
 	{
 		const NameKeyType key = NAMEKEY("DynamicPortalBehaviour");
 		for (BehaviorModule** module = obstacle->getBehaviorModules(); *module; ++module)

@@ -8,7 +8,8 @@ expect_portal() {
 check() {
     expect_portal 220 SiegePortalLadder 'active=1 docked=1 .* waypoints=4 topPos=1'
     expect_portal 250 SiegePortalHorde 'ord=0 .* climbing=1 .* climbSeg=0 '
-    expect_portal 300 SiegePortalHorde 'ord=0 .* climbing=1 .* climbSeg=1 '
+    expect_portal 270 SiegePortalHorde 'ord=0 .* climbing=1 .* climbSeg=1 '
+    expect_portal 300 SiegePortalHorde 'ord=0 .* climbing=1 .* climbSeg=2 '
     expect_portal 400 SiegePortalHorde 'ord=0 layer=15 wall=1 .* contained=0 climbing=0 '
     expect_portal 422 SiegePortalDefender 'ord=0 layer=15 wall=1 .* inRange=1 topRange=1 '
     expect_portal 422 SiegePortalDefender 'ord=1 layer=15 wall=1 .* inRange=0 topRange=0 '
