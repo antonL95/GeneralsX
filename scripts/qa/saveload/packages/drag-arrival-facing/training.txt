@@ -1,0 +1,12 @@
+206 create Player_1 DragArrivalCcw 0 2200,3000,0
+206 create Player_1 DragArrivalCw 0 2200,3150,0
+250 select Player_1 DragArrivalCcw 0
+250 drag-formation Player_1 - 0 0 2200 3000 1.65
+251 select Player_1 DragArrivalCw 0
+251 drag-formation Player_1 - 0 0 2200 3150 -1.5707964
+253 drag-formation-state Player_1 DragArrivalCw 0
+254 drag-formation-state Player_1 DragArrivalCw 0
+256 drag-formation-state Player_1 DragArrivalCcw 0
+257 drag-formation-state Player_1 DragArrivalCcw 0
+265 destroy Player_1 DragArrivalCcw 0
+265 destroy Player_1 DragArrivalCw 0

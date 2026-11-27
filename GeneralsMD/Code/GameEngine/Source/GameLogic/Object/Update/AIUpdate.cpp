@@ -2491,9 +2491,8 @@ Bool AIUpdateInterface::stepMoveOrientation()
 		m_hasArrivalFacing = FALSE;
 		return FALSE;
 	}
-	constexpr Real facingTolerance = 0.035f;
 	Object* object = getObject();
-	if (fabs(stdAngleDiff(m_arrivalFacing, object->getOrientation())) <= facingTolerance)
+	if (stdAngleDiff(m_arrivalFacing, object->getOrientation()) < PI / 10.0f)
 	{
 		object->setOrientation(m_arrivalFacing);
 		m_hasArrivalFacing = FALSE;
