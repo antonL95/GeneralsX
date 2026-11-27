@@ -582,6 +582,11 @@ void ShowControlBar( Bool immediate )
 	if (!TheWindowManager || !TheControlBar)
 		return;
 
+#if RTS_ZEROHOUR
+	if (TheInGameUI && TheInGameUI->isScriptUiHidden())
+		return;
+#endif
+
 	showReplayControls();
 
 	TheControlBar->showSpecialPowerShortcut();

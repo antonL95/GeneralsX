@@ -8205,6 +8205,12 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::PLAYER_EXIT_ALL_BUILDINGS:
 			doPlayerExitAllBuildings(pAction->getParameter(0)->getString());
 			return;
+		case ScriptAction::HIDE_UI:
+		case ScriptAction::SHOW_UI:
+			if (TheInGameUI)
+				TheInGameUI->setScriptUiHidden(pAction->getActionType() == ScriptAction::HIDE_UI);
+			return;
+
 		case ScriptAction::CAMERA_LETTERBOX_BEGIN:
 			doLetterBoxMode(true);
 			return;

@@ -82,6 +82,7 @@
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/UiTest.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameClient/RetailWorldUI.h"
 
 #include "GameLogic/AIGuard.h"
@@ -371,7 +372,7 @@ void InGameUI::crc( Xfer *xfer )
 void InGameUI::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 3;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -532,6 +533,14 @@ void InGameUI::xfer( Xfer *xfer )
 		}
 	}
 
+	if (RetailFileLayers::enabled())
+	{
+		RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, version >= 4, {
+			{"script-ui-hidden",
+				[this](Xfer *block) { block->xferBool(&m_scriptUiHidden); },
+				[this] { m_scriptUiHidden = FALSE; }},
+		});
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -539,7 +548,17 @@ void InGameUI::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void InGameUI::loadPostProcess()
 {
+	if (m_scriptUiHidden)
+		HideControlBar();
+}
 
+void InGameUI::setScriptUiHidden(Bool hidden)
+{
+	m_scriptUiHidden = hidden;
+	if (hidden)
+		HideControlBar();
+	else if (!TheScriptEngine || !TheScriptEngine->isLetterBoxActive())
+		ShowControlBar();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2321,6 +2340,7 @@ void InGameUI::unregisterWindowLayout( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::reset()
 {
+	m_scriptUiHidden = FALSE;
 	m_retailAttackActive = FALSE;
 	m_retailPlacementValid = FALSE;
 	m_isQuitMenuVisible = FALSE;

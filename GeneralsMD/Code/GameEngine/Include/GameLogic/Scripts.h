@@ -648,6 +648,8 @@ public:
 		UNIT_SET_MAX_LEVEL,
 		CAMERA_RESTRICT_TO_AREA,
 		CAMERA_REMOVE_AREA_RESTRICTION,
+		HIDE_UI,
+		SHOW_UI,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

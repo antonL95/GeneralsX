@@ -136,3 +136,4 @@
 3 map-script-camera-ui
 3 map-camera-entered-area
 3 map-camera-restriction
+3 map-script-hide-ui
