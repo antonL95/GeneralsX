@@ -706,6 +706,48 @@ void teamTeleportProbe(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST map-unit-ops team teleport frame=%u moved=%d missing=%d\n", ctx.frame, moved, missing);
 }
 
+void teamGarrisonProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* first = ctx.requireObject();
+	Object* second = ctx.findTarget();
+	Object* firstBuilding = ctx.findTarget(std::string_view("*:MapScriptGarrisonBuilding:0"));
+	Object* secondBuilding = ctx.findTarget(std::string_view("*:MapScriptGarrisonBuilding:1"));
+	if (!first || !second || !firstBuilding || !secondBuilding)
+		return;
+	Bool missing = TRUE;
+	if (ctx.frame == 242)
+	{
+		const Int type = ScriptEngine::findRotwkActionByRetailIndex(573);
+		const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+		if (definition && definition->m_internalName == "TEAM_GARRISON_TEAM_INSTANTLY" &&
+			definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::TEAM &&
+			definition->getParameterType(1) == Parameter::TEAM)
+		{
+			Team* original = first->getTeam();
+			Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+			first->setTemporaryTeam(team);
+			second->setTemporaryTeam(team);
+			auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+			action->getParameter(0)->friend_setString("<This Team>");
+			action->getParameter(1)->friend_setString("MapScriptGarrisonMissing");
+			TheScriptEngine->friend_executeAction(action, team);
+			missing = !first->getContainedBy() && !second->getContainedBy();
+			action->getParameter(1)->friend_setString(firstBuilding->getTeam()->getName());
+			TheScriptEngine->friend_executeAction(action, team);
+			deleteInstance(action);
+			first->setTemporaryTeam(original);
+			second->setTemporaryTeam(original);
+			deleteInstance(team);
+		}
+	}
+	const Object* firstDestination = first->getContainedBy();
+	const Object* secondDestination = second->getContainedBy();
+	const Bool distributed = (firstDestination == firstBuilding && secondDestination == secondBuilding) ||
+		(firstDestination == secondBuilding && secondDestination == firstBuilding);
+	std::fprintf(stderr, "TEST map-unit-ops garrison team frame=%u distributed=%d missing=%d\n",
+		ctx.frame, distributed, missing);
+}
+
 void probe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -732,6 +774,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-attack", probe);
 	registerAction("map-unit-ops-teleport", teleportProbe);
 	registerAction("map-unit-ops-team-teleport", teamTeleportProbe);
+	registerAction("map-unit-ops-garrison-team", teamGarrisonProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-set-xp", setExperienceProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);

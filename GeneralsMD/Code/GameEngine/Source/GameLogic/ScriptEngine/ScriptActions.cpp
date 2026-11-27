@@ -8117,6 +8117,43 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_GARRISON_SPECIFIC_BUILDING:
 			doTeamGarrisonSpecificBuilding(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
+		case ScriptAction::TEAM_GARRISON_TEAM_INSTANTLY:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			Team* targets = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString());
+			if (!team || !targets)
+				return;
+			std::vector<ObjectID> containers;
+			for (auto target = targets->iterate_TeamMemberList(); !target.done(); target.advance())
+				if (target.cur()->getContain())
+					containers.push_back(target.cur()->getID());
+			if (containers.empty())
+				return;
+			std::vector<ObjectID> passengers;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+				passengers.push_back(member.cur()->getID());
+			std::size_t nextContainer = 0;
+			for (const ObjectID id : passengers)
+			{
+				Object* unit = TheGameLogic->findObjectByID(id);
+				if (!unit || unit->isDestroyed() || unit->isEffectivelyDead() || unit->getContainedBy())
+					continue;
+				for (std::size_t tried = 0; tried < containers.size(); ++tried)
+				{
+					Object* target = TheGameLogic->findObjectByID(containers[nextContainer]);
+					nextContainer = (nextContainer + 1) % containers.size();
+					if (!target || target == unit || target->isDestroyed() || target->isEffectivelyDead())
+						continue;
+					ContainModuleInterface* contain = target->getContain();
+					if (contain && contain->isValidContainerFor(unit, TRUE))
+					{
+						contain->addToContain(unit);
+						break;
+					}
+				}
+			}
+			return;
+		}
 		case ScriptAction::EXIT_SPECIFIC_BUILDING:
 			doExitSpecificBuilding(pAction->getParameter(0)->getString());
 			return;
