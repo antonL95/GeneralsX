@@ -156,7 +156,7 @@ public:
 	std::vector<AsciiString> m_conflictsWith;
 	SpecialPowerAnimation m_customAnim;
 	Real m_activationDelaySeconds = 0.0f;
-	Int m_aboveWall = 0;
+	Int m_aboveWall = -1;
 	Coord3D m_topAttackPos = {0.0f, 0.0f, 0.0f};
 	Real m_topAttackRadius = 5.0f;
 	SpecialPowerObjectFilter m_objectFilter;
@@ -176,6 +176,7 @@ public:
 	static DynamicPortalBehaviour* find(const Object* object);
 	Bool isActive() const { return m_active; }
 	Bool permits(const Object& unit) const;
+	Bool canDockOnWall() const;
 	Bool getAboveWallPosition(Coord3D& position) const;
 	Bool getClimbEntryPosition(Coord3D& position) const;
 	Bool getClimbWaypoints(std::vector<Coord3D>& positions) const;

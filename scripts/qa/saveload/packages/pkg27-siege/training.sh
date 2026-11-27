@@ -9,9 +9,9 @@ check() {
     expect_state 186 Pkg27Ladder 'occupants=1 deployed=0 packing=0 unpacking=0 power=1 ready=1 '
     expect_state 200 Pkg27MordorSiegeTower 'occupants=2 '
     expect_state 200 Pkg27IthilienRam 'occupants=6 '
-    expect_state 200 Pkg27Ladder 'occupants=1 deployed=0 packing=0 unpacking=1 power=1 ready=0 '
-    expect_state 242 Pkg27Ladder 'occupants=1 deployed=1 packing=0 unpacking=0 power=1 ready=1 .* deployedFlag=1 constructing=0 '
-    expect_state 250 Pkg27Ladder 'occupants=1 deployed=1 packing=0 unpacking=0 power=1 ready=1 .* deployedFlag=1 constructing=0 '
+    expect_state 200 Pkg27Ladder 'occupants=1 deployed=0 packing=0 unpacking=0 power=1 ready=0 .* approaching=1 '
+    expect_state 242 Pkg27Ladder 'occupants=1 deployed=0 packing=0 unpacking=1 power=1 ready=1 '
+    expect_state 250 Pkg27Ladder 'occupants=1 deployed=0 packing=0 unpacking=1 power=1 ready=1 '
     expect_state 275 Pkg27Ladder '.* approaching=1 .* accepted=1 goal=1312\.'
     expect_state 600 Pkg27Ladder 'occupants=1 deployed=1 packing=0 unpacking=0 power=1 ready=1 .* deployedFlag=1 constructing=0 '
     if covers 600; then

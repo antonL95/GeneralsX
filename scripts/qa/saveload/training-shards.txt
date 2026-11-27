@@ -103,6 +103,7 @@
 3 tree-buffer
 3 siege-portal
 3 garrison-contain
+3 garrison-dock
 4 pkg34-nuggets
 3 death-debris
 3 context-commands

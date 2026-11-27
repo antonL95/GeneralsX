@@ -64,6 +64,7 @@ public:
 	Bool isApproaching() const { return m_phase == Approaching; }
 	const Coord3D& getDockPosition() const { return m_dockPosition; }
 	Bool getReleasePosition(Coord3D& position) const;
+	Bool isAllowedToAdjustDestination() const override;
 	UpdateSleepTime update() override;
 	void aiDoCommand(const AICommandParms* parms) override;
 	void onDelete() override;
@@ -72,7 +73,6 @@ private:
 	enum Phase { Idle, Approaching, Lowering, Docked, Raising };
 	void transferDock(Xfer* xfer);
 	void resetDock();
-	Real dockingRadiusSquared() const;
 	Bool chooseSocket(SiegeDockingBehavior& wall, CommandSourceType source);
 	Bool chooseNearbyWall(const Object& wall, CommandSourceType source);
 	void setPhase(Phase phase);

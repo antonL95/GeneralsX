@@ -18,6 +18,7 @@
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/RetailSiegeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/TerrainLogic.h"
 #include "WWMath/wwmath.h"
@@ -200,10 +201,9 @@ Bool SiegeAIUpdate::getClimbEntryPosition(const Object* carrier, const Object* r
 	return TRUE;
 }
 
-Real SiegeAIUpdate::dockingRadiusSquared() const
+Bool SiegeAIUpdate::isAllowedToAdjustDestination() const
 {
-	const Real radius = std::max(Real(PATHFIND_CELL_SIZE), getObject()->getGeometryInfo().getMinorRadius());
-	return radius * radius;
+	return m_phase != Approaching || !m_skipAdjustPosition;
 }
 
 Bool SiegeAIUpdate::chooseSocket(SiegeDockingBehavior& wall, CommandSourceType source)
@@ -241,8 +241,12 @@ Bool SiegeAIUpdate::chooseSocket(SiegeDockingBehavior& wall, CommandSourceType s
 	m_dockPosition = sockets[selected].position;
 	m_dockFacing = sockets[selected].facing;
 	wall.reserve(carrier, selected);
-	if (closest > dockingRadiusSquared())
-		AIUpdateInterface::aiMoveToPosition(&m_dockPosition, source);
+	if (closest > 0.0f)
+	{
+		AICommandParms move(AICMD_MOVE_TO_POSITION, source);
+		move.m_pos = m_dockPosition;
+		AIUpdateInterface::aiDoCommand(&move);
+	}
 	return TRUE;
 }
 
@@ -288,12 +292,12 @@ Bool SiegeAIUpdate::beginDock(Object* wall, const SiegeDeploySpecialPowerModuleD
 	m_wallSearchDistance = data.m_wallSearchDistance;
 	m_evacuate = data.m_evacuate;
 	m_skipAdjustPosition = data.m_skipAdjustPosition;
+	setPhase(Approaching);
 	if (!chooseSocket(*docking, source) && !chooseNearbyWall(*wall, source))
 	{
 		resetDock();
 		return FALSE;
 	}
-	setPhase(Approaching);
 	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
 	return TRUE;
 }
@@ -458,16 +462,24 @@ UpdateSleepTime SiegeAIUpdate::update()
 	}
 
 	const UnsignedInt frame = TheGameLogic->getFrame();
-	if (m_phase == Approaching)
+	if (m_phase == Approaching && (isIdle() || ThePartitionManager->isColliding(carrier, target)))
 	{
-		if (distanceSquared(*carrier->getPosition(), m_dockPosition) <= dockingRadiusSquared())
+		const Real facingError = normalizeAngle(m_dockFacing - carrier->getOrientation());
+		const Real facingTolerance = 0.15f;
+		const Bool aligned = WWMath::Fabs(facingError) < facingTolerance;
+		const auto* portal = DynamicPortalBehaviour::find(carrier);
+		if (aligned && portal && portal->canDockOnWall())
 		{
 			AIUpdateInterface::aiIdle(CMD_FROM_AI);
-			if (m_skipAdjustPosition)
-				carrier->setPosition(&m_dockPosition);
-			carrier->setOrientation(m_dockFacing);
 			setPhase(Lowering);
 			m_deadline = frame + m_lowerDelay;
+		}
+		else if (isIdle() && !aligned)
+		{
+			Coord3D lookAt = *carrier->getPosition();
+			lookAt.x += WWMath::CosTrig(m_dockFacing);
+			lookAt.y += WWMath::SinTrig(m_dockFacing);
+			AIUpdateInterface::aiFacePosition(&lookAt, CMD_FROM_AI);
 		}
 		else if (isIdle())
 		{

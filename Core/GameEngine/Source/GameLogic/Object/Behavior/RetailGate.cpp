@@ -622,17 +622,29 @@ Bool DynamicPortalBehaviour::permits(const Object& unit) const
 	return TRUE;
 }
 
+Bool DynamicPortalBehaviour::canDockOnWall() const
+{
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	if (data->m_aboveWall < 0 || static_cast<size_t>(data->m_aboveWall) >= data->m_wayPoints.size())
+		return TRUE;
+	Coord3D position;
+	return getAboveWallPosition(position) && TheAI->pathfinder()->isPointOnWall(&position);
+}
+
 Bool DynamicPortalBehaviour::getAboveWallPosition(Coord3D& position) const
 {
 	const auto* data = getDynamicPortalBehaviourModuleData();
-	if (data->m_aboveWall < 0 || data->m_aboveWall >= data->m_numberOfBones || data->m_bonePrefix.isEmpty())
+	if (data->m_aboveWall < 0 || static_cast<size_t>(data->m_aboveWall) >= data->m_wayPoints.size())
 		return FALSE;
-	std::vector<Coord3D> points(data->m_aboveWall + 1);
+	const Int bone = data->m_wayPoints[data->m_aboveWall].index;
+	if (bone < 0 || bone >= data->m_numberOfBones || data->m_bonePrefix.isEmpty())
+		return FALSE;
+	std::vector<Coord3D> points(bone + 1);
 	const Int count = getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(),
 		static_cast<Int>(points.size()), points.data(), nullptr);
-	if (count <= data->m_aboveWall)
+	if (count <= bone)
 		return FALSE;
-	position = points[data->m_aboveWall];
+	position = points[bone];
 	return TRUE;
 }
 

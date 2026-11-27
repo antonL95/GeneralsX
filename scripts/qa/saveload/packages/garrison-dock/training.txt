@@ -1,0 +1,15 @@
+221 create PlyrCivilian GarrisonDockWall 0 1350,2600,0
+221 create Player_1 GarrisonDockLadder 0 1241,2520,60
+234 power Player_1 GarrisonDockLadder 0 SpecialAbilitySiegeDeploy
+234 aim Player_1 GarrisonDockLadder 0 PlyrCivilian:GarrisonDockWall:0
+236 pkg27-state Player_1 GarrisonDockLadder 0 SpecialAbilitySiegeDeploy
+330 pkg27-state Player_1 GarrisonDockLadder 0 SpecialAbilitySiegeDeploy
+330 siege-portal-probe Player_1 GarrisonDockLadder 0 -
+330 create Player_1 GarrisonDockHorde 0 1240,2510,60
+332 power Player_1 GarrisonDockHorde 0 SpecialAbilitySiegeDeploy
+333 aim Player_1 GarrisonDockHorde 0 PlyrCivilian:GarrisonDockWall:0
+550 siege-portal-probe Player_1 GarrisonDockHorde 0 -
+730 siege-portal-probe Player_1 GarrisonDockHorde 0 -
+735 destroy Player_1 GarrisonDockHorde 0
+735 destroy Player_1 GarrisonDockLadder 0
+735 destroy PlyrCivilian GarrisonDockWall 0
