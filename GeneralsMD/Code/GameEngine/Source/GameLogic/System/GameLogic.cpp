@@ -6086,10 +6086,256 @@ void GameLogic::xfer( Xfer *xfer )
 	}
 }
 
+static Bool isSavedCommandMessage(const GameMessage* message)
+{
+	if (!message)
+		return FALSE;
+	const GameMessage::Type type = message->getType();
+	return type >= GameMessage::MSG_BEGIN_NETWORK_MESSAGES &&
+		type <= GameMessage::MSG_END_NETWORK_MESSAGES &&
+		type != GameMessage::MSG_LOGIC_CRC &&
+		type != GameMessage::MSG_SET_REPLAY_CAMERA &&
+		type != GameMessage::MSG_CLEAR_GAME_DATA;
+}
+
+static void xferPendingCommands(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt count = 0;
+	if (!loading && TheCommandList)
+	{
+		for (const GameMessage* msg = TheCommandList->getFirstMessage(); msg; msg = msg->next())
+		{
+			if (isSavedCommandMessage(msg))
+				++count;
+		}
+	}
+	xfer->xferUnsignedInt(&count);
+	if (!loading)
+	{
+		if (!TheCommandList)
+			return;
+		for (const GameMessage* msg = TheCommandList->getFirstMessage(); msg; msg = msg->next())
+		{
+			if (!isSavedCommandMessage(msg))
+				continue;
+			Int type = static_cast<Int>(msg->getType());
+			Int playerIndex = msg->getPlayerIndex();
+			UnsignedByte argCount = msg->getArgumentCount();
+			xfer->xferInt(&type);
+			xfer->xferInt(&playerIndex);
+			xfer->xferUnsignedByte(&argCount);
+			for (Int i = 0; i < argCount; ++i)
+			{
+				Int argType = static_cast<Int>(msg->getArgumentDataType(i));
+				xfer->xferInt(&argType);
+				const GameMessageArgumentType* arg = msg->getArgument(i);
+				switch (static_cast<GameMessageArgumentDataType>(argType))
+				{
+					case ARGUMENTDATATYPE_INTEGER:
+					{
+						Int value = arg->integer;
+						xfer->xferInt(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_REAL:
+					{
+						Real value = arg->real;
+						xfer->xferReal(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_BOOLEAN:
+					{
+						Bool value = arg->boolean;
+						xfer->xferBool(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_OBJECTID:
+					{
+						ObjectID value = arg->objectID;
+						xfer->xferObjectID(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_DRAWABLEID:
+					{
+						DrawableID value = arg->drawableID;
+						xfer->xferDrawableID(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_TEAMID:
+					{
+						UnsignedInt value = arg->teamID;
+						xfer->xferUnsignedInt(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_LOCATION:
+					{
+						Coord3D value = arg->location;
+						xfer->xferCoord3D(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_PIXEL:
+					{
+						ICoord2D value = arg->pixel;
+						xfer->xferICoord2D(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_PIXELREGION:
+					{
+						IRegion2D value = arg->pixelRegion;
+						xfer->xferIRegion2D(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_TIMESTAMP:
+					{
+						UnsignedInt value = arg->timestamp;
+						xfer->xferUnsignedInt(&value);
+						break;
+					}
+					case ARGUMENTDATATYPE_WIDECHAR:
+					{
+						UnsignedShort value = static_cast<UnsignedShort>(arg->wChar);
+						xfer->xferUnsignedShort(&value);
+						break;
+					}
+					default:
+						break;
+				}
+			}
+		}
+		return;
+	}
+
+	if (!TheCommandList || count > 1024)
+		throw SC_INVALID_DATA;
+	TheCommandList->reset();
+	const Int playerCount = ThePlayerList ? ThePlayerList->getPlayerCount() : 0;
+	for (UnsignedInt m = 0; m < count; ++m)
+	{
+		Int typeValue = GameMessage::MSG_INVALID;
+		Int playerIndex = -1;
+		UnsignedByte argCount = 0;
+		xfer->xferInt(&typeValue);
+		xfer->xferInt(&playerIndex);
+		xfer->xferUnsignedByte(&argCount);
+		const GameMessage::Type type = static_cast<GameMessage::Type>(typeValue);
+		if (type < GameMessage::MSG_BEGIN_NETWORK_MESSAGES ||
+			type > GameMessage::MSG_END_NETWORK_MESSAGES ||
+			type == GameMessage::MSG_LOGIC_CRC ||
+			type == GameMessage::MSG_SET_REPLAY_CAMERA ||
+			type == GameMessage::MSG_CLEAR_GAME_DATA ||
+			playerIndex < 0 || playerIndex >= playerCount)
+			throw SC_INVALID_DATA;
+
+		GameMessage* msg = newInstance(GameMessage)(type);
+		msg->friend_setPlayerIndex(playerIndex);
+		try
+		{
+			for (UnsignedInt i = 0; i < argCount; ++i)
+			{
+				Int argTypeValue = ARGUMENTDATATYPE_UNKNOWN;
+				xfer->xferInt(&argTypeValue);
+				switch (static_cast<GameMessageArgumentDataType>(argTypeValue))
+				{
+					case ARGUMENTDATATYPE_INTEGER:
+					{
+						Int value = 0;
+						xfer->xferInt(&value);
+						msg->appendIntegerArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_REAL:
+					{
+						Real value = 0.0f;
+						xfer->xferReal(&value);
+						msg->appendRealArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_BOOLEAN:
+					{
+						Bool value = FALSE;
+						xfer->xferBool(&value);
+						msg->appendBooleanArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_OBJECTID:
+					{
+						ObjectID value = INVALID_ID;
+						xfer->xferObjectID(&value);
+						msg->appendObjectIDArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_DRAWABLEID:
+					{
+						DrawableID value = INVALID_DRAWABLE_ID;
+						xfer->xferDrawableID(&value);
+						msg->appendDrawableIDArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_TEAMID:
+					{
+						UnsignedInt value = 0;
+						xfer->xferUnsignedInt(&value);
+						msg->appendTeamIDArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_LOCATION:
+					{
+						Coord3D value{};
+						xfer->xferCoord3D(&value);
+						msg->appendLocationArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_PIXEL:
+					{
+						ICoord2D value{};
+						xfer->xferICoord2D(&value);
+						msg->appendPixelArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_PIXELREGION:
+					{
+						IRegion2D value{};
+						xfer->xferIRegion2D(&value);
+						msg->appendPixelRegionArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_TIMESTAMP:
+					{
+						UnsignedInt value = 0;
+						xfer->xferUnsignedInt(&value);
+						msg->appendTimestampArgument(value);
+						break;
+					}
+					case ARGUMENTDATATYPE_WIDECHAR:
+					{
+						UnsignedShort value = 0;
+						xfer->xferUnsignedShort(&value);
+						msg->appendWideCharArgument(static_cast<WideChar>(value));
+						break;
+					}
+					default:
+						throw SC_INVALID_DATA;
+				}
+			}
+		}
+		catch (...)
+		{
+			deleteInstance(msg);
+			throw;
+		}
+		TheCommandList->appendMessage(msg);
+	}
+}
+
 void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
 		{"ai-groups", [](Xfer* block) { TheAI->xfer(block); }, {}},
+		{"pending-commands", [](Xfer* block) { xferPendingCommands(block); }, [] {
+			if (TheCommandList)
+				TheCommandList->reset();
+		}},
 		{"weather-modifier", [this](Xfer* block)
 		{
 			block->xferObjectID(&m_weatherModifier.source);
