@@ -21,6 +21,8 @@ struct Member
 	float offsetY;
 	float offsetZ;
 	float angle;
+	std::int32_t priority = 0;
+	std::int32_t phase = 0;
 };
 
 using Members = std::vector<Member>;
@@ -111,13 +113,16 @@ inline std::optional<Camp> parse(std::span<const std::uint8_t> bytes, unsigned v
 			constexpr float maxAngle = 64.0f;
 			if (name.find('\0') != std::string_view::npos)
 				return std::nullopt;
-			const Member member{std::string(name), reader.real(), reader.real(), reader.real(), reader.real()};
+			Member member{std::string(name), reader.real(), reader.real(), reader.real(), reader.real()};
 			if (std::abs(member.offsetX) > MAX_OFFSET || std::abs(member.offsetY) > MAX_OFFSET ||
 				std::abs(member.offsetZ) > MAX_OFFSET || std::abs(member.angle) > maxAngle)
 				return std::nullopt;
-			camp.members.push_back(member);
 			if (version >= 4)
-				reader.skip(8);
+			{
+				member.priority = std::bit_cast<std::int32_t>(reader.word());
+				member.phase = std::bit_cast<std::int32_t>(reader.word());
+			}
+			camp.members.push_back(std::move(member));
 		}
 		if (version >= 2)
 		{

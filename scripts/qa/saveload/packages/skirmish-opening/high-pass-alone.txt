@@ -1,0 +1,2 @@
+2 heroes Player_2 - 0
+3300 logall - - 0

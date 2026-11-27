@@ -52,6 +52,7 @@ public:	 // AISkirmish specific methods.
 	AISkirmishPlayer( Player *p );							///< constructor
 	static void loadRetailData();
 	static void parseRetailArmy(INI* ini);
+	static void parseRetailBase(INI* ini);
 	static void parseRetailTuning(INI* ini);
 	static Bool rollRetailSpecialPowerActivation(const Player& player);
 	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
@@ -191,6 +192,7 @@ protected:
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;
 	Int m_retailScavengedBuilding = -1;
+	Int m_retailOpeningBase = -1;
 	Real m_retailFarmPriority = 0.0f;
 	std::set<AsciiString> m_retailBuiltStructures;
 	std::map<AsciiString, Real> m_retailUnitPriorities;

@@ -33,6 +33,7 @@
 #include "Common/GameMemory.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/MapObject.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -54,6 +55,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/RetailSkirmishSpending.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/SidesList.h"
@@ -211,9 +213,19 @@ struct RetailCombatChain
 	std::vector<Real> modifiers;
 };
 
+struct RetailBaseOpening
+{
+	AsciiString side;
+	AsciiString mapFilter;
+	std::vector<Int> playerPositions;
+	Bool rotate = TRUE;
+	std::map<AsciiString, CastleTemplates::Member> structures;
+};
+
 struct RetailAITuning
 {
 	std::vector<RetailDifficulty> difficulties;
+	std::vector<RetailBaseOpening> baseOpenings;
 	std::array<RetailCombatChain, std::size(RetailAIKindOf::names) - 1> combatChains;
 	RetailBrutalCheats brutal;
 	Bool disableBaseBuilding = FALSE;
@@ -257,6 +269,31 @@ RetailSkirmishPolicy retailPolicy(const Player& player)
 				policy.difficulty = &difficulty;
 	}
 	return policy;
+}
+
+Int selectRetailBaseOpening(Player& player)
+{
+	const AsciiString path = TheTerrainLogic->getSourceFilename();
+	const std::string_view fullPath(path.str());
+	const auto separator = fullPath.find_last_of("/\\");
+	const AsciiString map(fullPath.substr(separator == std::string_view::npos ? 0 : separator + 1).data());
+	const Int position = player.getMpStartIndex() + 1;
+	std::vector<Int> matching, fallback;
+	for (Int index = 0; index < static_cast<Int>(retailTuning.baseOpenings.size()); ++index)
+	{
+		const RetailBaseOpening& opening = retailTuning.baseOpenings[index];
+		if (opening.side.compareNoCase(player.getSide()) != 0 || (!opening.playerPositions.empty() &&
+			std::find(opening.playerPositions.begin(), opening.playerPositions.end(), position) == opening.playerPositions.end()))
+			continue;
+		if (opening.mapFilter.compareNoCase(map) == 0)
+			matching.push_back(index);
+		else if (opening.mapFilter.isEmpty() || opening.mapFilter.compareNoCase("<ANY>") == 0)
+			fallback.push_back(index);
+	}
+	const auto& choices = matching.empty() ? fallback : matching;
+	if (choices.empty())
+		return -2;
+	return choices.size() == 1 ? choices.front() : choices[GameLogicRandomValue(0, static_cast<Int>(choices.size()) - 1)];
 }
 
 void parseCombatChainTargets(INI* ini, void*, void* store, const void*)
@@ -712,16 +749,20 @@ void chooseRetailDwarvenEra(Player& player, Object& keep)
 	}
 }
 
-Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Coord3D point)
+Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Coord3D point, Real angle,
+	UnsignedInt flags = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
+		BuildAssistant::CLEAR_PATH | BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SUPPRESS_BUILD_BIBS)
 {
 	Player* player = builder.getControllingPlayer();
-	const Real angle = type.getPlacementViewAngle();
-	const UnsignedInt flags = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
-		BuildAssistant::CLEAR_PATH | BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SUPPRESS_BUILD_BIBS;
 	if (TheBuildAssistant->isLocationLegalToBuild(&point, &type, angle, flags, &builder, player) != LBC_OK)
 		return nullptr;
 	point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
 	return builder.getAI()->getDozerAIInterface()->construct(&type, &point, angle, player, FALSE);
+}
+
+Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Coord3D point)
+{
+	return constructRetailBuildingAt(builder, type, point, type.getPlacementViewAngle());
 }
 
 struct RetailLumberGrove
@@ -730,23 +771,43 @@ struct RetailLumberGrove
 	Coord3D tree;
 };
 
-Bool isRetailExpansionMarker(const Object& object)
+Bool isRetailExpansionMarker(const ThingTemplate& type)
 {
-	const ThingTemplate* type = object.getTemplate();
-	if (!type || type->getEditorSorting() != ES_STRUCTURE)
+	if (type.getEditorSorting() != ES_STRUCTURE)
 		return FALSE;
-	if (!object.isKindOf(KINDOF_TACTICAL_MARKER) || !object.isKindOf(KINDOF_INERT) ||
-		!object.isKindOf(KINDOF_NO_COLLIDE) || !object.isKindOf(KINDOF_UNATTACKABLE) ||
-		!object.isKindOf(KINDOF_IMMOBILE) || !object.isKindOf(KINDOF_IGNORED_IN_GUI))
+	if (!type.isKindOf(KINDOF_TACTICAL_MARKER) || !type.isKindOf(KINDOF_INERT) ||
+		!type.isKindOf(KINDOF_NO_COLLIDE) || !type.isKindOf(KINDOF_UNATTACKABLE) ||
+		!type.isKindOf(KINDOF_IMMOBILE) || !type.isKindOf(KINDOF_IGNORED_IN_GUI))
 		return FALSE;
-	if (object.isKindOf(KINDOF_THREAT_FINDER) || object.isKindOf(KINDOF_ENVIRONMENT) ||
-		object.isKindOf(KINDOF_CAN_ATTACK))
+	if (type.isKindOf(KINDOF_THREAT_FINDER) || type.isKindOf(KINDOF_ENVIRONMENT) || type.isKindOf(KINDOF_CAN_ATTACK))
 		return FALSE;
-	if (object.findUpdateModule(NAMEKEY("FireWeaponUpdate")) ||
-		object.findUpdateModule(NAMEKEY("AttributeModifierAuraUpdate")) ||
-		object.findUpdateModule(NAMEKEY("LifetimeUpdate")))
-		return FALSE;
+	const ModuleInfo& modules = type.getBehaviorModuleInfo();
+	for (Int index = 0; index < modules.getCount(); ++index)
+	{
+		const AsciiString name = modules.getNthName(index);
+		if (name == "FireWeaponUpdate" || name == "AttributeModifierAuraUpdate" || name == "LifetimeUpdate")
+			return FALSE;
+	}
 	return TRUE;
+}
+
+std::vector<const MapObject*> findRetailFarmSites(const Coord3D& home)
+{
+	std::vector<const MapObject*> sites;
+	for (const MapObject* marker = MapObject::getFirstMapObject(); marker; marker = marker->getNext())
+	{
+		const ThingTemplate* type = marker->getThingTemplate();
+		if (!type || !isRetailExpansionMarker(*type))
+			continue;
+		const Coord3D& position = *marker->getLocation();
+		if (std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z) && std::isfinite(marker->getAngle()))
+			sites.push_back(marker);
+	}
+	const auto distance = [&](const MapObject* marker) { return (*marker->getLocation() - home).lengthSqr(); };
+	std::stable_sort(sites.begin(), sites.end(), [&](const MapObject* a, const MapObject* b) {
+		return distance(a) < distance(b);
+	});
+	return sites;
 }
 
 Bool hasRetailExpansionMarkerNear(const Coord3D& center, Real radius)
@@ -754,7 +815,7 @@ Bool hasRetailExpansionMarkerNear(const Coord3D& center, Real radius)
 	const Real limitSquared = radius * radius;
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
-		if (!isRetailExpansionMarker(*object))
+		if (!isRetailExpansionMarker(*object->getTemplate()))
 			continue;
 		const Coord3D delta = *object->getPosition() - center;
 		if (delta.x * delta.x + delta.y * delta.y + delta.z * delta.z < limitSquared)
@@ -802,17 +863,19 @@ std::vector<RetailLumberGrove> findRetailLumberGroves(const Coord3D* home, const
 Object* placeRetailLumberMill(Object& builder, const ThingTemplate& mill, const RetailLumberGrove& grove, const Coord3D* home)
 {
 	Coord3D direction = grove.anchor - grove.tree;
-	const Real length = tacticalDistance(grove.anchor, grove.tree);
+	const Real length = WWMath::SqrtfOrigin(direction.lengthSqr());
 	if (length > 0.0f)
 		direction.scale(1.0f / length);
 	Coord3D approach = direction;
 	approach.scale(50.0f - std::min(length, 300.0f));
 	Coord3D point = grove.anchor + approach;
 	constexpr Real baseClearance = 500.0f;
-	if (home && tacticalDistanceSquared(point, *home) < sqr(baseClearance))
+	const auto clearsHome = [&](const Coord3D& candidate) {
+		return !home || (candidate - *home).lengthSqr() >= sqr(baseClearance);
+	};
+	if (!clearsHome(point))
 	{
 		direction = point - *home;
-		direction.z = 0.0f;
 		const Real distance = WWMath::SqrtfOrigin(direction.lengthSqr());
 		if (distance > 0.0f)
 		{
@@ -823,23 +886,31 @@ Object* placeRetailLumberMill(Object& builder, const ThingTemplate& mill, const 
 		}
 	}
 	const auto trySite = [&](const Coord3D& position) -> Object* {
-		if (home && tacticalDistanceSquared(position, *home) < sqr(baseClearance))
-			return nullptr;
-		Coord3D tree{};
-		if (!TheTerrainLogic->findNearestHarvestTree(position, 300.0f, {}, tree))
-			return nullptr;
-		return constructRetailBuildingAt(builder, mill, position);
+		return constructRetailBuildingAt(builder, mill, position, mill.getPlacementViewAngle(),
+			BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
+			BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK | BuildAssistant::SUPPRESS_BUILD_BIBS);
 	};
 	Coord3D step = direction;
 	step.scale(45.0f);
-	if (home && tacticalDistanceSquared(point + step, *home) < sqr(baseClearance))
-		step = -step;
 	if (!step.is(0.0f))
 	{
-		Coord3D candidate = point;
-		for (Int i = 0; i < 7; ++i)
+		Bool reversed = FALSE;
+		for (Int attempt = 1; attempt <= 7; ++attempt)
 		{
-			candidate += step;
+			Coord3D offset{step.x * attempt, step.y * attempt, step.z};
+			if (!clearsHome(point + offset))
+			{
+				if (!clearsHome(point - offset))
+					continue;
+				offset = -offset;
+				if (!reversed)
+				{
+					step = -step;
+					reversed = TRUE;
+					attempt = 0;
+				}
+			}
+			const Coord3D candidate = point + offset;
 			if (Object* site = trySite(candidate))
 				return site;
 		}
@@ -848,7 +919,12 @@ Object* placeRetailLumberMill(Object& builder, const ThingTemplate& mill, const 
 	{
 		const Real angle = GameLogicRandomValueReal(0.0f, 6.283185307f);
 		const Real radius = GameLogicRandomValueReal(40.0f, 200.0f);
-		const Coord3D candidate = {point.x + WWMath::CosTrig(angle) * radius, point.y + WWMath::SinTrig(angle) * radius, point.z};
+		Coord3D offset{WWMath::CosTrig(angle) * radius, WWMath::SinTrig(angle) * radius, 0.0f};
+		if (!clearsHome(point + offset))
+			offset = -offset;
+		const Coord3D candidate = point + offset;
+		if (!clearsHome(candidate))
+			continue;
 		if (Object* site = trySite(candidate))
 			return site;
 	}
@@ -962,6 +1038,58 @@ Bool AISkirmishPlayer::rollRetailSpecialPowerActivation(const Player& player)
 		return TRUE;
 	const Int* chance = difficulty->specialPowerChance;
 	return chance[0] >= chance[1] || GameLogicRandomValue(0, chance[1] - 1) < chance[0];
+}
+
+void AISkirmishPlayer::parseRetailBase(INI* ini)
+{
+	struct BaseDefinition
+	{
+		AsciiString side;
+		AsciiString map;
+		AsciiString mapFilter;
+		std::vector<Int> playerPositions;
+		Bool rotate = TRUE;
+	};
+	ini->getNextToken();
+	BaseDefinition definition;
+	static const FieldParse fields[] = {
+		{ "Side", INI::parseAsciiString, nullptr, offsetof(BaseDefinition, side) },
+		{ "Map", INI::parseQuotedAsciiString, nullptr, offsetof(BaseDefinition, map) },
+		{ "GameMapToUseOn", INI::parseQuotedAsciiString, nullptr, offsetof(BaseDefinition, mapFilter) },
+		{ "PlayerPositions", [](INI* reader, void* instance, void*, const void*) {
+			auto& positions = static_cast<BaseDefinition*>(instance)->playerPositions;
+			for (const char* token = reader->getNextTokenOrNull(); token; token = reader->getNextTokenOrNull())
+				positions.push_back(INI::scanInt(token));
+		}, nullptr, 0 },
+		{ "AllowsArbirtaryRotation", INI::parseBool, nullptr, offsetof(BaseDefinition, rotate) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&definition, fields);
+	if (definition.map.isEmpty())
+		return;
+	try
+	{
+		const CastleTemplates::Camp* camp = CastleTemplates::find(definition.map);
+		if (!camp)
+			return;
+		RetailBaseOpening opening{definition.side, definition.mapFilter, std::move(definition.playerPositions), definition.rotate, {}};
+		auto& structures = opening.structures;
+		for (const CastleTemplates::Member& member : camp->members)
+		{
+			if (member.phase != 1 || member.templateName.empty() || member.templateName.size() >= AsciiString::MAX_LEN)
+				continue;
+			const AsciiString name(member.templateName.c_str());
+			const auto placed = structures.find(name);
+			if (placed == structures.end() || member.priority > placed->second.priority)
+				structures.insert_or_assign(name, member);
+		}
+		if (!structures.empty())
+			retailTuning.baseOpenings.push_back(std::move(opening));
+	}
+	catch (ErrorCode)
+	{
+		ini->recordSkipped("base", definition.map.str());
+	}
 }
 
 void AISkirmishPlayer::parseRetailArmy(INI* ini)
@@ -2294,7 +2422,7 @@ void AISkirmishPlayer::updateRetail()
 	if (!rules)
 		return;
 
-	const Real elapsed = INT_TO_REAL(frame) / LOGICFRAMES_PER_SECOND;
+	const Real elapsed = INT_TO_REAL(frame) / static_cast<Real>(LOGICFRAMES_PER_SECOND);
 	const auto phaseAt = [rules](Real seconds) {
 		return seconds < rules->rushSeconds ? 0 : seconds < rules->rushSeconds + rules->midgameSeconds ? 1 : 2;
 	};
@@ -2731,7 +2859,7 @@ void AISkirmishPlayer::updateRetail()
 			});
 		Int maximumCommandPoints = 0;
 		const Int commandPoints = m_player->getCommandPointsTotal(&maximumCommandPoints);
-		const Real sinceFarm = INT_TO_REAL(frame - m_retailLastFarmFrame) / LOGICFRAMES_PER_SECOND;
+		const Real sinceFarm = INT_TO_REAL(frame - m_retailLastFarmFrame) / static_cast<Real>(LOGICFRAMES_PER_SECOND);
 		const Bool belowFarmFloor = farms < rules->minimumFarms;
 		const Bool farmDue = phase == 0
 			? belowFarmFloor && (m_retailLastFarmFrame == 0 || sinceFarm > rules->rushFarmInterval)
@@ -2773,13 +2901,33 @@ void AISkirmishPlayer::updateRetail()
 				}
 			}
 		}
-		const auto buildFrom = [&](Object& builder, FoundationAIUpdate* plot) -> Bool {
+		struct BuildOffer
+		{
+			Object* builder;
+			FoundationAIUpdate* plot;
+			const CommandButton* button;
+			Bool usesSavings;
+		};
+		struct BuildRequest
+		{
+			const ThingTemplate* type;
+			Real priority;
+			const CastleTemplates::Member* layout;
+			std::vector<BuildOffer> offers;
+		};
+		std::vector<BuildRequest> requests;
+		const RetailBaseOpening* opening = nullptr;
+		if (phase == 0 && keep)
+		{
+			if (m_retailOpeningBase == -1)
+				m_retailOpeningBase = selectRetailBaseOpening(*m_player);
+			if (m_retailOpeningBase >= 0 && static_cast<size_t>(m_retailOpeningBase) < retailTuning.baseOpenings.size())
+				opening = &retailTuning.baseOpenings[m_retailOpeningBase];
+		}
+		const auto collectOffers = [&](Object& builder, FoundationAIUpdate* plot) {
 			const CommandSet* set = retailCommands(builder);
 			if (!set)
-				return FALSE;
-			const CommandButton* selected = nullptr;
-			Bool selectedUsesSavings = FALSE;
-			Real priority = 0.0f;
+				return;
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
 				const CommandButton* button = set->getCommandButton(slot);
@@ -2792,6 +2940,7 @@ void AISkirmishPlayer::updateRetail()
 				const Bool economy = isFarm(*type);
 				Bool usesSavings = FALSE;
 				Real score = 0.0f;
+				const CastleTemplates::Member* layout = nullptr;
 				if (economy)
 				{
 					const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
@@ -2817,6 +2966,15 @@ void AISkirmishPlayer::updateRetail()
 						if (producesArmy(*type) || (replacement && countType(replacement) == 0 && producesArmy(*replacement)) ||
 							(plot && farms >= 2 && soldiers.size() >= 2 && type->isKindOf(KINDOF_FS_BASE_DEFENSE)))
 							score = rules->defaultPriority;
+						if (opening)
+						{
+							const auto planned = opening->structures.find(type->getName());
+							if (planned != opening->structures.end())
+							{
+								layout = &planned->second;
+								score = static_cast<Real>(layout->priority);
+							}
+						}
 						if (m_retailBuiltStructures.contains(type->getName()))
 						{
 							score *= rules->structureRebuildModifier;
@@ -2824,71 +2982,117 @@ void AISkirmishPlayer::updateRetail()
 						}
 					}
 				}
-				if (score > priority)
+				if (score <= 0.0f)
+					continue;
+				const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
+				const auto cash = money->countMoney();
+				if (cost > cash && (!usesSavings || cost - cash > m_retailSavings))
+					continue;
+				if (plot)
 				{
-					const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
-					const auto cash = money->countMoney();
-					if (cost > cash && (!usesSavings || cost - cash > m_retailSavings))
+					if (!m_player->canBuild(type))
 						continue;
-					if (plot)
-					{
-						if (!m_player->canBuild(type))
-							continue;
-					}
-					else
-					{
-						const CanMakeType canMake = TheBuildAssistant->canMakeUnit(&builder, type);
-						if (canMake != CANMAKE_OK && !(usesSavings && canMake == CANMAKE_NO_MONEY))
-							continue;
-					}
-					priority = score;
-					selected = button;
-					selectedUsesSavings = usesSavings;
 				}
-			}
-			if (!selected)
-				return FALSE;
-			if (!upgrades.empty())
-				buyUpgradesAbove(std::max(prioritizedArmyOrder().priority, priority));
-			if (prioritizedArmyOrder().priority > priority)
-			{
-				deferBuildingForUnit = TRUE;
-				return FALSE;
-			}
-			const ThingTemplate* type = selected->getThingTemplate();
-			const auto construct = [&]() {
-				return plot ? plot->construct(type, m_player) != nullptr
-					: placeRetailBuilding(builder, *type, keep ? *keep->getPosition() : *builder.getPosition());
-			};
-			const Bool built = selectedUsesSavings ? spendWithSavings(type->calcCostToBuild(m_player), construct) : construct();
-			if (built)
-			{
-				if (isFarm(*type))
-				{
-					++farms;
-					m_retailLastFarmFrame = frame;
-					m_retailFarmPriority = 0.0f;
-				}
-				else if (scavenged && type->isEquivalentTo(scavenged))
-					m_retailScavengedBuilding = (scavengedIndex + 1) % scavengedCount;
 				else
-					m_retailBuiltStructures.insert(type->getName());
-				if (trace)
 				{
-					std::fprintf(stderr, "AI_BUILD\t%u\t%d\t%s\t%s\t%d\t%d\t%d\n", frame, playerIndex,
-						selected->getName().str(), type->getName().str(),
-						HeroRoster::buttonUpgradesMet(selected, m_player, &builder), farms, farmLimit);
-					std::fflush(stderr);
+					const CanMakeType canMake = TheBuildAssistant->canMakeUnit(&builder, type);
+					if (canMake != CANMAKE_OK && !(usesSavings && canMake == CANMAKE_NO_MONEY))
+						continue;
 				}
+				const BuildOffer offer{&builder, plot, button, usesSavings};
+				const auto request = std::find_if(requests.begin(), requests.end(), [&](const BuildRequest& candidate) {
+					return candidate.type == type && candidate.priority == score;
+				});
+				if (request == requests.end())
+					requests.push_back({type, score, layout, {offer}});
+				else
+					request->offers.push_back(offer);
 			}
-			return built;
 		};
 		for (Object* plot : plots)
-			if (buildFrom(*plot, FoundationAIUpdate::find(*plot)))
-				break;
+			collectOffers(*plot, FoundationAIUpdate::find(*plot));
 		for (Object* builder : builders)
-			if (buildFrom(*builder, nullptr))
+			collectOffers(*builder, nullptr);
+		std::stable_sort(requests.begin(), requests.end(), [](const BuildRequest& a, const BuildRequest& b) {
+			if (a.priority != b.priority)
+				return a.priority > b.priority;
+			return a.layout && !b.layout;
+		});
+		Real baseRotation = 0.0f;
+		if (opening && opening->rotate)
+		{
+			Region3D terrain{};
+			TheTerrainLogic->getExtent(&terrain);
+			const auto& home = *keep->getPosition();
+			baseRotation = PI / 2.0f - WWMath::Atan2(terrain.height() * 0.5f - home.y, terrain.width() * 0.5f - home.x);
+		}
+		const auto farmSites = opening && seekFarm && m_retailLastFarmFrame == 0
+			? findRetailFarmSites(*keep->getPosition()) : std::vector<const MapObject*>{};
+		for (BuildRequest& request : requests)
+		{
+			if (!upgrades.empty())
+				buyUpgradesAbove(std::max(prioritizedArmyOrder().priority, request.priority));
+			if (prioritizedArmyOrder().priority > request.priority)
+			{
+				deferBuildingForUnit = TRUE;
 				break;
+			}
+			const ThingTemplate* type = request.type;
+			const Bool useFarmSites = !farmSites.empty() && farm && type->isEquivalentTo(farm);
+			Coord3D position = keep ? *keep->getPosition() : Coord3D{};
+			if (useFarmSites)
+				position = *farmSites.front()->getLocation();
+			if (const auto* member = request.layout)
+			{
+				const Real cosine = WWMath::CosTrig(baseRotation);
+				const Real sine = WWMath::SinTrig(baseRotation);
+				position.x += member->offsetX * cosine - member->offsetY * sine;
+				position.y += member->offsetX * sine + member->offsetY * cosine;
+			}
+			if (keep)
+			{
+				const auto preference = [&](const BuildOffer& offer) {
+					return std::make_tuple(!offer.plot, tacticalDistanceSquared(*offer.builder->getPosition(), position), offer.builder->getID());
+				};
+				std::stable_sort(request.offers.begin(), request.offers.end(), [&](const BuildOffer& a, const BuildOffer& b) {
+					return preference(a) < preference(b);
+				});
+			}
+			const auto built = std::find_if(request.offers.begin(), request.offers.end(), [&](const BuildOffer& offer) {
+				const auto construct = [&]() {
+					if (offer.plot)
+						return offer.plot->construct(type, m_player) != nullptr;
+					if (request.layout && constructRetailBuildingAt(*offer.builder, *type, position, request.layout->angle + baseRotation))
+						return true;
+					if (useFarmSites)
+						for (const MapObject* site : farmSites)
+							if (constructRetailBuildingAt(*offer.builder, *type, *site->getLocation(), site->getAngle()))
+								return true;
+					return placeRetailBuilding(*offer.builder, *type, keep ? *keep->getPosition() : *offer.builder->getPosition()) != FALSE;
+				};
+				return offer.usesSavings ? spendWithSavings(type->calcCostToBuild(m_player), construct) : construct();
+			});
+			if (built == request.offers.end())
+				continue;
+			if (isFarm(*type))
+			{
+				++farms;
+				m_retailLastFarmFrame = frame;
+				m_retailFarmPriority = 0.0f;
+			}
+			else if (scavenged && type->isEquivalentTo(scavenged))
+				m_retailScavengedBuilding = (scavengedIndex + 1) % scavengedCount;
+			else
+				m_retailBuiltStructures.insert(type->getName());
+			if (trace)
+			{
+				std::fprintf(stderr, "AI_BUILD\t%u\t%d\t%s\t%s\t%d\t%d\t%d\n", frame, playerIndex,
+					built->button->getName().str(), type->getName().str(),
+					HeroRoster::buttonUpgradesMet(built->button, m_player, built->builder), farms, farmLimit);
+				std::fflush(stderr);
+			}
+			break;
+		}
 	}
 
 	if (!upgrades.empty())
@@ -3103,7 +3307,7 @@ void AISkirmishPlayer::updateRetail()
 			m_player->getRelationship(scoutOpponent->getDefaultTeam()) != ENEMIES);
 		const Bool missing = lostStructure || lostOpponent || (target.object != INVALID_ID && !liveObjective(object, target.owner));
 		if (!target.retiring && !missing &&
-			INT_TO_REAL(frame - target.selectedFrame) >= rules->targetLifetimeSeconds * LOGICFRAMES_PER_SECOND)
+			INT_TO_REAL(frame - target.selectedFrame) >= rules->targetLifetimeSeconds * static_cast<Real>(LOGICFRAMES_PER_SECOND))
 		{
 			if (GameLogicRandomValueReal(0.0f, 1.0f) < rules->targetRetentionChance)
 				target.selectedFrame = frame;
@@ -3958,6 +4162,7 @@ void AISkirmishPlayer::newMap()
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
+	m_retailOpeningBase = -1;
 	m_retailFarmPriority = 0.0f;
 	m_retailBuiltStructures.clear();
 	m_retailUnitPriorities.clear();
@@ -4289,7 +4494,10 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			}
 		}, [this] {
 			m_retailUpgradePlans.clear();
-		}}
+		}},
+		{"skirmish-opening-base", [this](Xfer* x) {
+			x->xferInt(&m_retailOpeningBase);
+		}, [this] { m_retailOpeningBase = -1; }}
 	});
 }
 

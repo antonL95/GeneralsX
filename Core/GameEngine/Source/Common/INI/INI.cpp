@@ -597,7 +597,9 @@ static INIBlockParse findBlockParse(const char* token)
 		return AISkirmishPlayer::parseRetailArmy;
 	if (RetailFileLayers::enabled() && strcmp(token, "SkirmishAIData") == 0)
 		return AISkirmishPlayer::parseRetailTuning;
-	if (RetailFileLayers::enabled() && (strcmp(token, "AIBase") == 0 || strcmp(token, "AIDozerAssignment") == 0))
+	if (RetailFileLayers::enabled() && strcmp(token, "AIBase") == 0)
+		return AISkirmishPlayer::parseRetailBase;
+	if (RetailFileLayers::enabled() && strcmp(token, "AIDozerAssignment") == 0)
 		return [](INI* ini) {
 			const std::string line = ini->currentRawLine();
 			INIBlockStructure::LineHead head{};

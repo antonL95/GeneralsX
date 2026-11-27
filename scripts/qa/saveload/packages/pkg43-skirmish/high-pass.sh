@@ -1,6 +1,6 @@
 check() {
     if covers 4; then
-        awk -F '\t' '$1 == "AI_BUILD" && $2 == 4 && $5 == "MordorSlaughterHouse_ForAI" && $7 == 1 && $8 == 1 { found = 1 }
+        awk -F '\t' '$1 == "AI_BUILD" && $3 == 4 && $5 == "MordorSlaughterHouse_ForAI" && $7 == 1 && $8 == 1 { found = 1 }
             END { exit !found }' "$log" || return 1
     fi
     awk -F '\t' '$1 == "AI_BUILD" && $8 == 1 && $7 > $8 { exit 1 }' "$log" || return 1
