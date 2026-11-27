@@ -267,6 +267,7 @@ struct ModelConditionInfo
 	const std::vector<AnimationFXEvent>* m_animationFXEvents = nullptr;
 	const ModelConditionInfo* m_animationState = nullptr;
 	const ModelConditionInfo* m_modelState = nullptr;
+	Bool m_retainSubObjects = FALSE;
 
 	enum
 	{
@@ -495,11 +496,8 @@ public:
 	virtual void updateSubObjects() override;
 	virtual void showSubObject( const AsciiString& name, Bool show ) override;
 #if !RTS_GENERALS
-	void showSubObjectForCurrentModel(const AsciiString& name, Bool show) override
-	{
-		if (m_renderObject)
-			setSubObjectHidden(name, !show);
-	}
+	void showSubObjectForCurrentModel(const AsciiString& name, Bool show) override;
+	Bool getTemporarySubObjectHidden(const AsciiString& name, Bool& hidden) const;
 #endif
 	Bool getSubObjectHidden(const AsciiString& name, Bool& hidden) const
 	{
@@ -617,6 +615,9 @@ private:
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.
 	std::vector<ModelConditionInfo::HideShowSubObjInfo>		m_subObjectVec;
+#if !RTS_GENERALS
+	std::vector<ModelConditionInfo::HideShowSubObjInfo> m_temporarySubObjects;
+#endif
 	Bool													m_hideHeadlights;
 	Bool													m_hasHeadlights;								///< the model has a HEADLIGHT sub-object
 	W3DDynamicLight*										m_headlightDynamicLight;						///< native dynamic light for active headlights

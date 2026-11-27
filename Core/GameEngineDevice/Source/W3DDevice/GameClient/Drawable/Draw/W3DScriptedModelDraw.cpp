@@ -268,7 +268,7 @@ void W3DScriptedModelDrawModuleData::parseModelState(INI* ini, void* instance, v
 		{ "ShadowOpacityFadeInTime", INI::parseInt, nullptr, offsetof(ModelState, shadowOpacityFadeInTime) },
 		{ "ShadowOpacityFadeOutTime", INI::parseInt, nullptr, offsetof(ModelState, shadowOpacityFadeOutTime) },
 		{ "ShadowOverrideLODVisibility", INI::parseBool, nullptr, offsetof(ModelState, shadowOverrideLODVisibility) },
-		{ "RetainSubObjects", INI::parseBool, nullptr, offsetof(ModelState, retainSubObjects) },
+		{ "RetainSubObjects", INI::parseBool, nullptr, offsetof(ModelState, draw.m_retainSubObjects) },
 		{ "FXEvent", W3DScriptedModelDrawModuleData::parseFXEvent, nullptr, offsetof(ModelState, fxEvents) },
 		{ "ParticleSysBone", parseParticleBone, nullptr, offsetof(ModelState, particles) },
 		{ "WeaponLaunchBone", parseWeaponLaunchBone, nullptr, 0 },

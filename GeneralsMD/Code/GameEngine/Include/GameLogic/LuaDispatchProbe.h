@@ -16,6 +16,8 @@ struct LuaDispatchResult
 };
 
 using LuaDispatchObserver = std::function<void(const LuaDispatchResult&)>;
+using LuaDispatchBefore = std::function<void(const Object&, std::string_view, std::string_view, std::string_view)>;
 
-void observeLuaDispatch(const LuaDispatchObserver& observer, const std::function<void()>& trigger);
+void observeLuaDispatch(const LuaDispatchObserver& observer, const std::function<void()>& trigger,
+	const LuaDispatchBefore* before = nullptr);
 bool triggerLuaModelEvent(Object& object, std::string_view name);

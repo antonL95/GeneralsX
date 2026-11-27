@@ -60,7 +60,6 @@ public:
 		Int shadowOpacityFadeInTime = 0;
 		Int shadowOpacityFadeOutTime = 0;
 		Bool shadowOverrideLODVisibility = FALSE;
-		Bool retainSubObjects = FALSE;
 	};
 
 	struct Animation

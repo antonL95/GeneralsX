@@ -1415,6 +1415,34 @@ void W3DModelDraw::showSubObject( const AsciiString& name, Bool show )
 	}
 }
 
+#if !RTS_GENERALS
+void W3DModelDraw::showSubObjectForCurrentModel(const AsciiString& name, Bool show)
+{
+	if (name.isEmpty())
+		return;
+	const Bool hidden = !show;
+	const auto entry = std::find_if(m_temporarySubObjects.begin(), m_temporarySubObjects.end(),
+		[&](const auto& state) { return state.subObjName.compareNoCase(name) == 0; });
+	if (entry == m_temporarySubObjects.end())
+		m_temporarySubObjects.push_back({name, hidden});
+	else if (entry->hide != hidden)
+		entry->hide = hidden;
+	else
+		return;
+	updateSubObjects();
+}
+
+Bool W3DModelDraw::getTemporarySubObjectHidden(const AsciiString& name, Bool& hidden) const
+{
+	const auto entry = std::find_if(m_temporarySubObjects.begin(), m_temporarySubObjects.end(),
+		[&](const auto& state) { return state.subObjName.compareNoCase(name) == 0; });
+	if (entry == m_temporarySubObjects.end())
+		return FALSE;
+	hidden = entry->hide;
+	return TRUE;
+}
+#endif
+
 
 
 //-------------------------------------------------------------------------------------------------
@@ -4072,6 +4100,10 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	hideAllMuzzleFlashes(newState, m_renderObject);
 
 	Bool keepAnimation = FALSE;
+#if !RTS_GENERALS
+	if (m_curState && newState->m_modelName != m_curState->m_modelName && !newState->m_retainSubObjects)
+		m_temporarySubObjects.clear();
+#endif
 	// note that different states might use the same model; for these, don't go thru the
 	// expense of creating a new render-object. (exception: if color is changing, or subobjs are changing,
 	// or a few other things...)
@@ -5399,6 +5431,11 @@ void W3DModelDraw::updateSubObjects()
 		return;
 	}
 
+#if !RTS_GENERALS
+	for (const auto& entry : m_temporarySubObjects)
+		setSubObjectHidden(entry.subObjName, entry.hide);
+#endif
+
 	for (const auto& entry : m_subObjectVec)
 	{
 		if (!setSubObjectHidden(entry.subObjName, entry.hide))
@@ -5655,26 +5692,47 @@ void W3DModelDraw::xfer( Xfer *xfer )
 
 	if (retail)
 	{
-		if (!loading && m_subObjectVec.size() == subObjectCount)
-			RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, version >= 5, {});
+		const auto transferSubObjects = [&](Xfer* x, std::vector<ModelConditionInfo::HideShowSubObjInfo>& entries, std::size_t start)
+		{
+			UnsignedInt count = loading ? 0 : static_cast<UnsignedInt>(entries.size() - start);
+			x->xferUnsignedInt(&count);
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				if (loading)
+				{
+					ModelConditionInfo::HideShowSubObjInfo entry;
+					xferSubObject(x, entry);
+					entries.push_back(std::move(entry));
+				}
+				else
+					xferSubObject(x, entries[start + i]);
+			}
+		};
+		const RetailSaveBlocks::Block<Xfer> extended{"extended-subobjects", [&](Xfer* x) {
+			transferSubObjects(x, m_subObjectVec, subObjectCount);
+		}, {}};
+#if !RTS_GENERALS
+		if (loading || !m_temporarySubObjects.empty())
+		{
+			const RetailSaveBlocks::Block<Xfer> temporary{"temporary-subobjects", [&](Xfer* x) {
+				if (loading)
+					m_temporarySubObjects.clear();
+				transferSubObjects(x, m_temporarySubObjects, 0);
+			}, [&] { m_temporarySubObjects.clear(); }};
+			RetailSaveBlocks::transferSection<Xfer>(xfer, loading, version >= 5, {extended, temporary});
+		}
 		else
-			RetailSaveBlocks::transferSection<Xfer>(xfer, loading, version >= 5, {
-				{"extended-subobjects", [&](Xfer* x) {
-					UnsignedInt count = loading ? 0 : static_cast<UnsignedInt>(m_subObjectVec.size() - subObjectCount);
-					x->xferUnsignedInt(&count);
-					for (UnsignedInt i = 0; i < count; ++i)
-						if (loading)
-						{
-							ModelConditionInfo::HideShowSubObjInfo entry;
-							xferSubObject(x, entry);
-							m_subObjectVec.push_back(std::move(entry));
-						}
-						else
-							xferSubObject(x, m_subObjectVec[subObjectCount + i]);
-				}, {}},
-			});
+#endif
+		if (loading || m_subObjectVec.size() > subObjectCount)
+			RetailSaveBlocks::transferSection<Xfer>(xfer, loading, version >= 5, {extended});
+		else
+			RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, version >= 5, {});
 	}
-	if (loading && !m_subObjectVec.empty())
+	Bool hasSubObjects = !m_subObjectVec.empty();
+#if !RTS_GENERALS
+	hasSubObjects |= !m_temporarySubObjects.empty();
+#endif
+	if (loading && hasSubObjects)
 		updateSubObjects();
 
 }

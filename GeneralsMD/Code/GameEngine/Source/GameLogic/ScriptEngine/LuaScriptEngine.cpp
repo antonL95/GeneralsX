@@ -150,10 +150,17 @@ public:
 	bool dispatchScripted(Object& object, std::string_view event, Argument second, Argument third) override;
 	void modelConditionsChanged(Object& object, const ModelConditionFlags& previous) override;
 	void restoreHordeConditions() override;
-	void observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger);
+	void observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger,
+		const LuaDispatchBefore* before);
 	bool triggerModelEvent(Object& object, std::string_view name);
 
 private:
+	struct Probe
+	{
+		const LuaDispatchObserver& after;
+		const LuaDispatchBefore* before;
+	};
+
 	const Registration* registeredObject(const Object& object) const;
 	const Registration* getRegistration(const Object& object) const;
 	bool invoke(Object& object, const EventList& list, std::string_view event, Argument second, Argument third);
@@ -164,7 +171,7 @@ private:
 	std::vector<ModelEvent> m_modelEvents;
 	std::set<std::string, std::less<>> m_scriptedEvents;
 	std::map<ObjectID, Registration> m_objects;
-	const LuaDispatchObserver* m_observer = nullptr;
+	const Probe* m_probe = nullptr;
 };
 
 bool LogicLua::load(Xfer& crc)
@@ -292,21 +299,26 @@ bool LogicLua::invoke(Object& object, const EventList& list, std::string_view ev
 	ScopedFPUGuard fpuGuard;
 	DispatchArguments args{object, second, third};
 	std::string error;
-	const bool ok = m_state->call(found->second, pushArguments, &args, m_observer ? &error : nullptr);
-	if (m_observer)
-		(*m_observer)({object, list.name, event, found->second, ok, error});
+	if (m_probe && m_probe->before)
+		(*m_probe->before)(object, list.name, event, found->second);
+	const bool ok = m_state->call(found->second, pushArguments, &args, m_probe ? &error : nullptr);
+	if (m_probe)
+		m_probe->after({object, list.name, event, found->second, ok, error});
 	return true;
 }
 
-void LogicLua::observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger)
+void LogicLua::observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger,
+	const LuaDispatchBefore* before)
 {
-	struct RestoreObserver
+	struct RestoreProbe
 	{
-		const LuaDispatchObserver*& slot;
-		const LuaDispatchObserver* previous;
-		~RestoreObserver() { slot = previous; }
-	} restore{m_observer, m_observer};
-	m_observer = &observer;
+		const Probe*& slot;
+		const Probe* previous;
+		~RestoreProbe() { slot = previous; }
+	};
+	const Probe probe{observer, before};
+	const RestoreProbe restore{m_probe, m_probe};
+	m_probe = &probe;
 	trigger();
 }
 
@@ -439,10 +451,11 @@ void LogicLua::restoreHordeConditions()
 }
 }
 
-void observeLuaDispatch(const LuaDispatchObserver& observer, const std::function<void()>& trigger)
+void observeLuaDispatch(const LuaDispatchObserver& observer, const std::function<void()>& trigger,
+	const LuaDispatchBefore* before)
 {
 	if (auto* engine = static_cast<LogicLua*>(LuaScriptEngine::active()))
-		engine->observe(observer, trigger);
+		engine->observe(observer, trigger, before);
 }
 
 bool triggerLuaModelEvent(Object& object, std::string_view name)
