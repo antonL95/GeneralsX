@@ -1,4 +1,7 @@
 check() {
+    if covers 245; then
+        expect 'TEST castle-member-eva eva frame=245 event=GenericEnemyUnitSighted played=1'
+    fi
     if covers 256; then
         if ! grep -Eq 'AUDIO TRACE frame=251 kind=sound-queue owner=[0-9]+ handle=[0-9]+ event=CastleMemberEvaBuildLoop' "$log"; then
             printf 'Missing CastleMemberEvaBuildLoop sound-queue trace in %s\n' "$phase" >&2
