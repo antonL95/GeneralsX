@@ -361,6 +361,24 @@ Bool HorseHordeContain::isHeadingAligned(Real heading, Bool retailStep) const
 	return TRUE;
 }
 
+Bool HordeContain::areMembersAtFormationSlots() const
+{
+	for (const Object* member : getContainList())
+	{
+		if (member->isEffectivelyDead())
+			continue;
+		const AIUpdateInterface* ai = member->getAI();
+		const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+		if (!locomotor || !ai->isIdle())
+			return FALSE;
+		const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+		const Coord3D& position = *member->getPosition();
+		if (sqr(slot.x - position.x) + sqr(slot.y - position.y) > sqr(locomotor->getCloseEnoughDist()))
+			return FALSE;
+	}
+	return TRUE;
+}
+
 AODHordeContain::~AODHordeContain() = default;
 void AODHordeContain::crc(Xfer* xfer) { HordeContain::crc(xfer); }
 void AODHordeContain::xfer(Xfer* xfer)
@@ -1529,6 +1547,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	{
 		goal.turnInPlace = TRUE;
 		goal.position = position;
+		goal.facing = cavalryAI->getCavalryStartupHeading().value_or(goal.facing);
 		goal.speed = 0.0f;
 		goal.distance = 0.0f;
 		return TRUE;

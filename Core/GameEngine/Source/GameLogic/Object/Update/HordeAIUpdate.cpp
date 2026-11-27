@@ -463,6 +463,12 @@ void HordeAIUpdate::approach(const Coord3D& position, Bool inRange)
 		advance(position);
 }
 
+void HordeAIUpdate::setCavalryStartupHeading(Real heading)
+{
+	m_cavalryStartupHeading = heading;
+	m_cavalryReforming = TRUE;
+}
+
 UpdateSleepTime HordeAIUpdate::update()
 {
 	Object* horde = getObject();
@@ -525,16 +531,26 @@ UpdateSleepTime HordeAIUpdate::update()
 			m_cavalryTurn = 0.0f;
 			m_cavalryReforming = TRUE;
 			m_cavalryLaunchFrames = 0;
+			m_cavalryStartupHeading.reset();
 		}
 		if (!isMoving())
 		{
 			m_cavalryReforming = FALSE;
 			m_cavalryLaunchFrames = 0;
+			m_cavalryStartupHeading.reset();
 		}
-		else if (m_cavalryReforming && contain->isHeadingAligned(horde->getOrientation(), FALSE))
+		else if (m_cavalryReforming)
 		{
-			m_cavalryReforming = FALSE;
-			m_cavalryLaunchFrames = locomotor ? getCavalryLaunchFrames(*horde, *locomotor, *contain) : 0;
+			const Real facing = horde->getOrientation();
+			const Real heading = m_cavalryStartupHeading.value_or(facing);
+			const Bool anchorAligned = !m_cavalryStartupHeading || !locomotor ||
+				fabs(stdAngleDiff(heading, facing)) <= locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
+			if (anchorAligned && contain->isHeadingAligned(heading, FALSE))
+			{
+				m_cavalryReforming = FALSE;
+				m_cavalryLaunchFrames = locomotor ? getCavalryLaunchFrames(*horde, *locomotor, *contain) : 0;
+				m_cavalryStartupHeading.reset();
+			}
 		}
 #endif
 	}
@@ -833,6 +849,18 @@ void HordeAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 			[this] { m_cavalryReforming = FALSE; }},
 		{"cavalry-reform-launch", [this](Xfer* block) { block->xferUnsignedInt(&m_cavalryLaunchFrames); },
 			[this] { m_cavalryLaunchFrames = 0; }},
+		{"cavalry-startup-heading", [this](Xfer* block) {
+			Bool active = m_cavalryStartupHeading.has_value();
+			block->xferBool(&active);
+			if (active)
+			{
+				Real heading = m_cavalryStartupHeading.value_or(0.0f);
+				block->xferReal(&heading);
+				m_cavalryStartupHeading = heading;
+			}
+			else
+				m_cavalryStartupHeading.reset();
+		}, [this] { m_cavalryStartupHeading.reset(); }},
 	});
 }
 

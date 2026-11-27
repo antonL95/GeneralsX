@@ -161,6 +161,7 @@ public:
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	static void separateGroundMovement(const Object* member, Coord3D& movement);
 	virtual Bool isHeadingAligned(Real heading, Bool retailStep = TRUE) const { return TRUE; }
+	Bool areMembersAtFormationSlots() const;
 #if RTS_ZEROHOUR
 	Real getFormationWheelRate(Real radius) const;
 	UnsignedInt getFormationReformTravelFrames() const;

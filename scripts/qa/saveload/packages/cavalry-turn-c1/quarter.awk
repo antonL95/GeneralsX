@@ -6,11 +6,20 @@ function headingError(facing, goal, delta) {
     delta = abs(facing - goal)
     return delta > pi ? 2*pi - delta : delta
 }
+function require(condition, message) {
+    if (!condition) {
+        print message
+        failed = 1
+    }
+}
 
 BEGIN {
     first = 620
     last = 920
     pi = atan2(0, -1)
+    riderCloseEnough = 2
+    pathCell = 10
+    bannerCenterTolerance = 3 + riderCloseEnough
 }
 
 $1 == "TEST" && $2 == "cavalry-c1-quarter" {
@@ -22,10 +31,15 @@ $1 == "TEST" && $2 == "cavalry-c1-quarter" {
         anchorX[frame] = x
         anchorY[frame] = y
         anchorYaw[frame] = $9
+        anchorTurnStep = $12
+        anchorCreepSpeed = 0.1*$13
         anchorMoving[frame] = $15
     } else if ($4 == "banner") {
         bannerX[frame] = x
         bannerY[frame] = y
+        bannerYaw[frame] = $9
+        bannerTurnStep = $12
+        ++banners[frame]
     } else if ($4 == "rider" && $6 >= 0) {
         if (frame == first) ids[++riders] = id
         riderX[frame, id] = x
@@ -44,7 +58,7 @@ END {
         exit 1
     }
     for (frame = first; frame <= last; ++frame) {
-        if (!(frame in anchorX) || !(frame in bannerX) || samples[frame] != riders) {
+        if (!(frame in anchorX) || banners[frame] != 1 || samples[frame] != riders) {
             print "Incomplete bannered cavalry trace at frame " frame
             exit 1
         }
@@ -68,9 +82,17 @@ END {
     }
 
     turnEnd = aligned ? aligned : last
+    anchorTravel = distance(anchorX[turnEnd] - anchorX[first], anchorY[turnEnd] - anchorY[first])
+    bannerTravel = distance(bannerX[turnEnd] - bannerX[first], bannerY[turnEnd] - bannerY[first])
     printf "Pinnath Gelin quarter turn: aligned=%d anchor travel=%.3f max rider displacement=%.3f min rider spacing=%.3f initially=%.3f banner travel=%.3f\n",
-        aligned, distance(anchorX[turnEnd] - anchorX[first], anchorY[turnEnd] - anchorY[first]), riderTravel, minGap, initialGap,
-        distance(bannerX[turnEnd] - bannerX[first], bannerY[turnEnd] - bannerY[first])
+        aligned, anchorTravel, riderTravel, minGap, initialGap, bannerTravel
+    require(aligned > first && aligned < last, "Riders did not align during the quarter turn")
+    require(anchorTravel <= anchorCreepSpeed*(turnEnd - first) + riderCloseEnough,
+        "Anchor advanced beyond startup creep before the riders aligned")
+    require(riderTravel <= riderCloseEnough && bannerTravel <= anchorTravel + riderCloseEnough,
+        "Riders or banner advanced out of the original layout before aligning")
+    require(headingError(bannerYaw[turnEnd], anchorYaw[last]) <= bannerTurnStep,
+        "Banner carrier did not turn with the riders")
 
     forwardX = cos(anchorYaw[last])
     forwardY = sin(anchorYaw[last])
@@ -91,7 +113,15 @@ END {
     if (rankSize[1] > 0) frontSide /= rankSize[1]
     bannerSide = bannerY[last]*forwardX - bannerX[last]*forwardY
     bannerForward = bannerX[last]*forwardX + bannerY[last]*forwardY
+    bannerCenterOffset = bannerSide - frontSide
+    bannerAhead = bannerForward - rankHigh[1]
     printf "Pinnath Gelin finish: ranks=%d+%d yaw=%.4f moving=%d row span=%.3f/%.3f slot error=%.3f banner center offset=%.3f ahead=%.3f\n",
         rankSize[1], rankSize[2], anchorYaw[last], anchorMoving[last], rankHigh[1] - rankLow[1], rankHigh[2] - rankLow[2],
-        slotError[last], bannerSide - frontSide, bannerForward - rankHigh[1]
+        slotError[last], bannerCenterOffset, bannerAhead
+    require(!anchorMoving[last] && headingError(anchorYaw[last], -pi/2) <= anchorTurnStep &&
+        distance(anchorX[last] - 3455, anchorY[last] - 1955) <= pathCell, "Anchor did not finish the commanded quarter turn")
+    require(rankSize[1] == 5 && rankSize[2] == 5 && slotError[last] <= riderCloseEnough &&
+        abs(bannerCenterOffset) <= bannerCenterTolerance && bannerAhead > 0,
+        "Horde did not settle in two ranks of five with its carrier centered ahead")
+    exit failed
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GameLogic/Module/AIUpdate.h"
+#include <optional>
 
 class HordeAIUpdateModuleData : public AIUpdateModuleData
 {
@@ -44,6 +45,8 @@ public:
 	Real getCavalryTurn() const { return m_cavalryTurn; }
 	Bool isCavalryReforming() const { return m_cavalryReforming; }
 	Bool isPacingCavalryReform() const { return m_cavalryReforming || m_cavalryLaunchFrames > 0; }
+	std::optional<Real> getCavalryStartupHeading() const { return m_cavalryStartupHeading; }
+	void setCavalryStartupHeading(Real heading);
 	static Bool isReforming(const AIUpdateInterface* ai);
 	void crcReformState(Xfer* xfer);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
@@ -62,6 +65,7 @@ private:
 	Real m_cavalryTurn = 0.0f;
 	Bool m_cavalryReforming = FALSE;
 	UnsignedInt m_cavalryLaunchFrames = 0;
+	std::optional<Real> m_cavalryStartupHeading;
 	UnsignedInt m_reformUntil = 0;
 	CommandSourceType m_attackSource = CMD_FROM_AI;
 	Int m_maxShots = 0;

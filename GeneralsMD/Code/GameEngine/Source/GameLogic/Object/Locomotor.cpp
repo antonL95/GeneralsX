@@ -3346,16 +3346,31 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	const Real distToGoal = dirToApplyForce.length();
 	const Real desiredAngle = distToGoal >= SLIDE_IN_PLACE_DISTANCE
 		? WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x) : obj->getOrientation();
+	const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
+	const Bool cavalrySteering = usesCavalrySteering(obj);
+	Bool startupTurn = FALSE;
 	if (RetailFileLayers::enabled() && m_retailScalarSpeed <= 0.25f * maxSpeed && obj->isKindOf(KINDOF_CAVALRY))
 	{
-		const AIUpdateInterface* ai = obj->getAI();
-		const Bool pacingReform = ai && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate") &&
-			static_cast<const HordeAIUpdate*>(ai)->isPacingCavalryReform();
+		AIUpdateInterface* ai = obj->getAI();
+		HordeAIUpdate* cavalryAI = ai && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate")
+			? static_cast<HordeAIUpdate*>(ai) : nullptr;
+		const Bool pacingReform = cavalryAI && cavalryAI->isPacingCavalryReform();
 		if (const HordeContain* horde = HordeContain::get(obj); horde && (pacingReform || !horde->isHeadingAligned(desiredAngle)))
+		{
+			if (cavalrySteering && cavalryAI && m_template->m_turnWhileMoving && !physics->getIsStunned() &&
+				onPathDistToGoal > REFORM_MIN_DISTANCE && fabs(relAngle) <= m_template->m_maxTurnWithoutReform &&
+				(cavalryAI->getCavalryStartupHeading().has_value() ||
+					(!pacingReform && m_retailScalarSpeed <= 0.0f && !cavalryAI->hasActiveAttack() &&
+						horde->areMembersAtFormationSlots())))
+			{
+				cavalryAI->setCavalryStartupHeading(desiredAngle);
+				startupTurn = TRUE;
+			}
 			desiredSpeed *= 0.1f;
+		}
 	}
 
-	if (usesCavalrySteering(obj))
+	if (cavalrySteering && !startupTurn)
 	{
 		moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 		return;
@@ -3369,7 +3384,6 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	{
 		dirToApplyForce.x /= distToGoal;
 		dirToApplyForce.y /= distToGoal;
-		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 		if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
 		{
 			obj->setOrientation(desiredAngle);
