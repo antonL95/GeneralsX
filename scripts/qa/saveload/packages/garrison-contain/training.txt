@@ -1,0 +1,19 @@
+160 create Player_1 GarrisonFadeCarrier 0 400,2515,0
+160 create Player_1 GarrisonClubRider 0 393,2515,0
+162 pkg31-msg-enter Player_1 GarrisonClubRider 0 Player_1:GarrisonFadeCarrier:0
+190 pkg31-container-state Player_1 GarrisonFadeCarrier 0 first-boarded
+190 tc-probe Player_1 GarrisonFadeCarrier 0 first-weapon-state
+190 tc-probe Player_1 GarrisonClubRider 0 visible-on-board
+205 create Player_1 GarrisonOrcRider 0 393,2515,0
+207 pkg31-ai-enter Player_1 GarrisonOrcRider 0 Player_1:GarrisonFadeCarrier:0
+242 pkg31-container-state Player_1 GarrisonFadeCarrier 0 both-boarded
+242 tc-probe Player_1 GarrisonFadeCarrier 0 second-weapon-state
+250 pkg31-container-state Player_1 GarrisonFadeCarrier 0 both-boarded-resumed
+250 tc-probe Player_1 GarrisonFadeCarrier 0 second-weapon-state-resumed
+251 pkg31-exit-button Player_1 GarrisonFadeCarrier 0 Player_1:GarrisonClubRider:0
+265 pkg31-container-state Player_1 GarrisonFadeCarrier 0 rider-remains
+265 tc-probe Player_1 GarrisonFadeCarrier 0 cleared-on-exit
+265 tc-probe Player_1 GarrisonClubRider 0 visible-on-exit
+270 destroy Player_1 GarrisonFadeCarrier 0
+270 destroy Player_1 GarrisonClubRider 0
+270 destroy Player_1 GarrisonOrcRider 0

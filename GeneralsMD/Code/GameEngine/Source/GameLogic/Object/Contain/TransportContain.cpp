@@ -72,6 +72,7 @@ TransportContainModuleData::TransportContainModuleData()
 	m_healthRegen = 0.0f;
 	m_exitDelay = 0;
 	m_isDelayExitInAir = FALSE;
+	m_fadeFilter.m_rules = SpecialPowerObjectFilter::RULE_NONE;
 
 	//
 	// by default we say that transports can have infantry inside them, this will be totally
@@ -411,11 +412,8 @@ void TransportContain::refreshPassengerWeaponState()
 
 void TransportContain::applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const
 {
-	const TransportContainModuleData* data = getTransportContainModuleData();
-	const SpecialPowerObjectFilter& filter = data->m_fadeFilter;
-	const Bool authored = filter.m_rules != 0 || filter.m_includeKinds.any() || filter.m_excludeKinds.any() ||
-		!filter.m_includeObjects.empty() || !filter.m_excludeObjects.empty();
-	if (!rider || timeMsec <= 0.0f || !authored || !filter.matchesObject(nullptr, rider))
+	const auto& filter = getTransportContainModuleData()->m_fadeFilter;
+	if (!rider || timeMsec <= 0.0f || !filter.matchesObject(nullptr, rider))
 		return;
 
 	const UnsignedInt frames = static_cast<UnsignedInt>(REAL_TO_INT_FLOOR(ConvertDurationFromMsecsToFrames(timeMsec)));
