@@ -1159,6 +1159,14 @@ def check_hover_roster():
     hover_world(360, "Fortress", "box")
 
 
+def check_promotion_tint():
+    wait_for("camera centers on the promotion fixture",
+             lambda: log_count("TEST frame 12: look ") >= 1, 150)
+    wait_for("promotion applies the authored model tint",
+             lambda: log_count("TEST promotion-tint frame=51 PromotionTintFixture rank=2 rgb=1.000,0.251,0.000") >= 1, 120)
+    capture("promotion-tint", 0, 0, 1024, 768)
+
+
 def launch_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
     speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
     with (out / "game.log").open(log_mode) as log:
@@ -1290,12 +1298,23 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-if "--create-a-hero" in sys.argv or "--hover-roster" in sys.argv:
+if any(option in sys.argv for option in ("--create-a-hero", "--hover-roster", "--promotion-tint")):
     map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
     map_dir.mkdir(parents=True)
     source = Path("/game/UserData/Maps/AotR Training Grounds")
     for file in source.iterdir():
         shutil.copy2(file, map_dir / (file.name.lower() if file.suffix.lower() == ".map" else file.name))
+if "--promotion-tint" in sys.argv:
+    package = Path(__file__).resolve().parent / "saveload/packages/promotion-tint"
+    with (map_dir / "map.ini").open("a") as map_ini:
+        map_ini.write("\n" + (package / "training.ini").read_text())
+    commands.write_text(
+        f"5 promotion-tint-load-levels - - 0 {package / 'levels.ini'}\n"
+        "10 create Player_1 PromotionTintFixture 0 700,2450,0\n"
+        "12 look Player_1 PromotionTintFixture 0\n"
+        "45 promotion-tint-award Player_1 PromotionTintFixture 0\n"
+        "51 promotion-tint-probe Player_1 PromotionTintFixture 0\n"
+    )
 if "--create-a-hero" in sys.argv:
     commands.write_text(
         "10 cash Player_1 - 0 10000\n"
@@ -1331,6 +1350,8 @@ elif "--hero-roster" in sys.argv:
     run(check_hero_roster)
 elif "--hover-roster" in sys.argv:
     run(check_hover_roster, "-file", str(map_dir / "aotr training grounds.map"))
+elif "--promotion-tint" in sys.argv:
+    run(check_promotion_tint, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--multi-select" in sys.argv:
     run(check_multi_select)
 elif "--dolguldur-buttons" in sys.argv:

@@ -395,6 +395,7 @@ public:
 
 	void colorFlash( const RGBColor *color, UnsignedInt decayFrames = DEF_DECAY_FRAMES, UnsignedInt attackFrames = 0, UnsignedInt sustainAtPeak = 0 );  ///< flash a drawable in the color specified for a short time
 	void playFXTint(const RGBColor& color, UnsignedInt attackFrames, UnsignedInt holdFrames, UnsignedInt decayFrames);
+	void playPromotionTint(const RGBColor& color, Int attackMs, Int holdMs, Int decayMs, Real frequency, Real amplitude);
 	void colorTint( const RGBColor *color );	 ///< tint this drawable the color specified
 	void setTintEnvelope( const RGBColor *color, Real attack, Real decay );	 ///< how to transition color
 	void flashAsSelected( const RGBColor *color = nullptr ); ///< drawable takes care of the details if you spec no color
@@ -710,6 +711,9 @@ private:
 																//   color, by tinting all four scene lights, not just ambient
 																//   zero = no effect
 																//   1    = full effect
+
+	struct PromotionTint;
+	std::unique_ptr<PromotionTint> m_promotionTint;
 
 	TerrainDecalType m_terrainDecalType; ///<current decal in use by m_terrainDecal
 
