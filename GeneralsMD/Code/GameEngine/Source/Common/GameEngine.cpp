@@ -295,7 +295,7 @@ static void startRetailFileSkirmish(const MapMetaData& map)
 	TheSkirmishGameInfo->setLocalIP(human.getIP());
 
 	const char *opponent = std::getenv("GENERALSX_RETAIL_SKIRMISH_AI");
-	if (opponent && (std::strcmp(opponent, "1") == 0 || std::strcmp(opponent, "brutal") == 0))
+	if (map.m_numPlayers >= 2 && opponent && (std::strcmp(opponent, "1") == 0 || std::strcmp(opponent, "brutal") == 0))
 	{
 		GameSlot ai;
 		ai.setState(std::strcmp(opponent, "brutal") == 0 ? SLOT_RETAIL_BRUTAL_AI : SLOT_EASY_AI);
@@ -1225,7 +1225,7 @@ void GameEngine::init()
 				TheWritableGlobalData->m_shellMapOn = FALSE;
 				TheWritableGlobalData->m_playIntro = FALSE;
 				TheWritableGlobalData->m_pendingFile = map ? map->m_fileName : TheGlobalData->m_initialFile;
-				const Bool skirmish = map && map->m_isMultiplayer && map->m_numPlayers >= 2;
+				const Bool skirmish = map && map->m_isMultiplayer && map->m_numPlayers > 0;
 				if (skirmish)
 					startRetailFileSkirmish(*map);
 

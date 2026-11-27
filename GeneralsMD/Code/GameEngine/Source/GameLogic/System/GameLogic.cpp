@@ -651,6 +651,8 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 	pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 
 	AsciiString buildingTemplateName = pTemplate->getStartingBuilding();
+	if (buildingTemplateName.compareNoCase("NONE") == 0)
+		return;
 
 	DEBUG_ASSERTCRASH(!buildingTemplateName.isEmpty(), ("no starting building type for player %d (playertemplate %ls)",
 		slotNum, pTemplate->getDisplayName().str()));
@@ -689,7 +691,7 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 	for (Int i=0; i<MAX_MP_STARTING_UNITS; ++i)
 	{
 		AsciiString objName = pTemplate->getStartingUnit(i);
-		if (objName.isNotEmpty())
+		if (objName.isNotEmpty() && objName.compareNoCase("NONE") != 0)
 		{
 			Coord3D objPos = pos;
 			FindPositionOptions options;

@@ -6802,6 +6802,7 @@ static Bool isSystemMessage( const GameMessage *msg )
 		case GameMessage::MSG_LOGIC_CRC:
 		case GameMessage::MSG_SET_REPLAY_CAMERA:
 		case GameMessage::MSG_FRAME_TICK:
+		case GameMessage::MSG_ENABLE_RETALIATION_MODE:
 		case GameMessage::MSG_META_DEMO_INSTANT_QUIT:
 			return TRUE;
 	}

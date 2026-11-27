@@ -1075,14 +1075,6 @@ namespace
 		Bool occupied() const { return state != SLOT_OPEN && state != SLOT_CLOSED; }
 	};
 
-	struct SetupMap
-	{
-		AsciiString path;
-		UnicodeString name;
-		Int players;
-		Bool official;
-	};
-
 	UnicodeString slotName(SlotState state)
 	{
 		switch (state)
@@ -1152,7 +1144,7 @@ namespace
 		Bool rulesTab = FALSE;
 		Bool sortByPlayers = FALSE;
 		Bool sandboxConfirmed = FALSE;
-		std::vector<SetupMap> maps;
+		std::vector<RetailSkirmishMap> maps;
 		std::vector<Int> factions;
 		std::vector<RetailHeroProfile> heroProfiles;
 		std::unique_ptr<RetailHeroEditor> heroEditor;
@@ -1264,27 +1256,8 @@ namespace
 			profileFeedback.clear();
 			loadProfiles();
 			heroProfiles = loadRetailHeroProfiles();
-			maps.clear();
 			factions.clear();
-			TheMapCache->updateCache();
-			for (const auto &[path, map] : *TheMapCache)
-			{
-				if (map.m_doesExist && map.m_isMultiplayer && map.m_numPlayers > 0)
-				{
-					UnicodeString name;
-					if (map.m_nameLookupTag.isEmpty())
-						name = localize(mapCatalogueKey(path).c_str(), "");
-					if (name.isEmpty())
-					{
-						name = map.m_displayName;
-						UnicodeString count;
-						count.format(L" (%d)", map.m_numPlayers);
-						if (name.endsWith(count))
-							name.truncateBy(count.getLength());
-					}
-					maps.push_back({path, name, map.m_numPlayers, map.m_isOfficial});
-				}
-			}
+			maps = collectRetailSkirmishMaps();
 			sortByPlayers = FALSE;
 			sortMaps();
 			for (Int i = 0; i < ThePlayerTemplateStore->getPlayerTemplateCount(); ++i)
@@ -1304,7 +1277,7 @@ namespace
 
 		void sortMaps()
 		{
-			std::sort(maps.begin(), maps.end(), [this](const SetupMap &a, const SetupMap &b) {
+			std::sort(maps.begin(), maps.end(), [this](const RetailSkirmishMap &a, const RetailSkirmishMap &b) {
 				if (a.official != b.official)
 					return !a.official;
 				if (sortByPlayers && a.players != b.players)
@@ -1321,7 +1294,7 @@ namespace
 			const AsciiString selected = maps[mapIndex].path;
 			sortByPlayers = byPlayers;
 			sortMaps();
-			const auto it = std::find_if(maps.begin(), maps.end(), [&](const SetupMap &map) { return map.path == selected; });
+			const auto it = std::find_if(maps.begin(), maps.end(), [&](const RetailSkirmishMap &map) { return map.path == selected; });
 			mapIndex = Int(it - maps.begin());
 			mapScroll = std::clamp(mapScroll, std::max(0, mapIndex - visibleMaps + 1), mapIndex);
 		}
@@ -1329,7 +1302,7 @@ namespace
 		void restoreSetup(const SkirmishGameInfo &game)
 		{
 			openSetup();
-			const auto map = std::find_if(maps.begin(), maps.end(), [&](const SetupMap &entry) {
+			const auto map = std::find_if(maps.begin(), maps.end(), [&](const RetailSkirmishMap &entry) {
 				return entry.path.compareNoCase(game.getMap()) == 0;
 			});
 			if (map == maps.end())
@@ -2208,6 +2181,30 @@ namespace
 			menu.startRematch();
 		return MSG_HANDLED;
 	}
+}
+
+std::vector<RetailSkirmishMap> collectRetailSkirmishMaps()
+{
+	std::vector<RetailSkirmishMap> maps;
+	TheMapCache->updateCache();
+	for (const auto &[path, map] : *TheMapCache)
+	{
+		if (!map.m_doesExist || !map.m_isMultiplayer || map.m_numPlayers <= 0)
+			continue;
+		UnicodeString name;
+		if (map.m_nameLookupTag.isEmpty())
+			name = localize(mapCatalogueKey(path).c_str(), "");
+		if (name.isEmpty())
+		{
+			name = map.m_displayName;
+			UnicodeString count;
+			count.format(L" (%d)", map.m_numPlayers);
+			if (name.endsWith(count))
+				name.truncateBy(count.getLength());
+		}
+		maps.push_back({path, name, map.m_numPlayers, map.m_isOfficial});
+	}
+	return maps;
 }
 
 void updateRetailShellLoad()

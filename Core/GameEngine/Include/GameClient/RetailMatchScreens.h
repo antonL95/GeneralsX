@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/AsciiString.h"
 #include "Common/UnicodeString.h"
 
 #include <array>
@@ -9,6 +10,16 @@
 class GameInfo;
 class GameWindow;
 class WindowLayout;
+
+struct RetailSkirmishMap
+{
+	AsciiString path;
+	UnicodeString name;
+	Int players;
+	Bool official;
+};
+
+std::vector<RetailSkirmishMap> collectRetailSkirmishMaps();
 
 class RetailLoadingScreen
 {

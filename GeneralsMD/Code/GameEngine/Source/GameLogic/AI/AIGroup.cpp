@@ -3214,10 +3214,7 @@ void AIGroup::groupSell( CommandSourceType cmdSource )
 
 	for( size_t j = 0; j < groupObjectsCopy.size(); ++j )
 	{
-		Object *object = groupObjectsCopy[j];
-		if (!object->isKindOf(KINDOF_NOT_SELLABLE) && !object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNSELLABLE) &&
-			!object->isDisabledByType(DISABLED_SUBDUED))
-			TheBuildAssistant->sellObject(object);
+		TheBuildAssistant->sellObject( groupObjectsCopy[j] );
 	}
 
 }

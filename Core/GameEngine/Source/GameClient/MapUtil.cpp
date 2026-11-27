@@ -800,6 +800,9 @@ Bool MapCache::addMap(
 	}
 
 	DEBUG_LOG(("MapCache::addMap(): caching '%s' because '%s' was not found", fname.str(), lowerFname.str()));
+	const Int registeredSlots = refresh && isOfficial && it != end() ? it->second.m_numPlayers : 0;
+	const Bool useRegisteredSlots = registeredSlots > 0 && registeredSlots <= MAX_SLOTS;
+	const Bool registeredMultiplayer = useRegisteredSlots && it->second.m_isMultiplayer;
 
 	if (!loadMap(fname))
 	{
@@ -814,8 +817,8 @@ Bool MapCache::addMap(
 	md.m_isOfficial = isOfficial;
 	md.m_doesExist = TRUE;
 	md.m_waypoints.update();
-	md.m_numPlayers = md.m_waypoints.m_numStartSpots;
-	md.m_isMultiplayer = (md.m_numPlayers >= 2);
+	md.m_numPlayers = useRegisteredSlots ? registeredSlots : md.m_waypoints.m_numStartSpots;
+	md.m_isMultiplayer = useRegisteredSlots ? registeredMultiplayer : md.m_numPlayers >= 2;
 	md.m_timestamp.m_highTimeStamp = fileInfo.timestampHigh;
 	md.m_timestamp.m_lowTimeStamp = fileInfo.timestampLow;
 	md.m_supplyPositions = m_supplyPositions;
@@ -1304,21 +1307,30 @@ const MapMetaData *MapCache::ensureRetailLaunchMap(const AsciiString &mapName)
 			return nullptr;
 	}
 
-	AsciiString fileName(path.generic_string().c_str());
+	const AsciiString requestedPath(path.generic_string().c_str());
+	AsciiString fileName = requestedPath;
 	FileInfo fileInfo;
 	if (!resolveRetailMapPath(*this, fileName) || !TheFileSystem->getFileInfo(fileName, &fileInfo))
 		return nullptr;
 
+	const MapMetaData* existing = findMap(requestedPath, FALSE);
 	AsciiString key = fileName;
+	Bool useRegisteredPath = FALSE;
+	if (existing && existing->m_isOfficial)
+	{
+		std::string registeredSpelling(existing->m_fileName.str());
+		std::replace(registeredSpelling.begin(), registeredSpelling.end(), '\\', '/');
+		AsciiString registeredPath(registeredSpelling.c_str());
+		useRegisteredPath = resolveRetailMapPath(*this, registeredPath) && registeredPath.compareNoCase(fileName) == 0;
+		if (useRegisteredPath)
+			key = existing->m_fileName;
+	}
 	key.toLower();
-	AsciiString originalKey(path.generic_string().c_str());
-	originalKey.toLower();
-	const MapMetaData* existing = findMap(originalKey, FALSE);
-	const Bool isOfficial = existing && existing->m_isOfficial;
-	if (!addMap(getMapDir(), fileName, key, fileInfo, isOfficial, TRUE))
+	if (!addMap(getMapDir(), fileName, key, fileInfo, useRegisteredPath, TRUE))
 		return nullptr;
 	auto &map = find(key)->second;
-	map.m_fileName = fileName;
+	if (!useRegisteredPath)
+		map.m_fileName = fileName;
 	return &map;
 }
 

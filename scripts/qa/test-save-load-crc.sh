@@ -3,7 +3,7 @@ set -eu
 export LC_ALL=C
 
 usage() {
-    printf '%s\n' "Usage: $0 [--only PACKAGE[,PACKAGE...]|--shard SHARD] BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
+    printf '%s\n' "Usage: $0 [--only PACKAGE[,PACKAGE...]|--shard SHARD] BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|retail-map|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
     exit 2
 }
 
@@ -55,7 +55,7 @@ if [ ! -d "$registry/packages" ] && [ -f "$build/CMakeCache.txt" ]; then
 fi
 
 case "$mode" in
-    training|high-pass|spellbook|zero-hour) fixture_mode=$mode ;;
+    training|high-pass|spellbook|retail-map|zero-hour) fixture_mode=$mode ;;
     marsh-training|marsh-stock) fixture_mode=marsh ;;
     *) usage ;;
 esac
@@ -191,6 +191,9 @@ case "$mode" in
         ;;
     marsh-stock)
         copy_map 'map mp druwaith iaur' "${PKGS1_DRUWAITH_DATA:-"$aotr/maps/map mp druwaith iaur"}"
+        ;;
+    retail-map)
+        map=${PKGS1_RETAIL_MAP:?Retail map path required}
         ;;
     zero-hour)
         work=${PKGS1_ZERO_HOUR_DATA:?Zero Hour game directory required}
