@@ -1,0 +1,3 @@
+31 hud-camera - - 0
+35 hud-click - - 0 - 31 324
+119 hud-camera - - 0

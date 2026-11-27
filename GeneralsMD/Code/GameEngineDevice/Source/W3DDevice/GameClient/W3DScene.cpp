@@ -41,6 +41,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
 #include "GameClient/Drawable.h"
@@ -434,6 +435,23 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 /** Custom visibility check method for the RTS3DScene, we can put optimized
   * culling methods in here */
 //=============================================================================
+static Bool isSkyboxDrawable(const Drawable *draw)
+{
+	if (!draw)
+		return FALSE;
+	if (draw->isKindOf(KINDOF_SKYBOX))
+		return TRUE;
+	const ThingTemplate *tmpl = draw->getTemplate();
+	if (!tmpl)
+		return FALSE;
+	for (const AsciiString &tag : tmpl->getRotWKObjectData().browser)
+	{
+		if (tag.compareNoCase("SKYBOXES") == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 void RTS3DScene::Visibility_Check(CameraClass * camera)
 {
 #ifdef DIRTY_CONDITION_FLAGS
@@ -512,11 +530,11 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 					drawInfo = (DrawableInfo *)robj->Get_User_Data();
 					if (drawInfo && (draw=drawInfo->m_drawable) != nullptr)
 					{
-						if (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud())
+						if (draw->isDrawableEffectivelyHidden() || (!isSkyboxDrawable(draw) && draw->getFullyObscuredByShroud()))
 						{
 							isVisible = FALSE;
-						  robj->Set_Visible(isVisible);
-            }
+							robj->Set_Visible(isVisible);
+						}
 						//assume normal rendering.
 						drawInfo->m_flags = DrawableInfo::ERF_IS_NORMAL;	//clear any rendering flags that may be in effect.
 
@@ -663,7 +681,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			ambient.Add(ambient, *drawAmbient, &ambient);
 #endif
 		obj = draw->getObject();
-		if (obj) {
+		if (isSkyboxDrawable(draw))
+		{
+			ss = OBJECTSHROUD_CLEAR;
+		}
+		else if (obj) {
 			ss = obj->getShroudedStatus(localPlayerIndex);
 			// For objects like planes, that pop out of the shroud, fire, then head back,
 			// we keep drawing them for 2 seconds after they return to the fogged area,

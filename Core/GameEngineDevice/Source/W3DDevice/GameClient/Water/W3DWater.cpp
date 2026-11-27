@@ -1127,25 +1127,7 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	m_alphaClippingTexture=WW3DAssetManager::Get_Instance()->Get_Texture("alphaclip.tga");
 #endif
 
-	m_skyBox = ((W3DAssetManager*)W3DAssetManager::Get_Instance())->Create_Render_Obj( "new_skybox", TheGlobalData->m_skyBoxScale, 0);
-
-	//Enable clamping on all textures used by the skybox (to reduce corner seams).
-	if (m_skyBox && m_skyBox->Class_ID() == RenderObjClass::CLASSID_MESH)
-	{
-		MeshClass *mesh=(MeshClass*) m_skyBox;
-		MaterialInfoClass	*material = mesh->Get_Material_Info();
-
-		for (Int i=0; i<material->Texture_Count(); i++)
-		{
-			if (material->Peek_Texture(i))
-			{
-				material->Peek_Texture(i)->Get_Filter().Set_U_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_CLAMP);
-				material->Peek_Texture(i)->Get_Filter().Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_CLAMP);
-			}
-		}
-
-		REF_PTR_RELEASE(material);
-	}
+	m_skyBox = nullptr;
 
 	m_riverTexture=WW3DAssetManager::Get_Instance()->Get_Texture(TheWaterTransparency->m_standingWaterTexture.str());
 
@@ -1847,7 +1829,7 @@ void WaterRenderObjClass::Render(RenderInfoClass & rinfo)
 
 					if(m_useCloudLayer)
 					{
-						if (TheGlobalData && TheGlobalData->m_drawEntireTerrain)
+						if (TheGlobalData && TheGlobalData->m_drawEntireTerrain && m_skyBox)
 							m_skyBox->Render(rinfo);
 						else
 						{

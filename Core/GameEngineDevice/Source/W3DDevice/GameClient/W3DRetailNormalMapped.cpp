@@ -1,6 +1,9 @@
 #include "W3DDevice/GameClient/RetailEffectInput.h"
 
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/DrawableInfo.h"
 #include "GameClient/Snow.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/RetailTerrainShadow.h"
@@ -238,11 +241,36 @@ Register fromVector(const Vector3 &value)
 	return {value.X, value.Y, value.Z, 0.0f};
 }
 
+bool isSkyboxMesh(MeshClass &mesh)
+{
+	RenderObjClass *root = &mesh;
+	while (root->Get_Container())
+		root = root->Get_Container();
+	void *userData = root->Get_User_Data();
+	if (!userData || *static_cast<const int *>(userData) == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE)
+		return false;
+	const auto *info = static_cast<const DrawableInfo *>(userData);
+	const Drawable *draw = info->m_drawable;
+	if (!draw)
+		return false;
+	if (draw->isKindOf(KINDOF_SKYBOX))
+		return true;
+	const ThingTemplate *tmpl = draw->getTemplate();
+	if (!tmpl)
+		return false;
+	for (const AsciiString &tag : tmpl->getRotWKObjectData().browser)
+	{
+		if (tag.compareNoCase("SKYBOXES") == 0)
+			return true;
+	}
+	return false;
+}
+
 bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
 	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world, DX8PolygonRendererClass &renderer)
 {
 	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
-		ShaderClass::Is_Backface_Culling_Inverted())
+		ShaderClass::Is_Backface_Culling_Inverted() || isSkyboxMesh(mesh))
 		return false;
 	auto &model = *mesh.Peek_Model();
 	const auto *fx = model.Peek_Fx_Materials();
