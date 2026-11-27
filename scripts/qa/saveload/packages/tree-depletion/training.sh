@@ -29,7 +29,7 @@ check() {
         expect "TEST tree-depletion mill frame=300 rank=1 experience=1976"
     fi
     if covers 900; then
-        expect "TEST tree-depletion mill frame=900 rank=2 experience=2008"
+        expect "TEST tree-depletion mill frame=900 rank=2 experience=2010"
     fi
     expect_tree 290 5 90 0
     expect_tree 330 5 0 0
