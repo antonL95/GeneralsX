@@ -495,6 +495,7 @@ public:
 	Bool instantLoadClipOnActivate() const { return m_instantLoadClipOnActivate; }
 	Bool isAimingWeapon() const { return m_isAimingWeapon; }
 	Bool isChaseWeapon() const { return m_chaseWeapon; }
+	Bool isMeleeWeapon() const { return m_meleeWeapon; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }

@@ -54,8 +54,18 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/Weapon.h"
 
 const Real CLOSE_ENOUGH = (25.0f);
+const Real MELEE_RETALIATE_RANGE_FACTOR_00C12234 = 1.15f;
+const UnsignedInt MELEE_RETALIATE_CHASE_EXTRA_SHIFT_0094C144 = 1;
+
+static Bool hasMeleeCurrentWeapon(const Object* obj)
+{
+	const Weapon* weapon = obj ? obj->getCurrentWeapon() : nullptr;
+	const WeaponTemplate* weaponTemplate = weapon ? weapon->getTemplate() : nullptr;
+	return weaponTemplate ? weaponTemplate->isMeleeWeapon() : FALSE;
+}
 
 
 static Bool hasAttackedMeAndICanReturnFire( State *thisState, void* /*userData*/ )
@@ -215,12 +225,15 @@ Bool AIGuardRetaliateMachine::isIdle() const
 }
 
 //--------------------------------------------------------------------------------------
-/*static*/ Real AIGuardRetaliateMachine::getStdGuardRange(const Object* obj)
+Real AIGuardRetaliateMachine::getStdGuardRange(const Object* obj)
 {
-	Real visionRange = TheAI->getAdjustedVisionRangeForObject(obj,
-		AI_VISIONFACTOR_OWNERTYPE | AI_VISIONFACTOR_MOOD | AI_VISIONFACTOR_GUARDINNER);
+	Real range = TheAI->getAiData()->m_maxRetaliateDistance;
+	if (hasMeleeCurrentWeapon(obj))
+	{
+		range *= MELEE_RETALIATE_RANGE_FACTOR_00C12234;
+	}
 
-	return visionRange;
+	return range;
 }
 
 //--------------------------------------------------------------------------------------
@@ -824,8 +837,14 @@ StateReturnType AIGuardRetaliateAttackAggressorState::onEnter()
 
 	Real range = TheAI->getAdjustedVisionRangeForObject(obj, AI_VISIONFACTOR_OWNERTYPE | AI_VISIONFACTOR_MOOD);
 
+	UnsignedInt chaseFrames = TheAI->getAiData()->m_guardChaseUnitFrames;
+	if (hasMeleeCurrentWeapon(obj))
+	{
+		chaseFrames += (chaseFrames >> MELEE_RETALIATE_CHASE_EXTRA_SHIFT_0094C144);
+	}
+
 	m_exitConditions.m_center = pos;
-	m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + TheAI->getAiData()->m_guardChaseUnitFrames;
+	m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + chaseFrames;
 	m_exitConditions.m_radiusSqr = sqr( range + AIGuardRetaliateMachine::getStdGuardRange( obj ) );
 	m_exitConditions.m_conditionsToConsider = ( GuardRetaliateExitConditions::ATTACK_ExitIfExpiredDuration |
 																						  GuardRetaliateExitConditions::ATTACK_ExitIfOutsideRadius |

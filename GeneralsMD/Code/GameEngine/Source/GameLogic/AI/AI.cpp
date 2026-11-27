@@ -204,6 +204,7 @@ static const FieldParse TheAIFieldParseTable[] =
  	{ "AICrushesInfantry",	INI::parseBool,nullptr,			offsetof( TAiData, m_aiCrushesInfantry ) },
 
  	{ "MaxRetaliationDistance",	INI::parseReal,nullptr,			offsetof( TAiData, m_maxRetaliateDistance ) },
+ 	{ "MaxRetaliateDistance",	INI::parseReal,nullptr,			offsetof( TAiData, m_maxRetaliateDistance ) },
  	{ "RetaliationFriendsRadius",	INI::parseReal,nullptr,			offsetof( TAiData, m_retaliateFriendsRadius ) },
 
 
