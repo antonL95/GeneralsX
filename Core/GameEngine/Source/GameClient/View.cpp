@@ -34,6 +34,9 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/View.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/TerrainLogic.h"
 
 UnsignedInt View::m_idNext = 1;
 
@@ -120,6 +123,7 @@ void View::reset()
 	m_userControlLockedUntilFrame = 0u;
 	m_clipDepthMultiplier = 1.0f;
 	m_isUserControlled = true;
+	m_scriptCameraArea.clear();
 }
 
 /**
@@ -314,11 +318,39 @@ PlaneClass::IntersectionResType View::getScreenCornerWorldPointsAtZ( Coord3D *to
 // ------------------------------------------------------------------------------------------------
 /** Xfer method for a view */
 // ------------------------------------------------------------------------------------------------
+void View::setScriptCameraArea(const AsciiString &name)
+{
+	m_scriptCameraArea = name;
+	m_scriptCameraAnchor = m_pos;
+	if (enforceScriptCameraArea())
+		forceRedraw();
+}
+
+Bool View::enforceScriptCameraArea()
+{
+	if (m_scriptCameraArea.isEmpty() || !TheTerrainLogic)
+		return FALSE;
+	const PolygonTrigger *area = TheTerrainLogic->getTriggerAreaByName(m_scriptCameraArea);
+	if (!area || area->getNumPoints() < 3)
+		return FALSE;
+	if (area->pointInTrigger(m_pos))
+	{
+		m_scriptCameraAnchor = m_pos;
+		return FALSE;
+	}
+	if (!area->pointInTrigger(m_scriptCameraAnchor))
+		area->getCenterPoint(&m_scriptCameraAnchor);
+	if (m_pos.x == m_scriptCameraAnchor.x && m_pos.y == m_scriptCameraAnchor.y)
+		return FALSE;
+	setPosition(m_scriptCameraAnchor);
+	return TRUE;
+}
+
 void View::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -334,4 +366,14 @@ void View::xfer( Xfer *xfer )
 	xfer->xferReal( &viewPos.z );
 	lookAt( &viewPos );
 
+	if (RetailFileLayers::enabled())
+	{
+		RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, version >= 2, {
+			{"camera-area-restriction",
+				[this](Xfer *block) { block->xferAsciiString(&m_scriptCameraArea); },
+				[this] { m_scriptCameraArea.clear(); }},
+		});
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_scriptCameraAnchor = getPosition();
+	}
 }

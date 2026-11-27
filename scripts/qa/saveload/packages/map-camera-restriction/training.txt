@@ -1,0 +1,3 @@
+242 camera-restriction-arm Player_1 - 0
+245 camera-restriction-check Player_1 - 0
+246 camera-restriction-release Player_1 - 0

@@ -30,6 +30,7 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/AsciiString.h"
 #include "Common/GameType.h"
 #include "Common/Snapshot.h"
 #include "Lib/BaseType.h"
@@ -205,6 +206,7 @@ public:
 	void setPosition2D( const Coord2D &pos ) { m_pos.x = pos.x; m_pos.y = pos.y; }
 	const Coord3D &getPosition() const { return m_pos; } ///< Returns position camera is looking at
 	Coord2D getPosition2D() const { return m_pos.asCoord2D(); } ///< Returns position camera is looking at
+	void setScriptCameraArea(const AsciiString &name);
 
 	virtual Coord3D get3DCameraPosition() const { Coord3D c={0,0,0}; return c; } ///< Returns the actual camera position
 	virtual Coord3D get3DCameraDirection() const { Coord3D c={0,0,0}; return c; } ///< Returns the actual camera view direction
@@ -326,6 +328,10 @@ private:
 
 protected:
 
+	Bool enforceScriptCameraArea();
+	AsciiString m_scriptCameraArea;
+	Coord3D m_scriptCameraAnchor = {};
+
 	View *m_next;																								///< List links used by the Display class
 
 	UnsignedInt m_id;																						///< The ID of this view
@@ -428,7 +434,7 @@ public:
 	virtual Bool screenToTerrain( const ICoord2D *screen, Coord3D *world ) override { return false; }
 	virtual PlaneClass::IntersectionResType screenToWorldAtZ( const ICoord2D *screen, Coord3D *world, Real z ) override { return PlaneClass::NO_INTERSECTION; }
 	virtual void drawView() override {}
-	virtual void updateView() override {}
+	virtual void updateView() override { enforceScriptCameraArea(); }
 	virtual void stepView() override {}
 	virtual void setGuardBandBias( const Coord2D *gb ) override {}
 	virtual Bool isDoingScriptedCamera() override { return false; }

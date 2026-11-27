@@ -8518,6 +8518,16 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				TheTacticalView->setClipDepthMultiplier(BfmeScriptRules::clipDepthMultiplier(pAction->getParameter(0)->getReal()));
 			return;
 
+		case ScriptAction::CAMERA_RESTRICT_TO_AREA:
+			if (TheTacticalView)
+				TheTacticalView->setScriptCameraArea(pAction->getParameter(0)->getString());
+			return;
+
+		case ScriptAction::CAMERA_REMOVE_AREA_RESTRICTION:
+			if (TheTacticalView)
+				TheTacticalView->setScriptCameraArea(AsciiString::TheEmptyString);
+			return;
+
 		case ScriptAction::WATER_CHANGE_HEIGHT:
 			doWaterChangeHeight(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;

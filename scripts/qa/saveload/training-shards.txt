@@ -135,3 +135,4 @@
 3 summon-busy
 3 map-script-camera-ui
 3 map-camera-entered-area
+3 map-camera-restriction

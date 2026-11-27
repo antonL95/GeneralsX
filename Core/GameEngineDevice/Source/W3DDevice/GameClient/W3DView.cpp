@@ -1713,6 +1713,9 @@ void W3DView::update()
 		updateCameraAreaConstraints();
 	}
 
+	if (enforceScriptCameraArea())
+		m_recalcCamera = true;
+
 	// (gth) C&C3 if m_isCameraSlaved then force the camera to update each frame
 	if (m_recalcCamera || m_isCameraSlaved)
 	{
