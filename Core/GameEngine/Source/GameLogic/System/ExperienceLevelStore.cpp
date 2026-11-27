@@ -25,9 +25,6 @@
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
-#if !RTS_GENERALS
-#include "GameClient/Drawable.h"
-#endif
 #include "GameLogic/ExperienceLevelRules.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -266,20 +263,6 @@ void apply(Object* obj, const Level& level, bool feedback)
 			ObjectCreationList::create(TheObjectCreationListStore->findObjectCreationList(level.levelUpOcl.str()), obj, nullptr);
 #if !RTS_GENERALS
 		obj->setTimedModelCondition(MODELCONDITION_LEVELED, 3 * LOGICFRAMES_PER_SECOND);
-		if (level.showLevelUpTint)
-		{
-			const auto tint = [&level](Object* target) {
-				if (Drawable* drawable = target->getDrawable())
-					drawable->playPromotionTint(level.levelUpTintColor, level.levelUpTintPreColorTime,
-						level.levelUpTintSustainColorTime, level.levelUpTintPostColorTime,
-						level.levelUpTintFrequency, level.levelUpTintAmplitude);
-			};
-			tint(obj);
-			if (const HordeContain* horde = HordeContain::get(obj))
-				for (Object* member : *horde->getContainedItemsList())
-					if (!member->isEffectivelyDead())
-						tint(member);
-		}
 #endif
 	}
 	if (tracing())

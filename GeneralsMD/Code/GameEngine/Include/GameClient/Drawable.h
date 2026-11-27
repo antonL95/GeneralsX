@@ -395,7 +395,6 @@ public:
 
 	void colorFlash( const RGBColor *color, UnsignedInt decayFrames = DEF_DECAY_FRAMES, UnsignedInt attackFrames = 0, UnsignedInt sustainAtPeak = 0 );  ///< flash a drawable in the color specified for a short time
 	void playFXTint(const RGBColor& color, UnsignedInt attackFrames, UnsignedInt holdFrames, UnsignedInt decayFrames);
-	void playPromotionTint(const RGBColor& color, Int attackMs, Int holdMs, Int decayMs, Real frequency, Real amplitude);
 	void setVeteranHoverDetails(const UnicodeString& name, Int battlesFought);
 	const UnicodeString& getVeteranHoverName() const { return m_veteranHoverName; }
 	Int getBattlesFought() const { return m_battlesFought; }
@@ -715,8 +714,6 @@ private:
 																//   zero = no effect
 																//   1    = full effect
 
-	struct PromotionTint;
-	std::unique_ptr<PromotionTint> m_promotionTint;
 	UnicodeString m_veteranHoverName;
 	Int m_battlesFought = 0;
 

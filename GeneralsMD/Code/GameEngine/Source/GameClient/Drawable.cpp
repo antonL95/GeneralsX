@@ -31,8 +31,6 @@
 
 #include <Utility/intrin_compat.h>	// For _isnan compatibility
 #include <algorithm>
-#include <cmath>
-#include <numbers>
 #include <stdio.h>
 #include "Common/AudioEventInfo.h"
 #include "Common/DynamicAudioEventInfo.h"
@@ -94,49 +92,6 @@
 #include "GameClient/GameText.h"
 
 #include "WW3D2/ww3d.h"
-
-struct Drawable::PromotionTint
-{
-	RGBColor color{};
-	UnsignedInt startFrame = 0;
-	Int attackMs = 0;
-	Int holdMs = 0;
-	Int decayMs = 0;
-	Real frequency = 0.0f;
-	Real amplitude = 0.0f;
-
-	Real strength(UnsignedInt frame) const
-	{
-		if (frame < startFrame)
-			return 0.0f;
-		const double seconds = static_cast<double>(frame - startFrame) / static_cast<double>(LOGICFRAMES_PER_SECOND);
-		const double elapsedMs = seconds * static_cast<double>(MSEC_PER_SECOND);
-		const double holdEnd = static_cast<double>(attackMs) + holdMs;
-		const double end = holdEnd + decayMs;
-		if (elapsedMs >= end)
-			return 0.0f;
-
-		double envelope = 1.0;
-		if (elapsedMs < attackMs)
-			envelope = elapsedMs / attackMs;
-		else if (elapsedMs >= holdEnd)
-			envelope = (end - elapsedMs) / decayMs;
-		if (frequency > 0.0f && amplitude > 0.0f)
-			envelope *= 1.0 - amplitude * (1.0 - std::cos(2.0 * std::numbers::pi * frequency * seconds)) / 2.0;
-		return static_cast<Real>(envelope);
-	}
-
-	void xfer(Xfer* block)
-	{
-		block->xferRGBColor(&color);
-		block->xferUnsignedInt(&startFrame);
-		block->xferInt(&attackMs);
-		block->xferInt(&holdMs);
-		block->xferInt(&decayMs);
-		block->xferReal(&frequency);
-		block->xferReal(&amplitude);
-	}
-};
 
 #define VERY_TRANSPARENT_MATERIAL_PASS_OPACITY (0.001f)
 #define MATERIAL_PASS_OPACITY_FADE_SCALAR (0.8f)
@@ -1100,17 +1055,6 @@ void Drawable::playFXTint(const RGBColor& color, UnsignedInt attackFrames, Unsig
 	m_fxTintEnvelope->play(&color, attackFrames, decayFrames, holdFrames);
 }
 
-void Drawable::playPromotionTint(const RGBColor& color, Int attackMs, Int holdMs, Int decayMs, Real frequency, Real amplitude)
-{
-	if (!TheGameClient || (attackMs <= 0 && holdMs <= 0 && decayMs <= 0))
-		return;
-	m_promotionTint = std::make_unique<PromotionTint>(PromotionTint{
-		color, TheGameClient->getFrame(), std::max(0, attackMs), std::max(0, holdMs), std::max(0, decayMs),
-		std::isfinite(frequency) ? std::max(0.0f, frequency) : 0.0f,
-		std::isfinite(amplitude) ? std::clamp(amplitude, 0.0f, 1.0f) : 0.0f
-	});
-}
-
 void Drawable::setVeteranHoverDetails(const UnicodeString& name, Int battlesFought)
 {
 	m_veteranHoverName = name;
@@ -1173,18 +1117,10 @@ const Vector3* Drawable::getTintColor(Vector3& combined) const
 {
 	const Vector3* status = m_colorTintEnvelope && m_colorTintEnvelope->isEffective() ? m_colorTintEnvelope->getColor() : nullptr;
 	const Vector3* effect = m_fxTintEnvelope && m_fxTintEnvelope->isEffective() ? m_fxTintEnvelope->getColor() : nullptr;
-	const Real promotion = m_promotionTint && TheGameClient ? m_promotionTint->strength(TheGameClient->getFrame()) : 0.0f;
-	if (promotion <= 0.0f && (!status || !effect))
+	if (!status || !effect)
 		return status ? status : effect;
 
-	combined = status ? *status : Vector3(0.0f, 0.0f, 0.0f);
-	if (effect)
-		combined += *effect;
-	if (promotion > 0.0f)
-	{
-		const RGBColor& color = m_promotionTint->color;
-		combined += Vector3(color.red, color.green, color.blue) * promotion;
-	}
+	combined = *status + *effect;
 	return &combined;
 }
 //-------------------------------------------------------------------------------------------------
@@ -5833,18 +5769,6 @@ void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 				throw SC_INVALID_DATA;
 			m_retailImpactFXTrigger = static_cast<RetailDamageFXTrigger>(trigger);
 		}, [this] { m_retailImpactFXTrigger = RETAIL_DAMAGE_FX_NONE; }},
-		{"promotion-tint", [this](Xfer* block) {
-			Bool hasTint = m_promotionTint != nullptr;
-			block->xferBool(&hasTint);
-			if (!hasTint)
-			{
-				m_promotionTint.reset();
-				return;
-			}
-			if (!m_promotionTint)
-				m_promotionTint = std::make_unique<PromotionTint>();
-			m_promotionTint->xfer(block);
-		}, [this] { m_promotionTint.reset(); }},
 		{"veteran-hover", [this](Xfer* block) {
 			block->xferUnicodeString(&m_veteranHoverName);
 			block->xferInt(&m_battlesFought);

@@ -1160,14 +1160,6 @@ def check_hover_roster():
     hover_world(360, "Fortress", "box")
 
 
-def check_promotion_tint():
-    wait_for("camera centers on the promotion fixture",
-             lambda: log_count("TEST frame 12: look ") >= 1, 150)
-    wait_for("promotion applies the authored model tint",
-             lambda: log_count("TEST promotion-tint frame=51 PromotionTintFixture rank=2 rgb=1.000,0.251,0.000") >= 1, 120)
-    capture("promotion-tint", 0, 0, 1024, 768)
-
-
 def check_hero_roster_filter():
     wait_for("hero roster sampled after fixture spawns",
              lambda: log_count("TEST roster 35 ") >= 1, 150)
@@ -1318,23 +1310,12 @@ env = os.environ | {
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
 if any(option in sys.argv for option in (
-        "--create-a-hero", "--hover-roster", "--promotion-tint", "--hero-roster-filter", "--veteran-hover")):
+        "--create-a-hero", "--hover-roster", "--hero-roster-filter", "--veteran-hover")):
     map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
     map_dir.mkdir(parents=True)
     source = Path("/game/UserData/Maps/AotR Training Grounds")
     for file in source.iterdir():
         shutil.copy2(file, map_dir / (file.name.lower() if file.suffix.lower() == ".map" else file.name))
-if "--promotion-tint" in sys.argv:
-    package = Path(__file__).resolve().parent / "saveload/packages/promotion-tint"
-    with (map_dir / "map.ini").open("a") as map_ini:
-        map_ini.write("\n" + (package / "training.ini").read_text())
-    commands.write_text(
-        f"5 promotion-tint-load-levels - - 0 {package / 'levels.ini'}\n"
-        "10 create Player_1 PromotionTintFixture 0 700,2450,0\n"
-        "12 look Player_1 PromotionTintFixture 0\n"
-        "45 promotion-tint-award Player_1 PromotionTintFixture 0\n"
-        "51 promotion-tint-probe Player_1 PromotionTintFixture 0\n"
-    )
 if "--hero-roster-filter" in sys.argv:
     with (map_dir / "map.ini").open("a") as map_ini:
         map_ini.write("\nChildObject RosterFixtureMissingArt GondorBoromir\n"
@@ -1404,8 +1385,6 @@ elif "--hero-roster" in sys.argv:
     run(check_hero_roster)
 elif "--hover-roster" in sys.argv:
     run(check_hover_roster, "-file", str(map_dir / "aotr training grounds.map"))
-elif "--promotion-tint" in sys.argv:
-    run(check_promotion_tint, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--hero-roster-filter" in sys.argv:
     run(check_hero_roster_filter, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--veteran-hover" in sys.argv:
