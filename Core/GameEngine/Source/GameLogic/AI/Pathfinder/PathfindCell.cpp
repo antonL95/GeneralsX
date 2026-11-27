@@ -94,6 +94,7 @@ void PathfindCell::reset()
 
 	m_connectsToLayer = LAYER_INVALID;
 	m_layer = LAYER_GROUND;
+	m_wallHeightBand = 0;
 
 }
 

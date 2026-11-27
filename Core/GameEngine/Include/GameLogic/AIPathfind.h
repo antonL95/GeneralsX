@@ -168,6 +168,7 @@ public:
 	void removeObjectFromPathfindMap( class Object *obj );	///< De-classify the given object's cells in the map
 	static Object* detachRetailFootprintForTransform(Thing* thing);
 	static void reattachRetailFootprintAfterTransform(Object* obj);
+	static void refreshWallAfterHeightChange(Thing* thing);
 
 	void removeUnitFromPathfindMap( Object *obj );	///< De-classify the given mobile unit's cells in the map
 	void updateGoal( Object *obj, const Coord3D *newGoalPos, PathfindLayerEnum layer);		///< Update the given mobile unit's cells in the map

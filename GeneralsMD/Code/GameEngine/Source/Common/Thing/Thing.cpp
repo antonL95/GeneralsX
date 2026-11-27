@@ -194,6 +194,8 @@ void Thing::setPosition( const Coord3D *pos )
 
 		if (footprint)
 			Pathfinder::reattachRetailFootprintAfterTransform(footprint);
+		else if (m_cachedPos.z != oldPos.z && m_template->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+			Pathfinder::refreshWallAfterHeightChange(this);
 		reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	}
 	else
@@ -281,6 +283,8 @@ void Thing::setTransformMatrix( const Matrix3D *mx )
 
 	if (footprint)
 		Pathfinder::reattachRetailFootprintAfterTransform(footprint);
+	else if (newPos.z != oldPos.z && m_template->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+		Pathfinder::refreshWallAfterHeightChange(this);
 	reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	DEBUG_ASSERTCRASH(!(_isnan(getPosition()->x) || _isnan(getPosition()->y) || _isnan(getPosition()->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
 }

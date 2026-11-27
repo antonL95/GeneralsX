@@ -1,14 +1,14 @@
-230 create Player_1 WallBatchKeep 0 3800,2940,0
-230 create Player_1 WallBatchSerial 0 3720,2940,0
-230 create Player_1 WallBatchSerial 0 3800,2940,0
-230 create Player_1 WallBatchSerial 0 3880,2940,0
-230 create Player_1 WallBatchKeep 0 4160,2940,0
-230 create Player_1 WallBatchGrouped 0 4080,2940,0
-230 create Player_1 WallBatchGrouped 0 4160,2940,0
-230 create Player_1 WallBatchGrouped 0 4240,2940,0
-249 wall-batch-state - - 0 - 3800 2940
+230 create Player_1 WallBatchKeep 0 2770,2720,0
+230 create Player_1 WallBatchSerial 0 2690,2720,0
+230 create Player_1 WallBatchSerial 0 2770,2720,0
+230 create Player_1 WallBatchSerial 0 2850,2720,0
+230 create Player_1 WallBatchKeep 0 3180,2720,0
+230 create Player_1 WallBatchGrouped 0 3100,2720,0
+230 create Player_1 WallBatchGrouped 0 3180,2720,0
+230 create Player_1 WallBatchGrouped 0 3260,2720,0
+249 wall-batch-state - - 0 - 2770 2720
 250 wall-batch-delete Player_1 WallBatchSerial 0
-251 wall-batch-state - - 0 - 3800 2940
-259 wall-batch-state - - 0 - 4160 2940
+251 wall-batch-state - - 0 - 2770 2720
+259 wall-batch-state - - 0 - 3180 2720
 260 wall-batch-delete Player_1 WallBatchGrouped 0 batch
-261 wall-batch-state - - 0 - 4160 2940
+261 wall-batch-state - - 0 - 3180 2720

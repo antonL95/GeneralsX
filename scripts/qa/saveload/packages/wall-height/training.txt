@@ -1,0 +1,6 @@
+230 create Player_1 WallHeightLeft 0 1760,3180,0
+230 create Player_1 WallHeightRight 0 2100,3180,0
+235 wall-height-stack Player_1 WallHeightLeft 0 Player_1:WallHeightRight:0 0 0 40
+245 wall-height-probe Player_1 WallHeightLeft 0 Player_1:WallHeightRight:0
+253 wall-height-level Player_1 WallHeightLeft 0 Player_1:WallHeightRight:0
+254 wall-height-probe Player_1 WallHeightLeft 0 Player_1:WallHeightRight:0

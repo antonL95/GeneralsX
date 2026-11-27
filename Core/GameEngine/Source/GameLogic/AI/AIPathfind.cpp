@@ -407,6 +407,13 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 	Real height = m_wallHeight;
 	if (RetailFileLayers::enabled())
 	{
+		ICoord2D cellIndex;
+		if (!m_layers[LAYER_WALL].isUnused() && !worldToCell(&position, &cellIndex))
+		{
+			const PathfindCell* cell = m_layers[LAYER_WALL].getCell(cellIndex.x, cellIndex.y);
+			if (cell && cell->getWallHeightBand())
+				return m_layers[LAYER_WALL].getAuthoredWallHeight(cell->getWallHeightBand());
+		}
 		for (ObjectID id : m_retailWallPieces)
 		{
 			const Object* wall = TheGameLogic->findObjectByID(id);
@@ -689,6 +696,19 @@ void Pathfinder::reattachRetailFootprintAfterTransform(Object* obj)
 	if (std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z) &&
 		std::isfinite(obj->getOrientation()))
 		TheAI->pathfinder()->classifyObjectFootprint(obj, TRUE);
+}
+
+void Pathfinder::refreshWallAfterHeightChange(Thing* thing)
+{
+	Object* object = AsObject(thing);
+	if (!object || !object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) ||
+		!TheAI || (TheGameState && TheGameState->isInLoadGame()) ||
+		!std::isfinite(object->getPosition()->z))
+		return;
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const auto& pieces = pathfinder->m_retailWallPieces;
+	if (std::binary_search(pieces.begin(), pieces.end(), object->getID()))
+		pathfinder->addWallPiece(object);
 }
 
 void Pathfinder::classifyPinchedCells( const IRegion2D &cellBounds )
@@ -1569,10 +1589,16 @@ static Bool isPassableGateCell(const PathfindCell* cell, const Object* unit)
 	return cell && cell->isPassableGate(unit);
 }
 
+static Bool crossesWallHeightBand(const PathfindCell* from, const PathfindCell* to)
+{
+	return from && from->getWallHeightBand() && to->getWallHeightBand() &&
+		from->getWallHeightBand() != to->getWallHeightBand();
+}
+
 Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask acceptableSurfaces,
 																			 PathfindCell *toCell, PathfindCell *fromCell, const Object *unit )
 {
-	if (toCell == nullptr)
+	if (!toCell || crossesWallHeightBand(fromCell, toCell))
 		return false;
 
 	// check if the destination cell is classified as an obstacle,
@@ -2887,6 +2913,8 @@ struct ExamineCellsStruct
 	ExamineCellsStruct* d = (ExamineCellsStruct*)userData;
 	if (d->thePathfinder->m_isTunneling) return 1; // abort.
 	if (from && to) {
+			if (from->getWallHeightBand() && to->getLayer() != LAYER_WALL)
+				return 1;
 			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), to, from, d->obj )) {
 				return 1;
 			}
@@ -3037,7 +3065,8 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			newCell = getCell(parentCell->getLayer(), newCellCoord.x, newCellCoord.y );
 
 			// check if cell is on the map
-			if (!newCell)
+			if (!newCell || crossesWallHeightBand(parentCell, newCell) ||
+				(parentCell->getWallHeightBand() && newCell->getLayer() != LAYER_WALL))
 				continue;
 
 			Bool notZonePassable = false;
@@ -6514,6 +6543,7 @@ Bool Pathfinder::circleClipsTallBuilding(	const Coord3D *from, const Coord3D *to
 struct LinePassableStruct
 {
 	const Object *obj;
+	PathfindLayerEnum layer;
 	LocomotorSurfaceTypeMask acceptableSurfaces;
 	Int radius;
 	Bool centerInCell;
@@ -6525,6 +6555,8 @@ struct LinePassableStruct
 /*static*/ Int Pathfinder::linePassableCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
 {
 	const LinePassableStruct* d = (const LinePassableStruct*)userData;
+	if (crossesWallHeightBand(from, to) || (d->layer == LAYER_WALL && to->getLayer() != LAYER_WALL))
+		return 1;
 
 	Bool isCrusher = d->obj ? d->obj->getCrusherLevel() > 0 : false;
 	TCheckMovementInfo info;
@@ -6575,6 +6607,8 @@ struct GroundPathPassableStruct
 /*static*/ Int Pathfinder::groundPathPassableCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
 {
 	const GroundPathPassableStruct* d = (const GroundPathPassableStruct*)userData;
+	if (crossesWallHeightBand(from, to))
+		return 1;
 
 	Int curDiameter = pathfinder->clearCellForDiameter(d->crusher, to_x, to_y, to->getLayer(), d->diameter);
 	if (curDiameter==d->diameter) return 0;	//  good to go.
@@ -6600,6 +6634,7 @@ Bool Pathfinder::isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acc
 	//CRCDEBUG_LOG(("Pathfinder::isLinePassable(): %d %d %d ", m_ignoreObstacleID, m_isMapReady, m_isTunneling));
 
 	info.obj = obj;
+	info.layer = layer;
 	info.acceptableSurfaces = acceptableSurfaces;
 	getRadiusAndCenter(obj, info.radius, info.centerInCell);
 	info.blocked = blocked;
@@ -6626,7 +6661,8 @@ Bool Pathfinder::isMovementSegmentPassable( const Object *obj, LocomotorSurfaceT
 	for (;;)
 	{
 		PathfindCell* to = getCell(layer, current.x, current.y);
-		if (!validMovementTerrainCell(to, acceptableSurfaces))
+		if (!validMovementTerrainCell(to, acceptableSurfaces) || crossesWallHeightBand(from, to) ||
+			(layer == LAYER_WALL && to->getLayer() != LAYER_WALL))
 			return false;
 		if (!terrainOnly && !validMovementPosition(isCrusher, acceptableSurfaces, to, from, obj))
 			return false;
@@ -6655,6 +6691,7 @@ Bool Pathfinder::isArcSegmentPassable(const Object* obj, LocomotorSurfaceTypeMas
 		return FALSE;
 	LinePassableStruct info;
 	info.obj = obj;
+	info.layer = layer;
 	info.acceptableSurfaces = acceptableSurfaces;
 	getRadiusAndCenter(obj, info.radius, info.centerInCell);
 	info.blocked = blocked;

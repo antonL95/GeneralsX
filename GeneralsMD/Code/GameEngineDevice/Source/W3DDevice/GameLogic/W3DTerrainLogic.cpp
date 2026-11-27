@@ -302,19 +302,7 @@ Real W3DTerrainLogic::getLayerHeight( Real x, Real y, PathfindLayerEnum layer, C
 {
 #ifdef USE_THE_TERRAIN_OBJECT
 
-	if (!TheTerrainRenderObject)
-	{
-		if (normal)
-		{
-			//return a default normal pointing up
-			normal->x=0.0f;
-			normal->y=0.0f;
-			normal->z=1.0f;
-		}
-		return 0;
-	}
-
-	Real height = TheTerrainRenderObject->getHeightMapHeight(x,y,normal);
+	const Real height = getGroundHeight(x, y, normal);
 
 	if (layer != LAYER_GROUND)
 	{
@@ -324,8 +312,10 @@ Real W3DTerrainLogic::getLayerHeight( Real x, Real y, PathfindLayerEnum layer, C
 		loc.z = height;
 		if (layer == LAYER_WALL)
 		{
-			if (!clip || TheAI->pathfinder()->isPointOnWall(&loc))
+			if (TheAI && TheAI->pathfinder() && (!clip || TheAI->pathfinder()->isPointOnWall(&loc)))
 			{
+				if (normal)
+					normal->set(0.0f, 0.0f, 1.0f);
 				return TheAI->pathfinder()->getWallHeightAt(loc);
 			}
 			else
@@ -343,8 +333,11 @@ Real W3DTerrainLogic::getLayerHeight( Real x, Real y, PathfindLayerEnum layer, C
 			}
 		}
 		else if (clip && (pBridge = findBridgeLayerAt(&loc, layer, FALSE)) != nullptr &&
-			pBridge->getAuthoredRampIndex() >= 0 && TheAI->pathfinder()->isPointOnWall(&loc))
+			pBridge->getAuthoredRampIndex() >= 0 && TheAI && TheAI->pathfinder() &&
+			TheAI->pathfinder()->isPointOnWall(&loc))
 		{
+			if (normal)
+				normal->set(0.0f, 0.0f, 1.0f);
 			return TheAI->pathfinder()->getWallHeightAt(loc);
 		}
 	}

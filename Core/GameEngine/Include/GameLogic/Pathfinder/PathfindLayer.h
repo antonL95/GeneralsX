@@ -40,6 +40,7 @@ public:
 	void allocateCells(const IRegion2D *extent);
 	void allocateCellsForWallLayer(const IRegion2D *extent, const ObjectID *wallPieces, Int numPieces);
 	void rebuildWallCells(const IRegion2D &extent, const std::vector<ObjectID>& wallPieces);
+	Real getAuthoredWallHeight(UnsignedByte band) const { return m_wallHeights[band - 1]; }
 	void classifyCells();
 	void classifyWallCells(const ObjectID *wallPieces, Int numPieces);
 	Bool setDestroyed(Bool destroyed);
@@ -64,6 +65,9 @@ protected:
 	void classifyWallMapCell( Int i, Int j, PathfindCell *cell, const ObjectID *wallPieces, Int numPieces);
 
 private:
+	void classifyWallHeights(const std::vector<ObjectID>& wallPieces);
+	std::vector<Real> m_wallHeights;
+
 	PathfindCell *m_blockOfMapCells;		///< Pathfinding map - contains iconic representation of the map
 	PathfindCell **m_layerCells;		///< Pathfinding map indexes - contains matrix indexing into the map.
 	Int m_width;		// Number of cells in x

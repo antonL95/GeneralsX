@@ -53,6 +53,7 @@ PathfindLayer::~PathfindLayer()
 void PathfindLayer::reset()
 {
 	m_bridge = nullptr;
+	m_wallHeights.clear();
 	if (m_layerCells) {
 		Int i, j;
 		for (i=0; i<m_width; i++) {
@@ -303,6 +304,7 @@ void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, const Obj
 void PathfindLayer::rebuildWallCells(const IRegion2D &extent, const std::vector<ObjectID>& wallPieces)
 {
 	PathfindLayer previous;
+	m_wallHeights.clear();
 	std::swap(previous.m_blockOfMapCells, m_blockOfMapCells);
 	std::swap(previous.m_layerCells, m_layerCells);
 	std::swap(previous.m_width, m_width);
@@ -315,6 +317,7 @@ void PathfindLayer::rebuildWallCells(const IRegion2D &extent, const std::vector<
 	init(nullptr, LAYER_WALL);
 	allocateCellsForWallLayer(&extent, wallPieces.data(), static_cast<Int>(wallPieces.size()));
 	classifyWallCells(wallPieces.data(), static_cast<Int>(wallPieces.size()));
+	classifyWallHeights(wallPieces);
 	applyZone();
 	for (Int x = 0; x < m_width; ++x)
 	{
@@ -326,6 +329,79 @@ void PathfindLayer::rebuildWallCells(const IRegion2D &extent, const std::vector<
 				m_layerCells[x][y].getType() != PathfindCell::CELL_IMPASSABLE)
 				m_layerCells[x][y].takeWallReservations(previous.m_layerCells[oldX][oldY]);
 		}
+	}
+}
+
+void PathfindLayer::classifyWallHeights(const std::vector<ObjectID>& wallPieces)
+{
+	constexpr Real heightBandTolerance = 3.5f;
+	constexpr UnsignedInt maxWallHeightBands = 64;
+	struct Surface
+	{
+		const RetailWallMesh::Geometry* geometry;
+		UnsignedByte band;
+	};
+	std::vector<Surface> surfaces;
+	std::vector<Real> bandOrigins;
+	if (!m_layerCells)
+		return;
+	for (ObjectID id : wallPieces)
+	{
+		const Object* object = TheGameLogic->findObjectByID(id);
+		const auto* geometry = object ? RetailWallMesh::forObject(*object) : nullptr;
+		if (!geometry || geometry->wall.empty())
+			continue;
+		UnsignedInt band = bandOrigins.size();
+		Real nearest = heightBandTolerance;
+		for (UnsignedInt i = 0; i < bandOrigins.size(); ++i)
+		{
+			const Real difference = std::fabs(geometry->wallHeight - bandOrigins[i]);
+			if (difference <= nearest && (band == bandOrigins.size() || difference < nearest))
+			{
+				band = i;
+				nearest = difference;
+			}
+		}
+		if (band == bandOrigins.size())
+		{
+			if (band == maxWallHeightBands)
+				continue;
+			bandOrigins.push_back(geometry->wallHeight);
+			m_wallHeights.push_back(geometry->wallHeight);
+		}
+		else
+			m_wallHeights[band] = MAX(m_wallHeights[band], geometry->wallHeight);
+		surfaces.push_back({geometry, static_cast<UnsignedByte>(band + 1)});
+	}
+
+	for (const auto& surface : surfaces)
+	{
+		Region2D bounds;
+		bounds.lo = bounds.hi = surface.geometry->wall.front().asCoord2D();
+		for (const Coord3D& point : surface.geometry->wall)
+			bounds.uniteWith(point.asCoord2D());
+		const Int left = MAX(m_xOrigin, REAL_TO_INT_CEIL(bounds.lo.x / PATHFIND_CELL_SIZE_F) - 1);
+		const Int right = MIN(m_xOrigin + m_width - 1, REAL_TO_INT_FLOOR(bounds.hi.x / PATHFIND_CELL_SIZE_F));
+		const Int bottom = MAX(m_yOrigin, REAL_TO_INT_CEIL(bounds.lo.y / PATHFIND_CELL_SIZE_F) - 1);
+		const Int top = MIN(m_yOrigin + m_height - 1, REAL_TO_INT_FLOOR(bounds.hi.y / PATHFIND_CELL_SIZE_F));
+		for (Int x = left; x <= right; ++x)
+			for (Int y = bottom; y <= top; ++y)
+			{
+				PathfindCell& cell = m_layerCells[x - m_xOrigin][y - m_yOrigin];
+				const UnsignedByte current = cell.getWallHeightBand();
+				if (current && getAuthoredWallHeight(current) >= getAuthoredWallHeight(surface.band))
+					continue;
+				for (Int corner = 0; corner < 4; ++corner)
+				{
+					const Coord3D point = {Real(x + (corner & 1)) * PATHFIND_CELL_SIZE_F,
+						Real(y + (corner >> 1)) * PATHFIND_CELL_SIZE_F, 0.0f};
+					if (RetailWallMesh::contains(*surface.geometry, point))
+					{
+						cell.setWallHeightBand(surface.band);
+						break;
+					}
+				}
+			}
 	}
 }
 
@@ -646,7 +722,8 @@ void PathfindLayer::classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bri
 					const Real toX = center.x - info->to.x, toY = center.y - info->to.y;
 					const Coord3D& endpoint = fromX * fromX + fromY * fromY <= toX * toX + toY * toY ? info->from : info->to;
 					PathfindCell* wallCell = TheAI->pathfinder()->getCell(LAYER_WALL, i, j);
-					const Coord3D& wallPoint = TheAI->pathfinder()->isPointOnWall(&endpoint) ? endpoint : center;
+					const Coord3D& wallPoint = wallCell && wallCell->getWallHeightBand() ? center :
+						(TheAI->pathfinder()->isPointOnWall(&endpoint) ? endpoint : center);
 					const Real wallHeight = TheAI->pathfinder()->getWallHeightAt(wallPoint);
 					if (wallCell && wallCell->getLayer() == LAYER_WALL && std::fabs(wallHeight - endpoint.z) < 15.0f)
 					{

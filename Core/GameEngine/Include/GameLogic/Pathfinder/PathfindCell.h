@@ -153,6 +153,8 @@ public:
 	Bool hasInfo() const {return m_info!=nullptr;}
 	zoneStorageType getZone() const {return m_zone;}
 	void setZone(zoneStorageType zone) {m_zone = zone;}
+	UnsignedByte getWallHeightBand() const { return m_wallHeightBand; }
+	void setWallHeightBand(UnsignedByte band) { m_wallHeightBand = band; }
 	void setGoalUnit(ObjectID unit, const ICoord2D &pos );
 	void shareGoalUnit(ObjectID unit);
 	void removeGoalUnit(ObjectID unit, const ICoord2D& pos);
@@ -199,6 +201,7 @@ private:
 	UnsignedByte m_flags : 4;                 ///< what type of units are in or moving through this cell.
 	UnsignedByte m_connectsToLayer : 4;       ///< This cell can pathfind onto this layer, if > LAYER_TOP.
 	UnsignedByte m_layer : 4;                 ///< Layer of this cell.
+	UnsignedByte m_wallHeightBand = 0;
 };
 
 typedef PathfindCell *PathfindCellP;
