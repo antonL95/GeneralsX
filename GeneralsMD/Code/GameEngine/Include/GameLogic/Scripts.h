@@ -653,6 +653,7 @@ public:
 		VICTORY_SCREEN,
 		DESELECT,
 		DIM_WORLD_LIGHTS,
+		RESTORE_WORLD_LIGHTS,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

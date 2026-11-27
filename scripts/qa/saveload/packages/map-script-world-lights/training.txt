@@ -3,3 +3,6 @@
 242 script-world-lights-check Player_1 - 0
 245 script-world-lights-check Player_1 - 0
 275 script-world-lights-check Player_1 - 0
+280 script-restore-world Player_1 - 0
+295 script-world-lights-check Player_1 - 0
+315 script-world-lights-check Player_1 - 0

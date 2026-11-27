@@ -7716,6 +7716,11 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			return;
 
+		case ScriptAction::RESTORE_WORLD_LIGHTS:
+			if (TheGameClient)
+				TheGameClient->setScriptWorldLight(GameClient::defaultWorldLight, pAction->getParameter(0)->getReal());
+			return;
+
 		case ScriptAction::SET_INFANTRY_LIGHTING_OVERRIDE:
 			doSetInfantryLightingOverride(pAction->getParameter(0)->getReal());
 			return;

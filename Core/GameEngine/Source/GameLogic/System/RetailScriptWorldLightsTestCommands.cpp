@@ -36,6 +36,17 @@ void check(const RetailTestCommands::Context &ctx)
 	std::fprintf(stderr, "TEST script-world-lights frame=%u normal=%d fading=%d dimmed=%d\n",
 		ctx.frame, normal, fading, settled);
 }
+
+void restore(const RetailTestCommands::Context &)
+{
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(438);
+	if (type < 0)
+		return;
+	auto *action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+	action->getParameter(0)->friend_setReal(fadeSeconds);
+	TheScriptEngine->friend_executeAction(action);
+	deleteInstance(action);
+}
 }
 #endif
 
@@ -45,6 +56,7 @@ void registerRetailScriptWorldLightsTestCommands()
 {
 #if RTS_ZEROHOUR
 	registerAction("script-dim-world", dim);
+	registerAction("script-restore-world", restore);
 	registerAction("script-world-lights-check", check);
 #endif
 }
