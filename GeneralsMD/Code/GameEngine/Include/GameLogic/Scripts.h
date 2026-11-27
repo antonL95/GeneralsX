@@ -651,6 +651,7 @@ public:
 		HIDE_UI,
 		SHOW_UI,
 		VICTORY_SCREEN,
+		DESELECT,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

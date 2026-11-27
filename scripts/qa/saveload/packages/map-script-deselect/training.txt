@@ -1,0 +1,4 @@
+236 create Player_1 CameraUiSelectionFixture 0 1450,1450,0
+242 script-deselect Player_1 CameraUiSelectionFixture 0
+245 script-deselect Player_1 CameraUiSelectionFixture 0
+247 destroy Player_1 CameraUiSelectionFixture 0

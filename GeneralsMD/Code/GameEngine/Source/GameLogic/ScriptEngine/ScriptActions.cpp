@@ -8216,6 +8216,11 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				TheInGameUI->setScriptUiHidden(pAction->getActionType() == ScriptAction::HIDE_UI);
 			return;
 
+		case ScriptAction::DESELECT:
+			if (TheInGameUI)
+				TheInGameUI->deselectAllDrawables();
+			return;
+
 		case ScriptAction::CAMERA_LETTERBOX_BEGIN:
 			doLetterBoxMode(true);
 			return;
