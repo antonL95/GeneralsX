@@ -3444,13 +3444,6 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 		if (m_template->m_appearance == LOCO_HORDE && distance < PATHFIND_CELL_SIZE_F)
 			speed = std::min(speed, turnRate * toGoal / (2.0f * lateral));
 	}
-	if (m_template->m_appearance == LOCO_HORDE && obj->isKindOf(KINDOF_CAVALRY) &&
-		m_retailScalarSpeed <= maxSpeed * 0.25f)
-	{
-		if (const HordeContain* formation = HordeContain::get(obj);
-			formation && !formation->isHeadingAligned(obj->getOrientation()))
-			speed *= 0.1f;
-	}
 	steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), distance, speed);
 }
 
