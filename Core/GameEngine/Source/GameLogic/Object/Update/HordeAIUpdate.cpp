@@ -490,7 +490,10 @@ UpdateSleepTime HordeAIUpdate::update()
 		{
 			const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 			m_cavalryTurn = 0.0f;
+			m_cavalryReforming = TRUE;
 		}
+		if (m_cavalryReforming && (!isMoving() || contain->isHeadingAligned(horde->getOrientation(), FALSE)))
+			m_cavalryReforming = FALSE;
 #endif
 	}
 	else if (fabs(turn) > (locomotor ? locomotor->getMaxTurnWithoutReform() : FORMATION_REFORM_ANGLE))
@@ -783,7 +786,10 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 
 void HordeAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"cavalry-reforming", [this](Xfer* block) { block->xferBool(&m_cavalryReforming); },
+			[this] { m_cavalryReforming = FALSE; }},
+	});
 }
 
 void HordeAIUpdate::loadPostProcess()

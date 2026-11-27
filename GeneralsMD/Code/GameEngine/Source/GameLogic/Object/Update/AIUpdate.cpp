@@ -2516,10 +2516,10 @@ Bool AIUpdateInterface::steerInFormation()
 
 	const Real ARRIVED_DISTANCE = 2.0f;
 	const Real FACING_TOLERANCE = 0.05f;
-	if (!goal.hordeMoving && goal.error < ARRIVED_DISTANCE)
+	if (goal.turnInPlace || (!goal.hordeMoving && goal.error < ARRIVED_DISTANCE))
 	{
 		obj->clearModelConditionState(MODELCONDITION_MOVING);
-		if (fabs(stdAngleDiff(goal.facing, obj->getOrientation())) > FACING_TOLERANCE)
+		if (goal.turnInPlace || fabs(stdAngleDiff(goal.facing, obj->getOrientation())) > FACING_TOLERANCE)
 			m_curLocomotor->locoUpdate_moveTowardsAngle(obj, goal.facing);
 		else
 			m_curLocomotor->locoUpdate_maintainCurrentPosition(obj);

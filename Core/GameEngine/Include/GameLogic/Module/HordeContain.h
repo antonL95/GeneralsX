@@ -153,6 +153,7 @@ public:
 		Real error;
 		Real facing;
 		Bool hordeMoving;
+		Bool turnInPlace;
 		Bool backing;
 		ObjectID backingSource;
 	};
@@ -161,7 +162,7 @@ public:
 	static Bool canSteerToFormationGoal(const Object* member, const FormationGoal& goal);
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	static void separateGroundMovement(const Object* member, Coord3D& movement);
-	virtual Bool isHeadingAligned(Real heading) const { return TRUE; }
+	virtual Bool isHeadingAligned(Real heading, Bool retailStep = TRUE) const { return TRUE; }
 #if RTS_ZEROHOUR
 	Real getFormationWheelRate(Real radius) const;
 	UnsignedInt getFormationReformTravelFrames() const;
@@ -318,7 +319,7 @@ class HorseHordeContain final : public HordeContain
 
 public:
 	HorseHordeContain(Thing* thing, const ModuleData* data) : HordeContain(thing, data) {}
-	Bool isHeadingAligned(Real heading) const override;
+	Bool isHeadingAligned(Real heading, Bool retailStep = TRUE) const override;
 
 private:
 	Bool m_legacySnapshot = FALSE;

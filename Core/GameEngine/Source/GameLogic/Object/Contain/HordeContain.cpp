@@ -335,7 +335,7 @@ void HorseHordeContain::loadPostProcess()
 	HordeContain::loadPostProcess();
 }
 
-Bool HorseHordeContain::isHeadingAligned(Real heading) const
+Bool HorseHordeContain::isHeadingAligned(Real heading, Bool retailStep) const
 {
 	constexpr Real RETAIL_LOGIC_STEP_SCALE = static_cast<Real>(LOGICFRAMES_PER_SECOND) / 5.0f;
 	Real turnStep = 0.0f;
@@ -350,7 +350,9 @@ Bool HorseHordeContain::isHeadingAligned(Real heading) const
 			if (locomotor)
 			{
 				const BodyDamageType damage = member->getBodyModule()->getDamageState();
-				turnStep = locomotor->getMaxTurnRate(damage) * RETAIL_LOGIC_STEP_SCALE;
+				turnStep = locomotor->getMaxTurnRate(damage);
+				if (retailStep)
+					turnStep *= RETAIL_LOGIC_STEP_SCALE;
 			}
 		}
 		if (fabs(stdAngleDiff(heading, member->getOrientation())) > turnStep)
@@ -1514,6 +1516,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	}
 
 	const Coord3D& position = *member->getPosition();
+	goal.turnInPlace = FALSE;
 	if (const auto move = m_backingMoves.find(member->getID());
 		move != m_backingMoves.end() && TheGameLogic->getFrame() >= move->second.start)
 	{
@@ -1542,6 +1545,17 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	const AIUpdateInterface* hordeAI = horde->getAI();
 	const PhysicsBehavior* physics = horde->getPhysics();
 	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics;
+	const HordeAIUpdate* cavalryAI = goal.hordeMoving && RetailFileLayers::enabled() &&
+		horde->isKindOf(KINDOF_CAVALRY) && hordeAI->getModuleNameKey() == NAMEKEY("HordeAIUpdate")
+		? static_cast<const HordeAIUpdate*>(hordeAI) : nullptr;
+	if (cavalryAI && cavalryAI->isCavalryReforming())
+	{
+		goal.turnInPlace = TRUE;
+		goal.position = position;
+		goal.speed = 0.0f;
+		goal.distance = 0.0f;
+		return TRUE;
+	}
 	if (!goal.hordeMoving)
 	{
 		goal.speed = FAST_AS_POSSIBLE;
@@ -1571,10 +1585,9 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		leadY = pathY * scale;
 		remaining = std::max(0.0f, point->distAlongPath);
 	}
-	if (horde->isKindOf(KINDOF_CAVALRY) && RetailFileLayers::enabled() &&
-		hordeAI->getModuleNameKey() == NAMEKEY("HordeAIUpdate"))
+	if (cavalryAI)
 	{
-		const Real turn = static_cast<const HordeAIUpdate*>(hordeAI)->getCavalryTurn();
+		const Real turn = cavalryAI->getCavalryTurn();
 		const Real leadFrames = std::min(FORMATION_LEAD_FRAMES,
 			hordeSpeed > 0.0f ? remaining / hordeSpeed : FORMATION_LEAD_FRAMES);
 		const Real angle = std::clamp(turn * leadFrames, -PI / 4.0f, PI / 4.0f);
@@ -1617,6 +1630,8 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 
 Bool HordeContain::canSteerToFormationGoal(const Object* member, const FormationGoal& goal)
 {
+	if (goal.turnInPlace)
+		return TRUE;
 	const Locomotor* locomotor = member->getAI()->getCurLocomotor();
 	if (!locomotor)
 		return FALSE;

@@ -1,0 +1,6 @@
+115 create Player_1 CavalryC1Hero 0 2440,1000,-60
+155 create Player_1 CavalryC1Horde 0 3455,2005,0
+238 move Player_1 CavalryC1Horde 0 - 3335 2005
+239 move Player_1 CavalryC1Hero 0 - 2750 1000
+420 destroy Player_1 CavalryC1Horde 0
+420 destroy Player_1 CavalryC1Hero 0
