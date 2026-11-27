@@ -42,6 +42,7 @@ class ObjectCreationList;
 class ObjectCreationListStore;
 class INI;
 class Object;
+class ThingTemplate;
 
 //-------------------------------------------------------------------------------------------------
 /**
@@ -99,6 +100,7 @@ public:
 		object, or using the existing one.
 	*/
 	virtual Object* create( const Object* primaryObj, const Coord3D *primary, const Coord3D *secondary, Bool createOwner, UnsignedInt lifetimeFrames = 0 ) const;
+	virtual const ThingTemplate* getFirstSpawnTemplate() const { return nullptr; }
 };
 EMPTY_DTOR(ObjectCreationNugget)
 
@@ -137,6 +139,7 @@ public:
 
 	void addObjectCreationNugget(ObjectCreationNugget* nugget);
 	Bool createsKindOf(KindOfType kind) const;
+	const ThingTemplate* getFirstSpawnTemplate() const;
 	Bool hasStrafeSpawnOrder() const;
 
 	// Kris: August 23, 2003

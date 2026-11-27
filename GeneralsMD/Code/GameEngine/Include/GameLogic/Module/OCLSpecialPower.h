@@ -105,6 +105,7 @@ public:
 
 	//If the special power launches a construction site, we need to know the final product for placement purposes.
 	virtual const ThingTemplate* getReferenceThingTemplate() const override;
+	const ThingTemplate* getFirstSpawnTemplate() const;
 
 protected:
 

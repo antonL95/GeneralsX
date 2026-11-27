@@ -22,7 +22,9 @@
 #include "Common/Team.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/HeroRoster.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
+#include "GameLogic/Module/OCLSpecialPower.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Weapon.h"
@@ -167,6 +169,49 @@ Bool canPoisonVictim(const Object& source, const Object& victim)
 	return !victim.isKindOf(KINDOF_STRUCTURE) && !victim.isKindOf(KINDOF_MACHINE) &&
 		!victim.isKindOf(KINDOF_SHIP) &&
 		ThePartitionManager->getDistanceSquared(&source, &victim, FROM_CENTER_2D) < poisonDistanceSquared;
+}
+
+void orderSummonTowardVictim(const Object& source, const SpecialPowerModuleInterface& module)
+{
+	const Object* victim = combatVictim(source);
+	if (!victim)
+		return;
+
+	const ThingTemplate* spawnedType = nullptr;
+	for (BehaviorModule** part = source.getBehaviorModules(); *part; ++part)
+	{
+		if ((*part)->getModuleNameKey() != NAMEKEY("OCLSpecialPower") || (*part)->getSpecialPower() != &module)
+			continue;
+		spawnedType = static_cast<const OCLSpecialPower*>(*part)->getFirstSpawnTemplate();
+		break;
+	}
+	if (!spawnedType || spawnedType->isKindOf(KINDOF_CAN_ATTACK))
+		return;
+
+	Object* summon = nullptr;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		if (object != &source && object->getTemplate() == spawnedType && object->getControllingPlayer() == source.getControllingPlayer() &&
+			!object->isEffectivelyDead() && !object->getContainedBy() && (!summon || object->getID() < summon->getID()))
+			summon = object;
+	AIUpdateInterface* ai = summon ? summon->getAI() : nullptr;
+	if (!ai)
+		return;
+
+	const Locomotor* locomotor = ai->getCurLocomotor();
+	if (!locomotor && !ai->isMoving())
+		return;
+	const Bool moving = !locomotor || locomotor->getRetailScalarSpeed() > 0.0f;
+	const Coord3D* origin = moving ? ai->getGoalPosition() : summon->getPosition();
+	if (!origin)
+		return;
+	constexpr Real stationaryTolerance = 5.0f;
+	constexpr Real movingTolerance = 30.0f;
+	const Real tolerance = moving ? movingTolerance : stationaryTolerance;
+	const Coord3D& destination = *victim->getPosition();
+	const Real dx = destination.x - origin->x;
+	const Real dy = destination.y - origin->y;
+	if (dx * dx + dy * dy > tolerance * tolerance)
+		ai->aiMoveToPosition(&destination, CMD_FROM_AI);
 }
 
 Bool canToggleWeapon(const Object& source, const Object& victim, Bool siege)
@@ -771,6 +816,9 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		(BitIsSet(button->getOptions(), NEED_UPGRADE) && !HeroRoster::buttonUpgradesMet(button, player, source)))
 		return checkAgain;
 	const auto* module = source->getSpecialPowerModule(power);
+	const Bool targetAreaSummon = policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON";
+	if (module && targetAreaSummon)
+		orderSummonTowardVictim(*source, *module);
 	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
 		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
@@ -812,7 +860,7 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 
 	const Bool wizardBlast = policy == "AI_SPECIAL_POWER_GANDALF_WIZARD_BLAST";
 	const Bool callOfTheDeep = policy == "AI_SPECIAL_POWER_GOBLINKING_CALLOFTHEDEEP";
-	if (wizardBlast || callOfTheDeep || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
+	if (wizardBlast || callOfTheDeep || targetAreaSummon)
 	{
 		if (!combatVictim(*source) || GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
 			return retailPolicyPoll;
@@ -824,6 +872,8 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		if (targetAreaSummon && !source->isDestroyed())
+			orderSummonTowardVictim(*source, *module);
 		return retailPolicyCooldown;
 	}
 

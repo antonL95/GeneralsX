@@ -323,6 +323,12 @@ const ThingTemplate* OCLSpecialPower::getReferenceThingTemplate() const
 	return TheThingFactory->findTemplate( getOCLSpecialPowerModuleData()->m_referenceThingName );
 }
 
+const ThingTemplate* OCLSpecialPower::getFirstSpawnTemplate() const
+{
+	const ObjectCreationList* list = findOCL();
+	return list ? list->getFirstSpawnTemplate() : nullptr;
+}
+
 // ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------

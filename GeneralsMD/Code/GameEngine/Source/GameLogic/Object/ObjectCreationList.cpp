@@ -770,6 +770,13 @@ class GenericObjectCreationNugget : public ObjectCreationNugget
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(GenericObjectCreationNugget, "GenericObjectCreationNugget")
 public:
 
+	const ThingTemplate* getFirstSpawnTemplate() const override
+	{
+		if (!m_nameAreObjects || m_names.empty())
+			return nullptr;
+		return TheThingFactory->findTemplate(m_names.front(), FALSE);
+	}
+
 	virtual Bool createsKindOf(KindOfType kind) const override
 	{
 		return m_nameAreObjects && std::any_of(m_names.begin(), m_names.end(), [kind](const AsciiString& name) {
@@ -1879,6 +1886,14 @@ Bool ObjectCreationList::createsKindOf(KindOfType kind) const
 {
 	return std::any_of(m_nuggets.begin(), m_nuggets.end(),
 		[kind](const ObjectCreationNugget* nugget) { return nugget->createsKindOf(kind); });
+}
+
+const ThingTemplate* ObjectCreationList::getFirstSpawnTemplate() const
+{
+	for (const ObjectCreationNugget* nugget : m_nuggets)
+		if (const ThingTemplate* object = nugget->getFirstSpawnTemplate())
+			return object;
+	return nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------

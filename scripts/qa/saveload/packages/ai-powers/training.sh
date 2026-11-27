@@ -110,4 +110,18 @@ check() {
         grep -F 'TEST formation-state 1035 AiPowersFormationToggle ' "$log" >&2 || true
         return 1
     fi
+    if covers 1440 && ! awk '
+        $1 == "TEST" && $2 == "health" && $4 == "Player_2" && $5 == "AiPowersFollowMarker" {
+            split($11, value, "=")
+            split(value[2], pos, ",")
+            dx = pos[1] - ($3 == 1315 ? 3430 : 3470)
+            dy = pos[2] - ($3 == 1315 ? 1450 : 1470)
+            if (dx * dx + dy * dy <= 100) near[$3] = 1
+        }
+        END { exit (!near[1315] || !near[1440]) }
+    ' "$log"; then
+        printf 'Expected the summoned unit to move toward each of the caster’s attack targets\n' >&2
+        grep -F 'AiPowersFollowMarker 0 ' "$log" >&2 || true
+        return 1
+    fi
 }

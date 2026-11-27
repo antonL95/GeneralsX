@@ -112,3 +112,16 @@
 1076 destroy Player_2 AiPowersFormationToggle 0
 1076 destroy Player_1 AiPowersFormationTarget 1
 1076 destroy Player_1 AiPowersFormationTarget 0
+1050 create Player_2 AiPowersFollowCaster 0 3390,1450,0
+1206 create Player_1 AiPowersCombatTarget 0 3430,1450,0
+1206 create Player_1 AiPowersCombatTarget 1 3435,1430,0
+1206 create Player_1 AiPowersCombatTarget 2 3470,1470,0
+1207 attack Player_2 AiPowersFollowCaster 0 Player_1:AiPowersCombatTarget:0
+1315 health Player_2 AiPowersFollowMarker 0
+1320 attack Player_2 AiPowersFollowCaster 0 Player_1:AiPowersCombatTarget:2
+1440 health Player_2 AiPowersFollowMarker 0
+1441 destroy Player_2 AiPowersFollowCaster 0
+1441 destroy Player_2 AiPowersFollowMarker 0
+1441 destroy Player_1 AiPowersCombatTarget 2
+1441 destroy Player_1 AiPowersCombatTarget 1
+1441 destroy Player_1 AiPowersCombatTarget 0
