@@ -1,4 +1,6 @@
 242 ui-ini-credits-check Player_1 - 0
 242 ui-ini-placement-claim-check Player_1 - 0
+242 ui-ini-transition-images-check Player_1 - 0
 245 ui-ini-credits-check Player_1 - 0
 245 ui-ini-placement-claim-check Player_1 - 0
+245 ui-ini-transition-images-check Player_1 - 0

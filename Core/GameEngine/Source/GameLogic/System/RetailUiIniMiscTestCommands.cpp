@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "Common/MultiplayerSettings.h"
+#include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 
 namespace
@@ -26,6 +27,13 @@ void checkPlacementClaim(const RetailTestCommands::Context &ctx)
 	const Color color = TheInGameUI->getPlacementClaimFontColor();
 	std::fprintf(stderr, "TEST ui-ini-placement-claim frame=%u color=%08x\n", ctx.frame, static_cast<unsigned>(color));
 }
+
+void checkTransitionImages(const RetailTestCommands::Context &ctx)
+{
+	const Bool vista = TheMappedImageCollection && TheMappedImageCollection->findImageByName("WorldViewMordorStart");
+	const Bool solo = TheMappedImageCollection && TheMappedImageCollection->findImageByName("SoloMordorTransition");
+	std::fprintf(stderr, "TEST ui-ini-transition-images frame=%u world=%d solo=%d\n", ctx.frame, vista, solo);
+}
 }
 #endif
 
@@ -36,6 +44,7 @@ void registerRetailUiIniMiscTestCommands()
 #if RTS_ZEROHOUR
 	registerAction("ui-ini-credits-check", checkStartingCredits);
 	registerAction("ui-ini-placement-claim-check", checkPlacementClaim);
+	registerAction("ui-ini-transition-images-check", checkTransitionImages);
 #endif
 }
 }

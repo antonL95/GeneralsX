@@ -285,5 +285,6 @@ void ImageCollection::load( Int textureSize )
 	{
 		ini.loadDirectory("Data\\INI\\MappedImages\\AptImages", INI_LOAD_OVERWRITE, nullptr,
 			INI::LoadFlags_SearchSubDirs);
+		ini.loadDirectory("Data\\INI\\MappedImages\\TransitionImages", INI_LOAD_OVERWRITE, nullptr);
 	}
 }

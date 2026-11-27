@@ -3,5 +3,6 @@ check() {
         covers "$frame" || continue
         expect "TEST ui-ini-credits frame=$frame presets=1 default=1500" || return 1
         expect "TEST ui-ini-placement-claim frame=$frame color=ffffffff" || return 1
+        expect "TEST ui-ini-transition-images frame=$frame world=1 solo=1" || return 1
     done
 }
