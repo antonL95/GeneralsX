@@ -1,24 +1,25 @@
 import re
 
-render_env = {
-    "GENERALSX_TEST_DRAWTRACE": "GoblinCaveTroll,DrawEntryProbe,DrawCaptureFlagProbe,DrawOwnerFlagProbe,DrawSpearProbe",
-}
+entry_probes = ("DrawEntryProbe", "DrawTrollListProbe", "DrawMountainListProbe", "DrawCreepListProbe", "DrawOlogListProbe")
+traced_actors = ("GoblinCaveTroll", "DrawCaptureFlagProbe", "DrawOwnerFlagProbe", "DrawSpearProbe", *entry_probes)
+render_env = {"GENERALSX_TEST_DRAWTRACE": ",".join(traced_actors)}
 
 
 def check(log):
     rows = re.findall(
-        r"^TEST draw frame (\d+) id \d+ (GoblinCaveTroll|DrawEntryProbe) module \S+ model \S+ clip (\S+)"
+        rf"^TEST draw frame (\d+) id \d+ ({'|'.join(traced_actors)}) module \S+ model \S+ clip (\S+)"
         r" at ([\d.]+)/\d+ .* subobjects (\S+)",
         log, re.MULTILINE,
     )
-    entry = [(int(frame), subobjects.lower()) for frame, actor, _, _, subobjects in rows if actor == "DrawEntryProbe"]
     toss = [(float(pose), subobjects.lower()) for _, actor, clip, pose, subobjects in rows
             if actor == "GoblinCaveTroll" and clip.lower().endswith("mucavtroll_thra")]
     failures = []
-    if not any(36 <= frame < 45 and ".rock:hidden" in subobjects for frame, subobjects in entry):
-        failures.append("entry probe did not start with a hidden rock")
-    if not any(frame >= 46 and ".rock:shown" in subobjects for frame, subobjects in entry):
-        failures.append("OnStateEnter did not reveal the rock")
+    for probe in entry_probes:
+        entry = [(int(frame), parts.lower()) for frame, actor, _, _, parts in rows if actor == probe]
+        if not any(36 <= frame < 45 and ".rock:hidden" in parts for frame, parts in entry):
+            failures.append(f"{probe} did not start with a hidden rock")
+        if not any(frame >= 46 and ".rock:shown" in parts for frame, parts in entry):
+            failures.append(f"OnStateEnter did not reveal the rock for {probe}")
     if "TEST lua visibility frame=52 part=ROCK hidden=1" not in log:
         failures.append("OnStateEnter changed the saved rock visibility override")
     if not any(pose < 24 and ".rock:shown" in subobjects for pose, subobjects in toss):
