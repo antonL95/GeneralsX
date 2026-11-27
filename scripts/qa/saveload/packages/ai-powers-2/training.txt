@@ -24,3 +24,79 @@
 371 destroy Player_2 AiPowers2Hero 1
 371 destroy Player_2 AiPowers2Hero 0
 371 destroy Player_2 AiPowers2Infantry 0
+150 create Player_2 AiPowers2WizardCaster 0 2800,1380,0
+150 create Player_2 AiPowers2WizardCaster 1 3160,1250,0
+150 create Player_2 AiPowers2WizardCaster 2 2800,1200,0
+153 create Player_1 AiPowers2ClusterTarget 0 2845,1410,0
+153 create Player_1 AiPowers2ClusterTarget 1 3205,1280,0
+153 create Player_1 AiPowers2ClusterTarget 2 2830,1230,0
+153 create Player_1 AiPowers2ClusterTarget 3 2832,1230,0
+153 create Player_1 AiPowers2ClusterTarget 4 2834,1230,0
+153 create Player_1 AiPowers2ClusterTarget 5 2836,1230,0
+153 create Player_1 AiPowers2ClusterTarget 6 2838,1230,0
+153 create Player_1 AiPowers2ClusterTarget 7 2840,1230,0
+153 create Player_1 AiPowers2ClusterTarget 8 2842,1230,0
+153 create Player_1 AiPowers2ClusterTarget 9 2830,1233,0
+153 create Player_1 AiPowers2ClusterTarget 10 2832,1233,0
+153 create Player_1 AiPowers2ClusterTarget 11 2834,1233,0
+153 create Player_1 AiPowers2ClusterTarget 12 2836,1233,0
+153 create Player_1 AiPowers2ClusterTarget 13 2838,1233,0
+153 create Player_1 AiPowers2ClusterTarget 14 2840,1233,0
+153 create Player_1 AiPowers2ClusterTarget 15 2842,1233,0
+153 create Player_1 AiPowers2ClusterTarget 16 2830,1236,0
+153 create Player_1 AiPowers2ClusterTarget 17 2832,1236,0
+153 create Player_1 AiPowers2ClusterTarget 18 2834,1236,0
+153 create Player_1 AiPowers2ClusterTarget 19 2836,1236,0
+153 create Player_1 AiPowers2ClusterTarget 20 2838,1236,0
+153 create Player_1 AiPowers2ClusterTarget 21 2840,1236,0
+153 create Player_1 AiPowers2ClusterTarget 22 2842,1236,0
+155 damage Player_2 AiPowers2WizardCaster 0 750
+156 attack Player_2 AiPowers2WizardCaster 0 Player_1:AiPowers2ClusterTarget:0
+156 attack Player_2 AiPowers2WizardCaster 1 Player_1:AiPowers2ClusterTarget:1
+156 attack Player_2 AiPowers2WizardCaster 2 Player_1:AiPowers2ClusterTarget:2
+243 ability Player_2 AiPowers2WizardCaster 0
+243 ability Player_2 AiPowers2WizardCaster 1
+243 ability Player_2 AiPowers2WizardCaster 2
+420 powers-fire-state Player_2 AiPowers2WizardCaster 1 AiPowers2Wizard
+421 destroy Player_2 AiPowers2WizardCaster 2
+421 destroy Player_2 AiPowers2WizardCaster 1
+421 destroy Player_2 AiPowers2WizardCaster 0
+421 destroy Player_1 AiPowers2ClusterTarget 22
+421 destroy Player_1 AiPowers2ClusterTarget 21
+421 destroy Player_1 AiPowers2ClusterTarget 20
+421 destroy Player_1 AiPowers2ClusterTarget 19
+421 destroy Player_1 AiPowers2ClusterTarget 18
+421 destroy Player_1 AiPowers2ClusterTarget 17
+421 destroy Player_1 AiPowers2ClusterTarget 16
+421 destroy Player_1 AiPowers2ClusterTarget 15
+421 destroy Player_1 AiPowers2ClusterTarget 14
+421 destroy Player_1 AiPowers2ClusterTarget 13
+421 destroy Player_1 AiPowers2ClusterTarget 12
+421 destroy Player_1 AiPowers2ClusterTarget 11
+421 destroy Player_1 AiPowers2ClusterTarget 10
+421 destroy Player_1 AiPowers2ClusterTarget 9
+421 destroy Player_1 AiPowers2ClusterTarget 8
+421 destroy Player_1 AiPowers2ClusterTarget 7
+421 destroy Player_1 AiPowers2ClusterTarget 6
+421 destroy Player_1 AiPowers2ClusterTarget 5
+421 destroy Player_1 AiPowers2ClusterTarget 4
+421 destroy Player_1 AiPowers2ClusterTarget 3
+421 destroy Player_1 AiPowers2ClusterTarget 2
+421 destroy Player_1 AiPowers2ClusterTarget 1
+421 destroy Player_1 AiPowers2ClusterTarget 0
+690 create Player_2 AiPowers2DeepCaster 0 2800,1380,0
+690 create Player_2 AiPowers2DeepCaster 1 2800,1640,0
+691 create Player_1 AiPowers2ClusterTarget 0 2850,1430,0
+691 create Player_1 AiPowers2ClusterTarget 1 2855,1438,0
+691 create Player_1 AiPowers2ClusterTarget 2 2850,1690,0
+692 attack Player_2 AiPowers2DeepCaster 0 Player_1:AiPowers2ClusterTarget:0
+692 attack Player_2 AiPowers2DeepCaster 1 Player_1:AiPowers2ClusterTarget:2
+855 powers-fire-state Player_2 AiPowers2DeepCaster 1 AiPowers2Deep
+855 powers-fire-state Player_2 AiPowers2DeepMarker 0
+855 health Player_2 AiPowers2DeepMarker 0
+856 destroy Player_2 AiPowers2DeepMarker 0
+856 destroy Player_2 AiPowers2DeepCaster 1
+856 destroy Player_2 AiPowers2DeepCaster 0
+856 destroy Player_1 AiPowers2ClusterTarget 2
+856 destroy Player_1 AiPowers2ClusterTarget 1
+856 destroy Player_1 AiPowers2ClusterTarget 0

@@ -28,4 +28,36 @@ check() {
     if covers 370; then
         expect 'TEST powers-fire-state frame=370 template=AiPowers2Healer alive=3 ready=1' || return 1
     fi
+    if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2WizardCaster ' "$log" | awk '
+        /cond=.*UNPACKING/ { pending++ }
+        END { exit (pending != 2) }
+    '; then
+        printf 'Expected wounded and crowded Wizard Blast casters to be unpacking at frame 243\n' >&2
+        grep -F 'TEST ability 243 Player_2 AiPowers2WizardCaster ' "$log" >&2 || true
+        return 1
+    fi
+    if covers 420; then
+        expect 'TEST powers-fire-state frame=420 template=AiPowers2WizardCaster alive=3 ready=1' || return 1
+        if ! awk '
+            $1 == "TEST" && $2 == "impact" && $4 == "weapon=AiPowers2WizardWeapon" {
+                if ($7 == "pos=2835.4,1415.4") wounded++
+                else if ($7 == "pos=2835.4,1235.4") crowded++
+                else unexpected++
+            }
+            END { exit (wounded != 1 || crowded != 1 || unexpected != 0) }
+        ' "$log"; then
+            printf 'Expected Wizard Blast impacts on the two sampled enemy clusters\n' >&2
+            grep -F ' weapon=AiPowers2WizardWeapon ' "$log" >&2 || true
+            return 1
+        fi
+    fi
+    if covers 855; then
+        expect 'TEST powers-fire-state frame=855 template=AiPowers2DeepCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=855 template=AiPowers2DeepMarker alive=1' || return 1
+        if ! grep -F 'TEST health 855 Player_2 AiPowers2DeepMarker 0 ' "$log" | grep -Fq ' pos=2849.5,1429.5'; then
+            printf 'Expected Call of the Deep at the occupied diagonal sample\n' >&2
+            grep -F 'TEST health 855 Player_2 AiPowers2DeepMarker 0 ' "$log" >&2 || true
+            return 1
+        fi
+    fi
 }

@@ -34,6 +34,7 @@
 #include "WWMath/wwmath.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <vector>
@@ -359,6 +360,70 @@ Bool canSummonAt(const Object& source, const CommandButton& button, const Specia
 	return TRUE;
 }
 
+std::array<Coord3D, 4> diagonalPowerLocations(const Object& source, Real radius)
+{
+	const Real offset = radius / WWMath::Sqrt(2.0f);
+	const Coord3D& center = *source.getPosition();
+	return {{
+		{center.x + offset, center.y + offset, center.z},
+		{center.x - offset, center.y + offset, center.z},
+		{center.x - offset, center.y - offset, center.z},
+		{center.x + offset, center.y - offset, center.z}
+	}};
+}
+
+Int countVisiblePowerEnemies(const Object& source, const Player& player, const Coord3D& center, Real radius,
+	Bool includeHordeMembers)
+{
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&center, radius, FROM_CENTER_2D);
+	MemoryPoolObjectHolder hold(nearby);
+	Int count = 0;
+	for (const Object* object = nearby->first(); object; object = nearby->next())
+	{
+		const Object* container = object->getContainedBy();
+		if (source.getRelationship(object) != ENEMIES || object->isEffectivelyDead() ||
+			(container && (!includeHordeMembers || !container->isKindOf(KINDOF_HORDE))) || object->isKindOf(KINDOF_INERT) ||
+			(object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED)))
+			continue;
+		const auto shroud = object->getShroudedStatus(player.getPlayerIndex());
+		if (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR)
+			++count;
+	}
+	return count;
+}
+
+Bool canCastPolicyAtPosition(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
+	const Coord3D& location)
+{
+	if (!button.isMountStateAllowed(&source) ||
+		(button.getRequiredRank() > 0 && source.getExperienceTracker()->getRank() < button.getRequiredRank()))
+		return FALSE;
+	return power.isValidRetailTarget(&source, nullptr, &location, CMD_FROM_AI) &&
+		(BitIsSet(button.getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET) ||
+			button.isValidToUseOn(&source, nullptr, &location, CMD_FROM_AI));
+}
+
+std::optional<Coord3D> selectWizardBlastLocation(const Object& source, const Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, Real radius)
+{
+	if (!(radius >= 0.0f) || !std::isfinite(radius))
+		return std::nullopt;
+	constexpr Real emergencyHealth = 0.3f;
+	constexpr Int minimumEnemies = 21;
+	Int bestCount = bodyHealthFraction(source) < emergencyHealth ? 0 : minimumEnemies - 1;
+	std::optional<Coord3D> best;
+	for (const Coord3D& location : diagonalPowerLocations(source, radius))
+	{
+		const Int count = countVisiblePowerEnemies(source, player, location, radius, TRUE);
+		if (count > bestCount)
+		{
+			bestCount = count;
+			best = location;
+		}
+	}
+	return best && canCastPolicyAtPosition(source, button, power, *best) ? best : std::nullopt;
+}
+
 std::optional<Coord3D> findSummonLocation(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
 	const AISpecialPowerUpdateModuleData& data, const Coord3D& location)
 {
@@ -385,39 +450,18 @@ std::optional<Coord3D> findSummonLocation(const Object& source, const CommandBut
 }
 
 std::optional<Coord3D> selectSummonLocation(const Object& source, const Player& player, const CommandButton& button,
-	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data)
+	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data, Real defaultRange)
 {
-	constexpr Real defaultRange = 149.0f;
 	const Real configuredRange = specialPowerSearchRange(source, power, data.m_specialPowerRange);
 	const Real range = configuredRange > 0.0f ? configuredRange : defaultRange;
 	if (!std::isfinite(range))
 		return std::nullopt;
-	const Real diagonalOffset = range / WWMath::Sqrt(2.0f);
-	const Coord3D& center = *source.getPosition();
-	const Coord3D points[] = {
-		{center.x + diagonalOffset, center.y + diagonalOffset, center.z},
-		{center.x - diagonalOffset, center.y + diagonalOffset, center.z},
-		{center.x - diagonalOffset, center.y - diagonalOffset, center.z},
-		{center.x + diagonalOffset, center.y - diagonalOffset, center.z}
-	};
 	constexpr Int minimumEnemies = 2;
 	Int bestCount = minimumEnemies - 1;
 	std::optional<Coord3D> best;
-	for (const Coord3D& location : points)
+	for (const Coord3D& location : diagonalPowerLocations(source, range))
 	{
-		SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&location, range, FROM_CENTER_2D);
-		MemoryPoolObjectHolder hold(nearby);
-		Int count = 0;
-		for (const Object* object = nearby->first(); object; object = nearby->next())
-		{
-			if (source.getRelationship(object) != ENEMIES || object->isEffectivelyDead() || object->getContainedBy() ||
-				object->isKindOf(KINDOF_INERT) ||
-				(object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED)))
-				continue;
-			const auto shroud = object->getShroudedStatus(player.getPlayerIndex());
-			if (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR)
-				++count;
-		}
+		const Int count = countVisiblePowerEnemies(source, player, location, range, FALSE);
 		if (count > bestCount)
 		{
 			if (const auto validLocation = findSummonLocation(source, button, power, data, location))
@@ -641,11 +685,17 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		return retailPolicyCooldown;
 	}
 
-	if (policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
+	const Bool wizardBlast = policy == "AI_SPECIAL_POWER_GANDALF_WIZARD_BLAST";
+	const Bool callOfTheDeep = policy == "AI_SPECIAL_POWER_GOBLINKING_CALLOFTHEDEEP";
+	if (wizardBlast || callOfTheDeep || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
 	{
 		if (!combatVictim(*source) || GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
 			return retailPolicyPoll;
-		const auto location = selectSummonLocation(*source, *player, *button, *power, *data);
+		constexpr Real defaultSummonRange = 149.0f;
+		constexpr Real callOfTheDeepRange = 200.0f;
+		const auto location = wizardBlast
+			? selectWizardBlastLocation(*source, *player, *button, *power, data->m_specialPowerRadius)
+			: selectSummonLocation(*source, *player, *button, *power, *data, callOfTheDeep ? callOfTheDeepRange : defaultSummonRange);
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
