@@ -8,6 +8,6 @@
 244 horde-climb-probe Player_1 SiegeHordeDeployLadder 0 -
 350 horde-climb-probe Player_1 SiegeHordeDeployLadder 0 -
 430 horde-climb-probe Player_1 SiegeHordeDeployInfantry 0 -
-431 destroy Player_1 SiegeHordeDeployInfantry 0
-431 destroy Player_1 SiegeHordeDeployLadder 0
-431 destroy PlyrCivilian SiegeHordeDeployWall 0
+460 destroy Player_1 SiegeHordeDeployInfantry 0
+460 destroy Player_1 SiegeHordeDeployLadder 0
+460 destroy PlyrCivilian SiegeHordeDeployWall 0
