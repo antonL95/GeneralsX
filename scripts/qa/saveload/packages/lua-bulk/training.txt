@@ -1,0 +1,3 @@
+235 lua-bulk PlyrCreeps GondorFaramir 0 FaramirFunctions:OnCreated 3310 2900
+246 lua-bulk Player_1 RohanBodyGuard 0 RohanBodyguardFunctions:ModelConditionMOUNTED 3310 2900
+247 lua-bulk Player_1 ElvenLorienArcher_TDMode 0 LorienWarriorTDFunctions:BeTowerUpgraded 3310 2900

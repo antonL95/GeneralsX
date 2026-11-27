@@ -163,7 +163,7 @@ bool LuaState::hasFunction(const std::string& name) const
 	return found;
 }
 
-bool LuaState::call(const std::string& name, PushArguments push, void* data)
+bool LuaState::call(const std::string& name, PushArguments push, void* data, std::string* error)
 {
 	if (!m_state)
 		return false;
@@ -172,7 +172,10 @@ bool LuaState::call(const std::string& name, PushArguments push, void* data)
 	lua_pushlightuserdata(m_state, &call);
 	if (lua_pcall(m_state, 1, 0, 0) == LUA_OK)
 		return true;
-	logError(name.c_str(), lua_tostring(m_state, -1));
+	const char* message = lua_tostring(m_state, -1);
+	if (error)
+		*error = message ? message : "unknown Lua error";
+	logError(name.c_str(), message);
 	lua_pop(m_state, 1);
 	return false;
 }

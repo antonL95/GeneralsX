@@ -13,6 +13,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/LuaDispatchProbe.h"
 #include "GameLogic/LuaEventTables.h"
 #include "GameLogic/LuaLogicBindings.h"
 #include "GameLogic/LuaState.h"
@@ -20,6 +21,7 @@
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Object.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <lua.hpp>
 #include <locale>
@@ -89,6 +91,7 @@ std::optional<ModelEvent> readModelEvent(const LuaEventTables::Event& event)
 
 struct EventList
 {
+	std::string_view name;
 	LuaEventTables::Handlers handlers;
 	std::vector<const ModelEvent*> modelEvents;
 };
@@ -140,6 +143,8 @@ public:
 	bool dispatchScripted(Object& object, std::string_view event, Argument second, Argument third) override;
 	void modelConditionsChanged(Object& object, const ModelConditionFlags& previous) override;
 	void restoreHordeConditions() override;
+	void observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger);
+	bool triggerModelEvent(Object& object, std::string_view name);
 
 private:
 	const EventList* registeredList(const Object& object) const;
@@ -152,6 +157,7 @@ private:
 	std::vector<ModelEvent> m_modelEvents;
 	std::set<std::string, std::less<>> m_scriptedEvents;
 	std::map<ObjectID, const EventList*> m_objects;
+	const LuaDispatchObserver* m_observer = nullptr;
 };
 
 bool LogicLua::load(Xfer& crc)
@@ -194,7 +200,9 @@ bool LogicLua::load(Xfer& crc)
 	std::set<std::string> missing;
 	for (auto& [name, handlers] : tables->lists)
 	{
-		auto& list = m_lists[name];
+		const auto entry = m_lists.try_emplace(name).first;
+		auto& list = entry->second;
+		list.name = entry->first;
 		for (auto& [event, function] : handlers)
 		{
 			if (m_state->hasFunction(function))
@@ -268,7 +276,61 @@ bool LogicLua::invoke(Object& object, const EventList& list, std::string_view ev
 	setFPMode();
 	ScopedFPUGuard fpuGuard;
 	DispatchArguments args{object, second, third};
-	m_state->call(found->second, pushArguments, &args);
+	std::string error;
+	const bool ok = m_state->call(found->second, pushArguments, &args, m_observer ? &error : nullptr);
+	if (m_observer)
+		(*m_observer)({object, list.name, event, found->second, ok, error});
+	return true;
+}
+
+void LogicLua::observe(const LuaDispatchObserver& observer, const std::function<void()>& trigger)
+{
+	struct RestoreObserver
+	{
+		const LuaDispatchObserver*& slot;
+		const LuaDispatchObserver* previous;
+		~RestoreObserver() { slot = previous; }
+	} restore{m_observer, m_observer};
+	m_observer = &observer;
+	trigger();
+}
+
+bool LogicLua::triggerModelEvent(Object& object, std::string_view name)
+{
+	const auto event = std::find_if(m_modelEvents.begin(), m_modelEvents.end(),
+		[name](const ModelEvent& rule) { return rule.name == name; });
+	if (event == m_modelEvents.end())
+		return false;
+
+	const auto original = object.getLogicModelConditions();
+	auto active = original;
+	active.clearAndSet(event->forbidden, event->required);
+	if (event->requireFiringOrPreAttack)
+	{
+		if (!active.testForAny(event->firingOrPreAttack))
+			active.set(event->forbidden.test(MODELCONDITION_FIRING_A) ?
+				MODELCONDITION_PREATTACK_A : MODELCONDITION_FIRING_A);
+	}
+	else
+		active.clear(event->firingOrPreAttack);
+	if (!event->matches(active))
+		return false;
+
+	if (event->matches(original))
+	{
+		auto inactive = original;
+		if (event->required.any())
+			inactive.clear(event->required);
+		else if (event->forbidden.any())
+			inactive.set(event->forbidden);
+		else if (event->requireFiringOrPreAttack)
+			inactive.clear(event->firingOrPreAttack);
+		else
+			inactive.set(MODELCONDITION_FIRING_A);
+		object.clearAndSetModelConditionFlags(original, inactive);
+	}
+	if (!object.isDestroyed() && !object.isEffectivelyDead())
+		object.clearAndSetModelConditionFlags(object.getLogicModelConditions(), active);
 	return true;
 }
 
@@ -356,6 +418,18 @@ void LogicLua::restoreHordeConditions()
 		}
 	}
 }
+}
+
+void observeLuaDispatch(const LuaDispatchObserver& observer, const std::function<void()>& trigger)
+{
+	if (auto* engine = static_cast<LogicLua*>(LuaScriptEngine::active()))
+		engine->observe(observer, trigger);
+}
+
+bool triggerLuaModelEvent(Object& object, std::string_view name)
+{
+	auto* engine = static_cast<LogicLua*>(LuaScriptEngine::active());
+	return engine && engine->triggerModelEvent(object, name);
 }
 
 std::unique_ptr<LuaScriptEngine> createLuaScriptEngine()

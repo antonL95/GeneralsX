@@ -21,7 +21,7 @@ public:
 	void bind(const char* name, Binding binding, void* context = nullptr);
 	bool load(std::string_view script, const char* chunkName);
 	bool hasFunction(const std::string& name) const;
-	bool call(const std::string& name, PushArguments push = nullptr, void* data = nullptr);
+	bool call(const std::string& name, PushArguments push = nullptr, void* data = nullptr, std::string* error = nullptr);
 
 	static bool isRetailDialect(std::string_view script);
 
