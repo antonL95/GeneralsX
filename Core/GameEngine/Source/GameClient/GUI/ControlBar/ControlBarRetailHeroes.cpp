@@ -1,5 +1,6 @@
 #include "PreRTS.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <string>
@@ -82,6 +83,8 @@ struct HeroSlot
 	Real health = 1.0f;
 	Real maxHealth = 0.0f;
 	Real lifetime = 0.0f;
+
+	Bool hasButtonImage() const { return appearance && appearance->getButtonImage(); }
 };
 
 struct HeroMemory
@@ -263,14 +266,16 @@ void collectHero(Object *obj, void *userData)
 	const ThingTemplate *identity = obj->getHeroIdentityTemplate();
 	const Int rosterIndex = HeroRoster::findIndex(census.player, identity);
 	const ThingTemplate *hero = rosterIndex >= 0 ? HeroRoster::heroAt(census.player, rosterIndex) : identity;
-	if (!hero || (rosterIndex < 0 && !obj->isKindOf(KINDOF_SELECTABLE)))
+	if (!hero)
 		return;
-	for (const HeroSlot &slot : *census.slots)
-		if (slot.hero == hero)
-			return;
+	const ThingTemplate *appearance = obj->getTemplate();
+	const auto existing = std::find_if(census.slots->begin(), census.slots->end(),
+		[hero](const HeroSlot& slot) { return slot.hero == hero; });
+	if (existing != census.slots->end() && (existing->hasButtonImage() || !appearance->getButtonImage()))
+		return;
 	HeroSlot slot;
 	slot.hero = hero;
-	slot.appearance = obj->getTemplate();
+	slot.appearance = appearance;
 	slot.id = obj->getID();
 	slot.alive = TRUE;
 	slot.lifetime = RetailWorldUI::remainingLifetime(*obj);
@@ -292,7 +297,10 @@ void collectHero(Object *obj, void *userData)
 	}
 	const Drawable *drawable = obj->getDrawable();
 	slot.selected = drawable && drawable->isSelected();
-	census.slots->push_back(slot);
+	if (existing == census.slots->end())
+		census.slots->push_back(slot);
+	else
+		*existing = slot;
 }
 
 std::vector<HeroSlot> collectHeroes(const Player *player, HeroSlot& builders)
@@ -848,6 +856,7 @@ void update()
 	HeroSlot builders;
 	std::vector<HeroSlot> present = collectHeroes(player, builders);
 	trackEvents(present);
+	std::erase_if(present, [](const HeroSlot& slot) { return !slot.hasButtonImage(); });
 	std::vector<const ThingTemplate *> keys;
 	for (const HeroSlot &slot : present)
 		keys.push_back(slot.hero);
@@ -927,7 +936,7 @@ Bool hasHeroSlot(ObjectID id)
 		return FALSE;
 	HeroSlot builders;
 	for (const HeroSlot &slot : collectHeroes(player, builders))
-		if (!slot.builder && slot.alive && slot.id == id)
+		if (!slot.builder && slot.alive && slot.id == id && slot.hasButtonImage())
 			return TRUE;
 	return FALSE;
 }

@@ -1167,6 +1167,18 @@ def check_promotion_tint():
     capture("promotion-tint", 0, 0, 1024, 768)
 
 
+def check_hero_roster_filter():
+    wait_for("hero roster sampled after fixture spawns",
+             lambda: log_count("TEST roster 35 ") >= 1, 150)
+    before, _ = roster_at(12)
+    after, _ = roster_at(35)
+    expected = sorted(before + ["GondorAragorn", "RosterFixtureUnselectable"])
+    if after != expected:
+        sys.exit(f"FAIL hero roster image filter expected={expected} actual={after}")
+    print(f"PASS hero roster image filter entries={after}", flush=True)
+    capture("hero-roster-filter", 360, 680, 220, 88)
+
+
 def launch_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
     speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
     with (out / "game.log").open(log_mode) as log:
@@ -1298,7 +1310,7 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-if any(option in sys.argv for option in ("--create-a-hero", "--hover-roster", "--promotion-tint")):
+if any(option in sys.argv for option in ("--create-a-hero", "--hover-roster", "--promotion-tint", "--hero-roster-filter")):
     map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
     map_dir.mkdir(parents=True)
     source = Path("/game/UserData/Maps/AotR Training Grounds")
@@ -1314,6 +1326,26 @@ if "--promotion-tint" in sys.argv:
         "12 look Player_1 PromotionTintFixture 0\n"
         "45 promotion-tint-award Player_1 PromotionTintFixture 0\n"
         "51 promotion-tint-probe Player_1 PromotionTintFixture 0\n"
+    )
+if "--hero-roster-filter" in sys.argv:
+    with (map_dir / "map.ini").open("a") as map_ini:
+        map_ini.write("\nChildObject RosterFixtureMissingArt GondorBoromir\n"
+                      "    ButtonImage = RosterFixtureUnmappedButton\n"
+                      "End\n\n"
+                      "ChildObject RosterFixtureUnselectable GondorBoromir\n"
+                      "    KindOf = -SELECTABLE +SUMMONED +IGNORES_SELECT_ALL\n"
+                      "End\n\n"
+                      "ChildObject RosterFixtureUnmappedEquivalent GondorAragorn\n"
+                      "    EquivalentTo = GondorAragorn\n"
+                      "    ButtonImage = RosterFixtureUnmappedButton\n"
+                      "End\n")
+    commands.write_text(
+        "12 hud - - 0\n"
+        "20 create Player_1 GondorAragorn 0 700,2450,0\n"
+        "21 create Player_1 RosterFixtureMissingArt 0 800,2450,0\n"
+        "22 create Player_1 RosterFixtureUnselectable 0 900,2450,0\n"
+        "23 create Player_1 RosterFixtureUnmappedEquivalent 0 1000,2450,0\n"
+        "35 hud - - 0\n"
     )
 if "--create-a-hero" in sys.argv:
     commands.write_text(
@@ -1352,6 +1384,8 @@ elif "--hover-roster" in sys.argv:
     run(check_hover_roster, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--promotion-tint" in sys.argv:
     run(check_promotion_tint, "-file", str(map_dir / "aotr training grounds.map"))
+elif "--hero-roster-filter" in sys.argv:
+    run(check_hero_roster_filter, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--multi-select" in sys.argv:
     run(check_multi_select)
 elif "--dolguldur-buttons" in sys.argv:
