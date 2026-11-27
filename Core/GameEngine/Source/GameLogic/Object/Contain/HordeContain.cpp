@@ -1586,7 +1586,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		const Real turn = cavalryAI->getCavalryTurn();
 		const Real leadFrames = std::min(FORMATION_LEAD_FRAMES,
 			hordeSpeed > 0.0f ? remaining / hordeSpeed : FORMATION_LEAD_FRAMES);
-		const Real angle = std::clamp(turn * leadFrames, -PI / 4.0f, PI / 4.0f);
+		const Real angle = turn * leadFrames;
 		if (angle != 0.0f)
 		{
 			const Real midpoint = horde->getOrientation() + angle * 0.5f;
@@ -1717,31 +1717,28 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		return other != member && !other->isEffectivelyDead() && other->getLayer() == layer &&
 			!other->isSignificantlyAboveTerrain();
 	};
+	const auto formationPoint = [&](Int slot) {
+		if (slot >= 0)
+		{
+			HordePoint point = slots[slot].position;
+			if (slot < static_cast<Int>(horde->m_slotOffsets.size()))
+			{
+				point.x += horde->m_slotOffsets[slot].x;
+				point.y += horde->m_slotOffsets[slot].y;
+			}
+			return point;
+		}
+		return horde->getBannerOffset();
+	};
+	const HordePoint memberPoint = formationPoint(memberSlot);
 	for (const Object* other : horde->getContainList())
 	{
 		if (!eligibleNeighbor(other) || !hasFormationPosition(other))
 			continue;
 		const Coord3D& position = *other->getPosition();
 		Real diameter = radius + other->getGeometryInfo().getBoundingCircleRadius() + CLEARANCE;
-		if (cavalrySettling && (cavalryBanner || horde->isBannerCarrier(other)))
-			diameter = (diameter - CLEARANCE) * 0.75f + CLEARANCE;
-		const Int otherSlot = memberSlot >= 0 ? horde->getMemberSlot(other->getID()) : -1;
-		if (otherSlot >= 0)
-		{
-			HordePoint a = slots[memberSlot].position;
-			HordePoint b = slots[otherSlot].position;
-			if (memberSlot < static_cast<Int>(horde->m_slotOffsets.size()))
-			{
-				a.x += horde->m_slotOffsets[memberSlot].x;
-				a.y += horde->m_slotOffsets[memberSlot].y;
-			}
-			if (otherSlot < static_cast<Int>(horde->m_slotOffsets.size()))
-			{
-				b.x += horde->m_slotOffsets[otherSlot].x;
-				b.y += horde->m_slotOffsets[otherSlot].y;
-			}
-			diameter = std::min(diameter, WWMath::SqrtfOrigin(sqr(a.x - b.x) + sqr(a.y - b.y)));
-		}
+		const HordePoint otherPoint = formationPoint(horde->getMemberSlot(other->getID()));
+		diameter = std::min(diameter, WWMath::SqrtfOrigin(sqr(memberPoint.x - otherPoint.x) + sqr(memberPoint.y - otherPoint.y)));
 		const Real dx = next.x - position.x;
 		const Real dy = next.y - position.y;
 		const Real distanceSquared = dx * dx + dy * dy;
