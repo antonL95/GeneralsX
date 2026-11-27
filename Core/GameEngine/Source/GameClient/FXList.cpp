@@ -161,6 +161,12 @@ public:
 			played = TRUE;
 	}
 
+	Bool isVoice() const
+	{
+		const AudioEventInfo* info = TheAudio ? TheAudio->findAudioEventInfo(m_soundName) : nullptr;
+		return info && BitIsSet(info->m_type, ST_VOICE);
+	}
+
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
 	{
 		static const FieldParse myFieldParse[] =
@@ -1751,6 +1757,17 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 		else
 			(*it)->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 	}
+}
+
+Bool FXList::playsVoice() const
+{
+	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
+	{
+		const SoundFXNugget* sound = (*it)->asSoundNugget();
+		if (sound && sound->isVoice())
+			return TRUE;
+	}
+	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------

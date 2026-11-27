@@ -157,6 +157,8 @@ public:
 		if (fx) fx->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius, source, target);
 	}
 
+	Bool playsVoice() const;
+
 	/// inline convenience method to avoid having to check for null.
 	inline static void doFXObj(const FXList* fx, const Object* primary, const Object* secondary = nullptr)
 	{

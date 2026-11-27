@@ -6,28 +6,22 @@ check_voices() {
                 next
             if ($7 == "event=SpawnVoicesCreated" || $7 == "event=" spawn)
                 print
-            if ($7 == "event=SpawnVoicesCreated" && $5 != "owner=0") {
-                if ($4 == "kind=voice-queue") {
-                    created++
-                    createdLine = NR
-                } else
-                    createdStarted++
-            }
+            if ($7 == "event=SpawnVoicesCreated")
+                created++
             if ($7 == "event=" spawn && $5 == "owner=0") {
-                if ($4 == "kind=voice-queue") {
+                if ($4 == "kind=voice-queue")
                     fx++
-                    fxLine = NR
-                } else
+                else
                     fxStarted++
             }
         }
         END {
-            if (created != 1 || fx != 1 || createdLine >= fxLine) {
-                printf "Expected one owned VoiceCreated before one positional %s in frames %d to %d\n", spawn, first, last
+            if (created != 0) {
+                printf "Expected no VoiceCreated when the spawn effects speak in frames %d to %d\n", first, last
                 exit 1
             }
-            if (createdStarted != 1 || fxStarted != 1) {
-                printf "Expected both voices to start in frames %d to %d\n", first, last
+            if (fx != 1 || fxStarted != 1) {
+                printf "Expected one positional %s queued and started in frames %d to %d\n", spawn, first, last
                 exit 1
             }
         }

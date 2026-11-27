@@ -153,6 +153,12 @@ void RespawnUpdate::markRevived(Int healthPercent)
 		getObject()->getBodyModule()->setInitialHealth(healthPercent);
 }
 
+const FXList* RespawnUpdate::spawnFX() const
+{
+	const RespawnUpdateModuleData* data = getRespawnUpdateModuleData();
+	return m_revived ? data->m_respawnFX : data->m_initialSpawnFX;
+}
+
 UpdateSleepTime RespawnUpdate::update()
 {
 	const RespawnUpdateModuleData *data = getRespawnUpdateModuleData();
@@ -168,8 +174,7 @@ UpdateSleepTime RespawnUpdate::update()
 	}
 
 	m_spawnHandled = TRUE;
-	const FXList* fx = m_revived ? data->m_respawnFX : data->m_initialSpawnFX;
-	FXList::doFXPos(fx, obj->getPosition(), nullptr, 0.0f, nullptr, 0.0f, obj);
+	FXList::doFXPos(spawnFX(), obj->getPosition(), nullptr, 0.0f, nullptr, 0.0f, obj);
 	const Int condition = m_revived ? data->m_respawnAnim : data->m_initialSpawnAnim;
 	const UnsignedInt frames = m_revived ? data->m_respawnAnimationTime : data->m_initialSpawnAnimationTime;
 	if (condition < 0 || frames == 0)

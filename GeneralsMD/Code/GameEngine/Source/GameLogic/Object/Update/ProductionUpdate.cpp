@@ -52,6 +52,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
+#include "GameClient/FXList.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
@@ -62,6 +63,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
+#include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
@@ -121,6 +123,15 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 
 namespace
 {
+Bool spawnFXSpeaks(Object& produced)
+{
+	UpdateModule* update = produced.findUpdateModule(TheNameKeyGenerator->nameToKey("RespawnUpdate"));
+	if (!update)
+		return FALSE;
+	const FXList* fx = static_cast<RespawnUpdate*>(update)->spawnFX();
+	return fx && fx->playsVoice();
+}
+
 void parseRetailProductionModifier(INI* ini, void*, void* store, const void*)
 {
 	auto& modifier = static_cast<std::vector<RetailProductionModifier>*>(store)->emplace_back();
@@ -1035,7 +1046,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						production->setExitDoor(DOOR_NONE_AVAILABLE);
 
 						const Bool firstProduced = production->getProductionQuantity() == production->getProductionQuantityRemaining();
-						if (firstProduced)
+						if (firstProduced && !spawnFXSpeaks(*newObj))
 						{
 							AudioEventRTS voiceCreated = *RetailClientAudio::select(*newObj, "VoiceCreated", newObj->getTemplate()->getVoiceCreated());
 							voiceCreated.setObjectID(newObj->getID());
