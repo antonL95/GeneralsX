@@ -338,7 +338,14 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 				count == expected + 1;
 			opcode.supported = validPrefix >= expected && (count == expected || ignoreTrailing);
 			for (Int p = 0; opcode.supported && p < expected; ++p)
-				opcode.supported = parameters[p]->getParameterType() == definition->getParameterType(p);
+			{
+				const auto actual = parameters[p]->getParameterType();
+#if !RTS_GENERALS
+				if (!condition && i == ScriptAction::SOUND_PLAY_NAMED && p == 0 && actual == Parameter::SOUND)
+					continue;
+#endif
+				opcode.supported = actual == definition->getParameterType(p);
+			}
 			if (opcode.supported)
 			{
 				if (ignoreTrailing)

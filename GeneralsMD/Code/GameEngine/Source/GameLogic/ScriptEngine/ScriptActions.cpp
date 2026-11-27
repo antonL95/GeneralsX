@@ -2840,15 +2840,15 @@ void ScriptActions::doMoviePlayRadar(const AsciiString& movieName)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doSoundPlayFromNamed(const AsciiString& soundName, const AsciiString& unitName)
 {
-	Object *pUnit = TheScriptEngine->getUnitNamed(unitName);
+	const Object* unit = TheScriptEngine->getUnitNamed(unitName);
 
-	if (!pUnit) {
+	if (!unit || !TheAudio)
 		return;
-	}
 
-	AudioEventRTS sfx(soundName, pUnit->getID());
-	sfx.setIsLogicalAudio(true);
-	TheAudio->addAudioEvent(&sfx);
+	AudioEventRTS sound(soundName, unit->getID());
+	if (const Player* owner = unit->getControllingPlayer())
+		sound.setPlayerIndex(owner->getPlayerIndex());
+	TheAudio->addAudioEvent(&sound);
 }
 
 //-------------------------------------------------------------------------------------------------

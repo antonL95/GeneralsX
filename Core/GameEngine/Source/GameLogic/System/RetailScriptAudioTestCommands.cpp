@@ -64,7 +64,7 @@ struct ScriptWireValue
 constexpr char fixtureUnitName[] = "AudioScriptFixtureNamedUnit";
 constexpr char fixtureSound[] = "AudioScriptFixtureSound";
 
-void parseAction(ScriptAction& action, const char* name, Int wireAction,
+ScriptAction* parseAction(const char* name, Int wireAction,
 	std::initializer_list<ScriptWireValue> parameters)
 {
 	ScriptActionStream bytes;
@@ -87,8 +87,12 @@ void parseAction(ScriptAction& action, const char* name, Int wireAction,
 	DataChunkInput input(&bytes);
 	DataChunkVersionType version;
 	input.openDataChunk(&version);
-	BfmeMapScripts::readAction(input, action);
+	ScriptAction* action = newInstance(ScriptAction)(ScriptAction::NO_OP);
+	action->setNextAction(nullptr);
+	action->setWarnings(FALSE);
+	BfmeMapScripts::readAction(input, *action);
 	input.closeDataChunk();
+	return action;
 }
 
 void arm(const RetailTestCommands::Context& ctx)
@@ -107,8 +111,7 @@ void playNamed(const RetailTestCommands::Context& ctx)
 		return;
 	TheAudio->setTraceEnabled(TRUE);
 	TheAudio->setHeadlessVirtualPlayback(TRUE);
-	ScriptAction* action = newInstance(ScriptAction);
-	parseAction(*action, "SOUND_PLAY_NAMED", 84, {{12, fixtureSound}, {14, fixtureUnitName}});
+	ScriptAction* action = parseAction("SOUND_PLAY_NAMED", 84, {{12, fixtureSound}, {14, fixtureUnitName}});
 	const Bool mapped = action->getActionType() == ScriptAction::SOUND_PLAY_NAMED;
 	const Bool named = TheScriptEngine->getUnitNamed(fixtureUnitName) == unit;
 	std::fprintf(stderr, "TEST script audio frame=%u named=%d mapped=%d\n", ctx.frame, named, mapped);
@@ -120,8 +123,7 @@ void overrideVolume(const RetailTestCommands::Context& ctx)
 {
 	TheAudio->setTraceEnabled(TRUE);
 	TheAudio->setHeadlessVirtualPlayback(TRUE);
-	ScriptAction* action = newInstance(ScriptAction);
-	parseAction(*action, "AUDIO_OVERRIDE_VOLUME_TYPE", 224, {{59, fixtureSound}, {1, "", 0.0f}});
+	ScriptAction* action = parseAction("AUDIO_OVERRIDE_VOLUME_TYPE", 224, {{59, fixtureSound}, {1, "", 0.0f}});
 	const Bool mapped = action->getActionType() == ScriptAction::AUDIO_OVERRIDE_VOLUME_TYPE;
 	TheScriptEngine->friend_executeAction(action);
 	deleteInstance(action);
