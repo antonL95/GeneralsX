@@ -50,6 +50,7 @@
 #include "Common/PlayerList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "Common/ProductionPrerequisite.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/Drawable.h"
@@ -372,7 +373,9 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 		if (RetailFileLayers::enabled())
 		{
 			const Player* controller = obj->getControllingPlayer();
-			obj->getExperienceTracker()->setVeterancyLevel(controller->getProductionVeterancyLevel(obj->getTemplate()->getName()));
+			obj->getExperienceTracker()->setVeterancyLevel(controller->getProductionVeterancyLevel(obj->getTemplate()->getName()), FALSE);
+			if (auto* emotions = static_cast<EmotionTrackerUpdate*>(obj->findUpdateModule(NAMEKEY("EmotionTrackerUpdate"))))
+				emotions->clearPromotionEmotions();
 		}
 		if (lua)
 			lua->registerObject(*obj, LuaScriptEngine::ModelEventState::InitialConditions);
