@@ -22,10 +22,12 @@
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
+#include "WWMath/wwmath.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 
 namespace
 {
@@ -33,6 +35,34 @@ constexpr Real FORMATION_PATHFIND_DISTANCE = 120.0f;
 constexpr Real FORMATION_REPATH_DISTANCE = 30.0f;
 constexpr Real FORMATION_REFORM_ANGLE = PI / 6.0f;
 constexpr Int MAX_ADVANCE_ATTEMPTS = 2;
+
+#if RTS_ZEROHOUR
+UnsignedInt getCavalryLaunchFrames(const Object& anchor, const Locomotor& anchorLocomotor, const HordeContain& contain)
+{
+	const BodyDamageType anchorDamage = anchor.getBodyModule()->getDamageState();
+	const Real anchorAcceleration = anchorLocomotor.getMaxAcceleration(anchorDamage);
+	const Real anchorMaxSpeed = anchorLocomotor.getMaxSpeedForCondition(anchorDamage, &anchor);
+	if (anchorAcceleration <= 0.0f || anchorMaxSpeed <= 0.0f)
+		return 0;
+	const Real launchSpeed = std::min(anchorMaxSpeed, anchorLocomotor.getRetailScalarSpeed() + anchorAcceleration);
+	Real frames = 0.0f;
+	for (const Object* member : *contain.getContainedItemsList())
+	{
+		const auto* ai = member->getAI();
+		const auto* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+		if (!locomotor || ai->isAttacking() || member->isEffectivelyDead() || contain.getMemberSlot(member->getID()) < 0)
+			continue;
+		const BodyDamageType damage = member->getBodyModule()->getDamageState();
+		const Real acceleration = locomotor->getMaxAcceleration(damage);
+		if (acceleration <= 0.0f)
+			continue;
+		const Real speed = std::min(launchSpeed, locomotor->getMaxSpeedForCondition(damage, member));
+		frames = std::max(frames, (speed - locomotor->getRetailScalarSpeed()) / acceleration);
+	}
+	frames = WWMath::Ceil(std::min(frames, anchorMaxSpeed / anchorAcceleration));
+	return frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()) ? static_cast<UnsignedInt>(frames) : 0;
+}
+#endif
 
 Bool exitHandsOverToFormation(const Object* anchor, const Object* member)
 {
@@ -486,14 +516,25 @@ UpdateSleepTime HordeAIUpdate::update()
 	{
 		m_cavalryTurn = turn;
 #if RTS_ZEROHOUR
+		if (m_cavalryLaunchFrames > 0)
+			--m_cavalryLaunchFrames;
 		if (locomotor && fabs(turn) > locomotor->getMaxTurnWithoutReform())
 		{
 			const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 			m_cavalryTurn = 0.0f;
 			m_cavalryReforming = TRUE;
+			m_cavalryLaunchFrames = 0;
 		}
-		if (m_cavalryReforming && (!isMoving() || contain->isHeadingAligned(horde->getOrientation(), FALSE)))
+		if (!isMoving())
+		{
 			m_cavalryReforming = FALSE;
+			m_cavalryLaunchFrames = 0;
+		}
+		else if (m_cavalryReforming && contain->isHeadingAligned(horde->getOrientation(), FALSE))
+		{
+			m_cavalryReforming = FALSE;
+			m_cavalryLaunchFrames = locomotor ? getCavalryLaunchFrames(*horde, *locomotor, *contain) : 0;
+		}
 #endif
 	}
 	else if (fabs(turn) > (locomotor ? locomotor->getMaxTurnWithoutReform() : FORMATION_REFORM_ANGLE))
@@ -789,6 +830,8 @@ void HordeAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
 		{"cavalry-reforming", [this](Xfer* block) { block->xferBool(&m_cavalryReforming); },
 			[this] { m_cavalryReforming = FALSE; }},
+		{"cavalry-reform-launch", [this](Xfer* block) { block->xferUnsignedInt(&m_cavalryLaunchFrames); },
+			[this] { m_cavalryLaunchFrames = 0; }},
 	});
 }
 

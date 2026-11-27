@@ -3348,7 +3348,10 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		? WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x) : obj->getOrientation();
 	if (RetailFileLayers::enabled() && m_retailScalarSpeed <= 0.25f * maxSpeed && obj->isKindOf(KINDOF_CAVALRY))
 	{
-		if (const HordeContain* horde = HordeContain::get(obj); horde && !horde->isHeadingAligned(desiredAngle))
+		const AIUpdateInterface* ai = obj->getAI();
+		const Bool pacingReform = ai && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate") &&
+			static_cast<const HordeAIUpdate*>(ai)->isPacingCavalryReform();
+		if (const HordeContain* horde = HordeContain::get(obj); horde && (pacingReform || !horde->isHeadingAligned(desiredAngle)))
 			desiredSpeed *= 0.1f;
 	}
 
