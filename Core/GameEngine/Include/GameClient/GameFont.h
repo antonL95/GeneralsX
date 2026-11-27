@@ -29,12 +29,17 @@
 
 #pragma once
 
+#include <map>
+#include <utility>
+
 #include "Common/SubsystemInterface.h"
 #include "Common/AsciiString.h"
 #include "Common/GameMemory.h"
 #include "GameClient/FontSubstitution.h"
 
 #include <vector>
+
+class INI;
 
 //-------------------------------------------------------------------------------------------------
 /** A font for use in the device independent game */
@@ -73,6 +78,7 @@ public:
 
 	GameFont *getFont( AsciiString name, Int pointSize, Bool bold );  ///< get a font pointer
 	GameFont *getFontPixels( AsciiString name, Int pixelSize, Bool bold );
+	Bool isFontAntialiased(AsciiString name, Int pointSize) const;
 	GameFont *getFontVariant( const GameFont *font, Bool bold );
 	GameFont *getUiFont( AsciiString name, Int designSize, Bool bold, Int screenWidth, Int screenHeight );
 	void releaseUnusedPixelFonts( const std::vector<const GameFont *>& inUse );
@@ -93,6 +99,8 @@ protected:
 
 	/// load the font data pointer based on everything else we already have set
 	virtual Bool loadFontData( GameFont *font ) = 0;
+	static void parseFontDefaults(INI *ini);
+	std::map<std::pair<AsciiString, Int>, Bool> m_fontAntialiasing;
 	/// release the font data pointer
 	virtual void releaseFontData( GameFont *font ) { };
 	virtual void releaseUnusedFontData() { }

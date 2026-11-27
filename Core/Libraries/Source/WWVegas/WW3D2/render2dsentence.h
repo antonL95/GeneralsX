@@ -134,8 +134,10 @@ public:
 	bool	Has_Glyph( WCHAR ch ) const;
 
 	void	Free_Glyph_Cache();
+	void	Set_Antialiased(bool enabled) { Antialiased = enabled; }
 
 private:
+	bool Antialiased = true;
 
 	//
 	//	Private methods

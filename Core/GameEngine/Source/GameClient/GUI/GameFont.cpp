@@ -30,6 +30,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameClient/GameFont.h"
+#include "Common/FileSystem.h"
+#include "Common/INI.h"
+#include "Common/INIException.h"
 #include "GameClient/UiScale.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -159,7 +162,40 @@ FontLibrary::~FontLibrary()
 //-------------------------------------------------------------------------------------------------
 void FontLibrary::init()
 {
+	m_fontAntialiasing.clear();
+	const char *path = "Data\\INI\\FontSettings.ini";
+	if (TheFileSystem && TheFileSystem->doesFileExist(path))
+	{
+		INI ini;
+		ini.load(path, INI_LOAD_OVERWRITE, nullptr, "FontDefaultSettings", parseFontDefaults);
+	}
+}
 
+void FontLibrary::parseFontDefaults(INI *ini)
+{
+	static const FieldParse fields[] = {
+		{ "Antialiased", INI::parseBool, nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	AsciiString name = ini->getNextQuotedAsciiString();
+	name.toLower();
+	const char *size = ini->getNextTokenOrNull();
+	const Int pointSize = size ? INI::scanInt(size) : 0;
+	if (size && pointSize <= 0)
+		throw INIException("FontDefaultSettings point size must be positive");
+	Bool antialiased = TRUE;
+	ini->initFromINI(&antialiased, fields);
+	TheFontLibrary->m_fontAntialiasing[{name, pointSize}] = antialiased;
+}
+
+Bool FontLibrary::isFontAntialiased(AsciiString name, Int pointSize) const
+{
+	name.toLower();
+	const auto sized = m_fontAntialiasing.find({name, pointSize});
+	if (sized != m_fontAntialiasing.end())
+		return sized->second;
+	const auto family = m_fontAntialiasing.find({name, 0});
+	return family == m_fontAntialiasing.end() || family->second;
 }
 
 //-------------------------------------------------------------------------------------------------

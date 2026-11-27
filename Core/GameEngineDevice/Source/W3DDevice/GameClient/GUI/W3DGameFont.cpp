@@ -321,6 +321,7 @@ Bool W3DFontLibrary::loadFontData( GameFont *font )
 	}
 
 	// assign font data
+	fontChar->Set_Antialiased(isFontAntialiased(font->nameString, font->pointSize));
 	font->fontData = fontChar;
 	font->height = fontChar->Get_Char_Height();
 

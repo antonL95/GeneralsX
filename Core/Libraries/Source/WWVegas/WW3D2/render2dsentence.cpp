@@ -1436,7 +1436,7 @@ FontCharsClass::Blit_Char (WCHAR ch, uint16 *dest_ptr, int dest_stride, int x, i
 		//
 		for ( int row = 0; row < CharHeight; row ++ ) {
 			for ( int col = 0; col < data->Width; col ++ ) {
-				const uint8 coverage = *src_ptr;
+				const uint8 coverage = Antialiased ? *src_ptr : (*src_ptr >= 128 ? 255 : 0);
 				uint16 curData = (coverage != 0 ? 0x0FFF : 0) | ((uint16)(coverage >> 4) << 12);
 				if (col<PixelOverlap) {
 					curData |= dest_ptr[col];
