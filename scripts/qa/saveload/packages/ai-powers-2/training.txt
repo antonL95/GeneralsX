@@ -223,4 +223,21 @@
 661 destroy Player_2 AiPowers3FreezeAlly 0
 661 destroy Player_1 AiPowers3FreezeEnemy 1
 661 destroy Player_1 AiPowers3FreezeEnemy 0
+690 ai-powers-economy Player_2 - 0 1000,100000
+690 create Player_2 AiPowers3ReinforcementsCaster 0 2870,2070,0
+900 powers-fire-state Player_2 AiPowers3ReinforcementsCaster 0 AiPowers3Reinforcements
+900 cash Player_2 - 0 0
+900 pw-cp Player_2 - 0
+901 create Player_2 AiPowers3CapacityBlocker 0 2900,2110,0
+901 ai-powers-economy Player_2 - 0 20000,400
+1065 powers-fire-state Player_2 AiPowers3ReinforcementsCaster 0 AiPowers3Reinforcements
+1065 pw-cp Player_2 - 0
+1066 destroy Player_2 AiPowers3CapacityBlocker 0
+1066 ai-powers-economy Player_2 - 0 20000,100000
+1270 powers-fire-state Player_2 AiPowers3ReinforcementsCaster 0 AiPowers3Reinforcements
+1270 powers-fire-state Player_2 AiPowers3ReinforcementsMarker 0
+1270 cash Player_2 - 0 0
+1270 pw-cp Player_2 - 0
+1271 destroy Player_2 AiPowers3ReinforcementsCaster 0
+1271 destroy Player_2 AiPowers3ReinforcementsMarker 0
 1436 destroy Player_1 AiPowers2DominateFootman 0

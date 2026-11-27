@@ -33,6 +33,16 @@ check() {
             return 1
         fi
     fi
+    if covers 900; then
+        expect 'TEST powers-fire-state frame=900 template=AiPowers3ReinforcementsCaster alive=1 ready=1' || return 1
+    fi
+    if covers 1065; then
+        expect 'TEST powers-fire-state frame=1065 template=AiPowers3ReinforcementsCaster alive=1 ready=1' || return 1
+    fi
+    if covers 1270; then
+        expect 'TEST powers-fire-state frame=1270 template=AiPowers3ReinforcementsCaster alive=1 ready=0' || return 1
+        expect 'TEST powers-fire-state frame=1270 template=AiPowers3ReinforcementsMarker alive=1' || return 1
+    fi
     if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2Healer ' "$log" | awk '
         /cond=.*UNPACKING/ { pending++ }
         END { exit (pending != 2) }

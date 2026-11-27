@@ -4,6 +4,7 @@
 
 #include "Common/ActionManager.h"
 #include "Common/AttributeModifierRules.h"
+#include "Common/Money.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -319,6 +320,16 @@ Bool shouldCastCombatFear(const Object& source, Real radius)
 			++enemyBalance;
 	}
 	return enemyBalance > 0;
+}
+
+Bool canCallReinforcements(const Player& player)
+{
+	constexpr UnsignedInt minimumCash = 1000;
+	if (player.getMoney()->countMoney() <= minimumCash)
+		return FALSE;
+	const Int capacity = player.getCommandPointsTotal();
+	const Int used = player.getCommandPointsUsed();
+	return capacity > 0 && static_cast<Int64>(used) * 4 < static_cast<Int64>(capacity) * 3;
 }
 
 UpdateSleepTime updateStancePolicy(Object& source, const Player& player, const CommandButton& button, Int policyStance)
@@ -899,7 +910,7 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
 	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
-		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE")
+		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" || policy == "AI_SPELLBOOK_CALLTHEHORDE")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -1004,10 +1015,13 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		return retailPolicyCooldown;
 	}
 
-	if (policy == "AI_SPECIAL_POWER_ELENDIL")
+	const Bool combatFear = policy == "AI_SPECIAL_POWER_ELENDIL";
+	const Bool reinforcements = policy == "AI_SPELLBOOK_CALLTHEHORDE";
+	if (combatFear || reinforcements)
 	{
 		const UnsignedInt options = button->getOptions();
-		if (!shouldCastCombatFear(*source, data->m_specialPowerRadius) ||
+		const Bool eligible = combatFear ? shouldCastCombatFear(*source, data->m_specialPowerRadius) : canCallReinforcements(*player);
+		if (!eligible ||
 			!button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) ||
 			!power->isValidRetailTarget(source, nullptr, nullptr, CMD_FROM_AI) ||
 			!rollRetailPolicyActivation(*player))
