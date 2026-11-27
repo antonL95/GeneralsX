@@ -7460,6 +7460,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				unit->getExperienceTracker()->setScriptRetailExperience(pAction->getParameter(1)->getInt());
 			return;
 		}
+		case ScriptAction::UNIT_SET_MAX_LEVEL:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (unit)
+				unit->getExperienceTracker()->setRetailRankCap(pAction->getParameter(1)->getInt());
+			return;
+		}
 		case ScriptAction::UNIT_TELEPORT_TO_WAYPOINT:
 		{
 			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());

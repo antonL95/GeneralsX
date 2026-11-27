@@ -684,11 +684,18 @@ void ExperienceTracker::advanceRetailLevel(Real experience, Bool feedback)
 	}
 }
 
+Bool ExperienceTracker::isBelowRetailRankCap() const
+{
+	return m_retailRankCap < 1 || getRank() < m_retailRankCap;
+}
+
 void ExperienceTracker::addRetailExperience(Real points, Bool scale)
 {
 	if (points <= 0.0f || !isTrainable())
 		return;
 	initializeRetailLevel();
+	if (!isBelowRetailRankCap())
+		return;
 	if (scale)
 	{
 		points = m_experienceScalar * points * multiplayerExperienceMultiplier(m_parent);
@@ -729,7 +736,7 @@ void ExperienceTracker::addScriptRetailExperience(Real points)
 	if (!recipient->isTrainable() || !std::isfinite(points))
 		return;
 	recipient->initializeRetailLevel();
-	if (!recipient->m_retailThreshold)
+	if (!recipient->m_retailThreshold || !recipient->isBelowRetailRankCap())
 		return;
 	points *= recipient->m_experienceScalar * multiplayerExperienceMultiplier(recipient->m_parent);
 	points *= ExperienceLevelStore::experienceScalar(recipient->m_parent, recipient->getRank(), recipient->m_retailStartingRank);

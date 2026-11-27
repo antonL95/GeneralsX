@@ -32,6 +32,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -290,6 +291,7 @@ void ExperienceTracker::crc( Xfer *xfer )
 		xfer->xferInt(&m_retailThreshold);
 		xfer->xferInt(&m_retailStartingRank);
 		xfer->xferReal(&m_retailExperience);
+		xferRetailBlocks(xfer, TRUE);
 	}
 	xfer->xferInt( &m_currentExperience );
 	xfer->xferUser( &m_currentLevel, sizeof( VeterancyLevel ) );
@@ -315,7 +317,7 @@ void ExperienceTracker::xfer( Xfer *xfer )
 	XferVersion currentVersion = 2;
 #endif
 	if (RetailFileLayers::enabled())
-		currentVersion = 3;
+		currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -342,6 +344,19 @@ void ExperienceTracker::xfer( Xfer *xfer )
 		xfer->xferInt(&m_retailStartingRank);
 		xfer->xferReal(&m_retailExperience);
 	}
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
+}
+
+void ExperienceTracker::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "experience-rank-cap", [this](Xfer* transfer) {
+			transfer->xferInt(&m_retailRankCap);
+		}, [this] {
+			m_retailRankCap = 0;
+		} }
+	});
 }
 
 //-----------------------------------------------------------------------------

@@ -51,6 +51,12 @@ check() {
             expect "TEST map-unit-ops health frame=$frame partial=1 match=1 reject=1 member-excluded=1"
         fi
     done
+    if covers 243; then
+        expect "TEST map-unit-ops xp cap frame=243 set=1 named=1 team=1 cleared=0"
+    fi
+    if covers 249; then
+        expect "TEST map-unit-ops xp cap frame=249 set=1 named=1 team=1 cleared=1"
+    fi
     for frame in 240 248; do
         if covers "$frame"; then
             expect "TEST map-unit-ops team-xp frame=$frame sink=1 members=1"

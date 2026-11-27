@@ -53,6 +53,7 @@ public:
 	void addRetailExperience(Real points, Bool scale = TRUE);
 	void addScriptRetailExperience(Real points);
 	void setScriptRetailExperience(Int points);
+	void setRetailRankCap(Int rank) { m_retailRankCap = rank; }
 	void advanceRetailLevel(Real experience, Bool feedback);
 	void setMinRetailRank(Int rank, Bool feedback = FALSE);
 	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE);
@@ -81,7 +82,9 @@ public:
 	virtual void loadPostProcess() override;
 
 private:
+	Bool isBelowRetailRankCap() const;
 	ExperienceTracker* resolveScriptExperienceSink(Real* scaledPoints);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	Object*						m_parent;														///< Object I am owned by
 	VeterancyLevel		m_currentLevel;											///< Level of experience
@@ -91,5 +94,6 @@ private:
 	Bool							m_isTrainable;											///< Can I gain experience?
 	Int m_retailThreshold = 0;
 	Int m_retailStartingRank = 1;
+	Int m_retailRankCap = 0;
 	Real m_retailExperience = 0.0f;
 };

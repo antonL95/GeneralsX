@@ -617,6 +617,68 @@ End
 		ctx.frame, baseline, amount, missing);
 }
 
+void experienceCapProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject();
+	Object* receiver = ctx.findTarget();
+	if (!source || !receiver)
+		return;
+	const Bool first = ctx.frame == 243;
+	auto* recipient = receiver->getExperienceTracker();
+	if (first)
+	{
+		source->setName("MapScriptCappedXPSource");
+		receiver->setName("MapScriptCappedXPReceiver");
+		TheScriptEngine->addObjectToCache(source);
+		TheScriptEngine->addObjectToCache(receiver);
+		source->getExperienceTracker()->setExperienceSink(receiver->getID());
+		recipient->setMinRetailRank(2);
+	}
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(591);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	const auto setCap = [&](Int cap) {
+		if (!definition || definition->m_internalName != "UNIT_SET_MAX_LEVEL" ||
+			definition->getNumParameters() != 2 || definition->getParameterType(0) != Parameter::UNIT ||
+			definition->getParameterType(1) != Parameter::INT)
+			return FALSE;
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString("MapScriptCappedXPReceiver");
+		action->getParameter(1)->friend_setInt(cap);
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		deleteInstance(action);
+		return TRUE;
+	};
+	const Bool assigned = !first || setCap(2);
+	auto* named = newInstance(ScriptAction)(ScriptAction::UNIT_GIVE_EXPERIENCE_POINTS);
+	named->getParameter(0)->friend_setString("MapScriptCappedXPSource");
+	named->getParameter(1)->friend_setInt(10);
+	TheScriptEngine->friend_executeAction(named, nullptr);
+	const Bool namedBlocked = recipient->getRetailExperience() == 20.0f && recipient->getRank() == 2;
+
+	Team* original = source->getTeam();
+	Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+	source->setTemporaryTeam(team);
+	auto* grant = newInstance(ScriptAction)(ScriptAction::TEAM_GIVE_EXPERIENCE_POINTS);
+	grant->getParameter(0)->friend_setString("<This Team>");
+	grant->getParameter(1)->friend_setInt(10);
+	const Real beforeTeam = recipient->getRetailExperience();
+	TheScriptEngine->friend_executeAction(grant, team);
+	const Bool teamBlocked = recipient->getRetailExperience() == beforeTeam && recipient->getRank() == 2;
+	deleteInstance(grant);
+	source->setTemporaryTeam(original);
+	deleteInstance(team);
+
+	Bool cleared = FALSE;
+	if (!first && setCap(0))
+	{
+		TheScriptEngine->friend_executeAction(named, nullptr);
+		cleared = recipient->getRetailExperience() > beforeTeam && recipient->getRank() == 2;
+	}
+	deleteInstance(named);
+	std::fprintf(stderr, "TEST map-unit-ops xp cap frame=%u set=%d named=%d team=%d cleared=%d\n",
+		ctx.frame, assigned, namedBlocked, teamBlocked, cleared);
+}
+
 void teleportProbe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -814,6 +876,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-garrison-team", teamGarrisonProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-set-xp", setExperienceProbe);
+	registerAction("map-unit-ops-xp-cap", experienceCapProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);
 	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
 	registerAction("map-unit-ops-horde-remove", removeHordeMember);
