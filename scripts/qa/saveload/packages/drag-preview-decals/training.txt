@@ -1,0 +1,10 @@
+206 create Player_1 DragPreviewFoot 0 2350,3000,0
+206 create Player_1 DragPreviewBow 0 2350,3150,0
+206 create Player_1 DragPreviewHero 0 2450,3075,0
+250 select Player_1 DragPreviewFoot 0
+250 selectadd Player_1 DragPreviewBow 0
+250 selectadd Player_1 DragPreviewHero 0
+252 drag-formation-preview-decals Player_1 - 0 1 2500 3075 1.5707964
+260 destroy Player_1 DragPreviewFoot 0
+260 destroy Player_1 DragPreviewBow 0
+260 destroy Player_1 DragPreviewHero 0

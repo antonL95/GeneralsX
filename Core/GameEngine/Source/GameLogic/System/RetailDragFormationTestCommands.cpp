@@ -4,12 +4,15 @@
 #if !RTS_GENERALS
 #include <cstdio>
 #include <cstdlib>
+#include <map>
+#include <string>
 #include <string_view>
 
 #include "Common/MessageStream.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameClient/View.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
@@ -131,6 +134,43 @@ void dragFormationPreview(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST drag-preview %u %d %d %.1f\n", ctx.frame, preview.active ? 1 : 0,
 		preview.templateIndex, preview.dragLength);
 }
+
+void dragFormationPreviewDecals(const RetailTestCommands::Context& ctx)
+{
+	Coord3D anchor;
+	Real angle = 0.0f;
+	Real dragLength = 0.0f;
+	Int templateIndex = -1;
+	if (ctx.hasPosition)
+	{
+		anchor = ctx.groundLocation();
+		angle = ctx.angle;
+		dragLength = 80.0f;
+		templateIndex = std::atoi(ctx.argument);
+	}
+	else
+	{
+		const InGameUI::FormationDragPreview& preview = TheInGameUI->getFormationDragPreview();
+		if (!preview.active)
+		{
+			std::fprintf(stderr, "TEST drag-preview-decals %u total=0\n", ctx.frame);
+			return;
+		}
+		anchor = preview.anchor;
+		angle = preview.angle;
+		dragLength = preview.dragLength;
+		templateIndex = preview.templateIndex;
+	}
+	const std::vector<RetailWorldUI::FormationPreviewStamp> stamps =
+		RetailWorldUI::collectFormationPreviewStamps(anchor, angle, dragLength, templateIndex);
+	std::map<std::string, size_t> counts;
+	for (const RetailWorldUI::FormationPreviewStamp& stamp : stamps)
+		++counts[stamp.texture.str()];
+	std::fprintf(stderr, "TEST drag-preview-decals %u total=%zu", ctx.frame, stamps.size());
+	for (const auto& entry : counts)
+		std::fprintf(stderr, " %s=%zu", entry.first.c_str(), entry.second);
+	std::fprintf(stderr, "\n");
+}
 }
 #endif
 
@@ -146,6 +186,7 @@ void registerRetailDragFormationTestCommands()
 	registerAction("drag-formation-hold", dragFormationHold);
 	registerAction("drag-formation-release", dragFormationRelease);
 	registerAction("drag-formation-preview", dragFormationPreview);
+	registerAction("drag-formation-preview-decals", dragFormationPreviewDecals);
 #endif
 }
 }

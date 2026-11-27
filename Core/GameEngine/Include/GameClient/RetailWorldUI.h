@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Common/AsciiString.h"
 #include "Common/GameCommon.h"
 #include "Common/GameType.h"
 
 #include <deque>
 #include <map>
+#include <vector>
 
 class Drawable;
 class GameMessage;
@@ -23,6 +25,16 @@ void drawLifetimeBar(Int x, Int y, Int width, Int height, Real remaining);
 void showPayout(const Object& source, Int amount, Bool bounty);
 void drawSelection(View& view, const IRegion2D* dragRegion,
 	std::map<DrawableID, WorldGroundDecal>& decals);
+struct FormationPreviewStamp
+{
+	AsciiString texture;
+	Coord3D position;
+	Real width;
+	Real height;
+	Real angle;
+};
+std::vector<FormationPreviewStamp> collectFormationPreviewStamps(const Coord3D& anchor, Real angle,
+	Real dragLength, Int templateIndex);
 void drawFormationPreview(std::deque<WorldGroundDecal>& decals);
 void drawTerrainClaims(View& view, const Player& player, const Object* site = nullptr, Real siteRadius = 0.0f);
 void drawOrder(View& view, const Coord3D& position, Bool attack, UnsignedInt age);
