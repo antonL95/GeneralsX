@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "Common/MultiplayerSettings.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
@@ -43,6 +44,13 @@ void checkFontDefaults(const RetailTestCommands::Context &ctx)
 		TheFontLibrary->isFontAntialiased("FixedSys", 12),
 		TheFontLibrary->isFontAntialiased("Courier New", 12));
 }
+
+void checkAlteredBorder(const RetailTestCommands::Context &ctx)
+{
+	const CommandButton *button = TheControlBar->findCommandButton("UiIniAlteredBorderFixture");
+	const Bool altered = button && button->getCommandButtonMappedBorderType() == COMMAND_BUTTON_BORDER_ALTERED;
+	std::fprintf(stderr, "TEST ui-ini-button-border frame=%u altered=%d\n", ctx.frame, altered);
+}
 }
 #endif
 
@@ -55,6 +63,7 @@ void registerRetailUiIniMiscTestCommands()
 	registerAction("ui-ini-placement-claim-check", checkPlacementClaim);
 	registerAction("ui-ini-transition-images-check", checkTransitionImages);
 	registerAction("ui-ini-fonts-check", checkFontDefaults);
+	registerAction("ui-ini-border-check", checkAlteredBorder);
 #endif
 }
 }

@@ -149,6 +149,7 @@ public:
 	Color m_borderActionColor;								///< we can setup the color for the button border colors
 	Color m_borderUpgradeColor;								///< we can setup the color for the button border colors
 	Color m_borderSystemColor;								///< we can setup the color for the button border colors
+	Color m_borderAlteredColor = GAME_COLOR_UNDEFINED;
 
 	Color m_commandBarBorderColor;
 

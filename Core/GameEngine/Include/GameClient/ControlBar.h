@@ -323,6 +323,7 @@ enum CommandButtonMappedBorderType CPP_11(: Int)
 	COMMAND_BUTTON_BORDER_UPGRADE,
 	COMMAND_BUTTON_BORDER_ACTION,
 	COMMAND_BUTTON_BORDER_SYSTEM,
+	COMMAND_BUTTON_BORDER_ALTERED,
 
 	COMMAND_BUTTON_BORDER_COUNT
 };
@@ -334,6 +335,7 @@ static const LookupListRec CommandButtonMappedBorderTypeNames[] =
 	{ "UPGRADE",			COMMAND_BUTTON_BORDER_UPGRADE },
 	{ "ACTION",				COMMAND_BUTTON_BORDER_ACTION },
 	{ "SYSTEM",				COMMAND_BUTTON_BORDER_SYSTEM },
+	{ "ALTERED",			COMMAND_BUTTON_BORDER_ALTERED },
 
 	{ nullptr, 0	}
 };
@@ -1273,12 +1275,13 @@ private:
 	Color m_commandButtonBorderActionColor;
 	Color m_commandButtonBorderUpgradeColor;
 	Color m_commandButtonBorderSystemColor;
+	Color m_commandButtonBorderAlteredColor = GAME_COLOR_UNDEFINED;
 
 	Color m_commandBarBorderColor;
 
 	void setCommandBarBorder( GameWindow *button, CommandButtonMappedBorderType type);
 public:
-	void updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system );
+	void updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system, Color altered);
 	CommandAvailability queryRetailCommandAvailability(const CommandButton *command, Object *obj) const { return getCommandAvailability(command, obj, nullptr); }
 
 private:

@@ -85,6 +85,7 @@ const FieldParse ControlBarSchemeManager::m_controlBarSchemeFieldParseTable[] =
 	{ "ButtonBorderActionColor",		INI::parseColorInt,						nullptr, offsetof( ControlBarScheme, m_borderActionColor ) },
 	{ "ButtonBorderUpgradeColor",		INI::parseColorInt,						nullptr, offsetof( ControlBarScheme, m_borderUpgradeColor ) },
 	{ "ButtonBorderSystemColor",		INI::parseColorInt,						nullptr, offsetof( ControlBarScheme, m_borderSystemColor ) },
+	{ "ButtonBorderAlteredColor", INI::parseColorInt, nullptr, offsetof(ControlBarScheme, m_borderAlteredColor) },
 	{ "OptionsButtonEnable",				INI::parseMappedImage,				nullptr, offsetof( ControlBarScheme, m_optionsButtonEnable ) },
 	{ "OptionsButtonHightlited",				INI::parseMappedImage,				nullptr, offsetof( ControlBarScheme, m_optionsButtonHightlited ) },
 	{ "OptionsButtonPushed",				INI::parseMappedImage,				nullptr, offsetof( ControlBarScheme, m_optionsButtonPushed ) },
@@ -419,7 +420,8 @@ void ControlBarScheme::init()
 		TheControlBar->updateBuildQueueDisabledImages( m_buttonQueueImage );
 		TheControlBar->updateRightHUDImage(m_rightHUDImage);
 		TheControlBar->updateBuildUpClockColor( m_buildUpClockColor );
-		TheControlBar->updateCommandBarBorderColors(m_borderBuildColor, m_borderActionColor, m_borderUpgradeColor,m_borderSystemColor);
+		TheControlBar->updateCommandBarBorderColors(m_borderBuildColor, m_borderActionColor, m_borderUpgradeColor,
+			m_borderSystemColor, m_borderAlteredColor);
 		TheControlBar->updateBorderColor(m_commandBarBorderColor);
 		//TheControlBar->updateCommandMarkerImage(m_commandMarkerImage);
 		TheControlBar->updateSlotExitImage(m_commandMarkerImage);

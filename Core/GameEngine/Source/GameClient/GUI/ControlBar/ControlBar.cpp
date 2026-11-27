@@ -1298,7 +1298,8 @@ ControlBar::ControlBar()
 	m_generalButtonHighlight = nullptr;
 	m_genArrow = nullptr;
 	m_sideSelectAnimateDown = FALSE;
-	updateCommandBarBorderColors(GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED);
+	updateCommandBarBorderColors(GAME_COLOR_UNDEFINED, GAME_COLOR_UNDEFINED, GAME_COLOR_UNDEFINED,
+		GAME_COLOR_UNDEFINED, GAME_COLOR_UNDEFINED);
 
 	m_radarAttackGlowOn = FALSE;
 	m_remainingRadarAttackGlowFrames = 0;
@@ -2942,6 +2943,11 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 		}
 
 		//-------------------------------------------------------------------------------------------------
+		case COMMAND_BUTTON_BORDER_ALTERED:
+			GadgetButtonSetBorder(button, m_commandButtonBorderAlteredColor,
+				m_commandButtonBorderAlteredColor != GAME_COLOR_UNDEFINED);
+			break;
+
 		case COMMAND_BUTTON_BORDER_NONE:
 		default:
 			GadgetButtonSetBorder(button, GAME_COLOR_UNDEFINED, FALSE);
@@ -3479,12 +3485,13 @@ void ControlBar::updateBuildUpClockColor( Color color)
 
 
 
-void ControlBar::updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system )
+void ControlBar::updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system, Color altered)
 {
 	m_commandButtonBorderBuildColor = build;
 	m_commandButtonBorderActionColor = action;
 	m_commandButtonBorderUpgradeColor = upgrade;
 	m_commandButtonBorderSystemColor = system;
+	m_commandButtonBorderAlteredColor = altered;
 }
 
 // ---------------------------------------------------------------------------------------
