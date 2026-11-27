@@ -385,11 +385,13 @@ void GameLogic::destroyAllObjectsImmediate()
 		obj->setEffectivelyDead(true);
 	}
 
-	// destroy all remaining objects
-	for( obj = m_objList; obj; obj = nextObj )
 	{
-		nextObj = obj->getNextObject();
-		destroyObject( obj );
+		Pathfinder::WallRemovalBatch wallRemoval(*TheAI->pathfinder());
+		for( obj = m_objList; obj; obj = nextObj )
+		{
+			nextObj = obj->getNextObject();
+			destroyObject( obj );
+		}
 	}
 
 	// process the destroy list immediately

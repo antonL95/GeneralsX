@@ -261,6 +261,17 @@ public:
 
 	void addWallPiece(Object *wallPiece); // Adds a wall piece.
 	void removeWallPiece(Object *wallPiece);  // Removes a wall piece.
+	class WallRemovalBatch
+	{
+	public:
+		explicit WallRemovalBatch(Pathfinder& pathfinder);
+		~WallRemovalBatch();
+		WallRemovalBatch(const WallRemovalBatch&) = delete;
+		WallRemovalBatch& operator=(const WallRemovalBatch&) = delete;
+
+	private:
+		Pathfinder& m_pathfinder;
+	};
 	void dropUnsupportedWallOccupants(const Object& wall);
 	Real getWallHeight() {return m_wallHeight;}
 	Real getWallHeightAt(const Coord3D& position);
@@ -403,6 +414,8 @@ private:
 
 	ObjectID			m_wallPieces[MAX_WALL_PIECES];
 	std::vector<ObjectID> m_retailWallPieces;
+	Int m_wallRemovalBatchDepth = 0;
+	Bool m_wallRemovalPending = FALSE;
 	std::set<ObjectID> m_retailTrackedFootprints;
 	void refreshRetailWallLayer();
 	Int						m_numWallPieces;

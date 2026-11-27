@@ -276,6 +276,7 @@ static Bool isRetailWalkableWall(const Object* object)
 
 void Pathfinder::refreshRetailWallLayer()
 {
+	m_wallRemovalPending = FALSE;
 	if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
 	{
 		m_layers[LAYER_WALL].rebuildWallCells(m_extent, m_retailWallPieces);
@@ -289,6 +290,18 @@ void Pathfinder::refreshRetailWallLayer()
 			}
 		}
 	}
+}
+
+Pathfinder::WallRemovalBatch::WallRemovalBatch(Pathfinder& pathfinder)
+	: m_pathfinder(pathfinder)
+{
+	++m_pathfinder.m_wallRemovalBatchDepth;
+}
+
+Pathfinder::WallRemovalBatch::~WallRemovalBatch()
+{
+	if (--m_pathfinder.m_wallRemovalBatchDepth == 0 && m_pathfinder.m_wallRemovalPending)
+		m_pathfinder.refreshRetailWallLayer();
 }
 
 void Pathfinder::addWallPiece(Object *wallPiece)
@@ -330,7 +343,10 @@ void Pathfinder::removeWallPiece(Object *wallPiece)
 		{
 			TheTerrainLogic->removeAuthoredRamps(id);
 			m_retailWallPieces.erase(pos);
-			refreshRetailWallLayer();
+			if (m_wallRemovalBatchDepth > 0)
+				m_wallRemovalPending = TRUE;
+			else
+				refreshRetailWallLayer();
 		}
 		return;
 	}

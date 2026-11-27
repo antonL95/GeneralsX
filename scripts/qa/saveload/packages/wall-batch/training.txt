@@ -1,0 +1,14 @@
+230 create Player_1 WallBatchKeep 0 3800,2940,0
+230 create Player_1 WallBatchSerial 0 3720,2940,0
+230 create Player_1 WallBatchSerial 0 3800,2940,0
+230 create Player_1 WallBatchSerial 0 3880,2940,0
+230 create Player_1 WallBatchKeep 0 4160,2940,0
+230 create Player_1 WallBatchGrouped 0 4080,2940,0
+230 create Player_1 WallBatchGrouped 0 4160,2940,0
+230 create Player_1 WallBatchGrouped 0 4240,2940,0
+249 wall-batch-state - - 0 - 3800 2940
+250 wall-batch-delete Player_1 WallBatchSerial 0
+251 wall-batch-state - - 0 - 3800 2940
+259 wall-batch-state - - 0 - 4160 2940
+260 wall-batch-delete Player_1 WallBatchGrouped 0 batch
+261 wall-batch-state - - 0 - 4160 2940
