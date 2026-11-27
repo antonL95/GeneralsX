@@ -51,6 +51,7 @@
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
 
+#include "GameLogic/AI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ObjectTypes.h"
@@ -6678,14 +6679,24 @@ const AttackPriorityInfo *ScriptEngine::getDefaultAttackInfo()
 //-------------------------------------------------------------------------------------------------
 const AttackPriorityInfo *ScriptEngine::getAttackInfo(const AsciiString& name)
 {
-	Int i;
-	for (i=1; i<m_numAttackInfo; i++) {
-		if (m_attackPriorityInfo[i].getName() == name) {
-			return &m_attackPriorityInfo[i];
+	if (const AttackPriorityInfo* info = findAttackInfo(name, FALSE))
+		return info;
+	if (RetailFileLayers::enabled() && TheAI)
+	{
+		const auto& definitions = TheAI->getAiData()->m_attackPriorityDefinitions;
+		const auto found = definitions.find(name);
+		if (found != definitions.end())
+		{
+			if (AttackPriorityInfo* info = findAttackInfo(name, TRUE))
+			{
+				info->friend_setDefaultPriority(found->second.defaultPriority);
+				for (const auto& [target, value] : found->second.targets)
+					info->setPriority(TheThingFactory->findTemplate(target, FALSE), value);
+				return info;
+			}
 		}
 	}
-	// Note - m_attackPriorityInfo[0] is the default info, with an empty name.
-	return &m_attackPriorityInfo[0];
+	return getDefaultAttackInfo();
 }
 
 //-------------------------------------------------------------------------------------------------

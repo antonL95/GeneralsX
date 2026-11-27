@@ -33,6 +33,7 @@
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
+#include "GameLogic/AI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -147,7 +148,7 @@ UpdateSleepTime FireSpreadUpdate::update()
 // but the first (closest).
 //
 			Object* objectToLight = ThePartitionManager->getClosestObject(getObject(), d->m_spreadTryRange, FROM_CENTER_3D, filters);
-			if (!objectToLight && RetailFileLayers::enabled() && TheTerrainLogic)
+			if (!objectToLight && d->m_spreadTryRange > 0.0f && RetailFileLayers::enabled() && TheTerrainLogic && TheAI && TheAI->getAiData()->m_allowForestFires)
 				objectToLight = TheTerrainLogic->materializeFlammableMapTree(*me->getPosition(), d->m_spreadTryRange);
 			if( objectToLight )
 			{

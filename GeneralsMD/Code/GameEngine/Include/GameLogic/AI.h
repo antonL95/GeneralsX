@@ -34,6 +34,7 @@
 #include "Common/GameType.h"
 #include "GameLogic/Damage.h"
 #include "Common/STLTypedefs.h"
+#include <map>
 
 class AIGroup;
 class AttackPriorityInfo;
@@ -139,6 +140,12 @@ public:
 class TAiData : public Snapshot
 {
 public:
+	struct AttackPriorityDefinition
+	{
+		Int defaultPriority = 1;
+		std::map<AsciiString, Int> targets;
+	};
+
 	TAiData();
 	~TAiData();
 
@@ -181,6 +188,16 @@ public:
 		 effective priority for powerplant is 8 (15 -(700/100).  So the tanks
 		 would be attacked first because their distance weighted priority is greater. */
 	Real m_attackPriorityDistanceModifier; // Distance to reduce a relative AttackPriority by 1.
+	std::map<AsciiString, AttackPriorityDefinition> m_attackPriorityDefinitions;
+	Bool m_useFormations = TRUE;
+	Real m_formationEnemyDistance = 600.0f;
+	Real m_narrowPassageScale = 1.0f;
+	Bool m_allowForestFires = FALSE;
+	Bool m_useLowLodTrees = FALSE;
+	Real m_lowLodTreeScale = 0.55f;
+	AsciiString m_lowLodTreeName;
+	AsciiString m_lowLodTreeNameNoGrab;
+	AsciiString m_lowLodTreeNameNoHarvest;
 
 
 	/*

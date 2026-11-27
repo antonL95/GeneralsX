@@ -39,6 +39,11 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
+#if !RTS_GENERALS
+#include "Common/GameLOD.h"
+#include "Common/ThingFactory.h"
+#include "GameLogic/AI.h"
+#endif
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
@@ -171,7 +176,25 @@ Bool W3DTreeDraw::placeMapVegetation(const ThingTemplate& thing, const Dict& pro
 	Bool hasScale;
 	const NameKeyType scaleKey = TheNameKeyGenerator->nameToKey("objectPrototypeScale");
 	const Real mapScale = properties.getReal(scaleKey, &hasScale);
-	const Real scale = thing.getAssetScale() * (hasScale ? mapScale : 1.0f);
+	Real scale = thing.getAssetScale() * (hasScale ? mapScale : 1.0f);
+#if !RTS_GENERALS
+	const TAiData* rules = TheAI ? TheAI->getAiData() : nullptr;
+	if (rules && rules->m_useLowLodTrees && thing.isKindOf(KINDOF_TREE) &&
+		TheGameLODManager && TheGameLODManager->getStaticLODLevel() == STATIC_GAME_LOD_VERY_LOW &&
+		std::isfinite(rules->m_lowLodTreeScale) && rules->m_lowLodTreeScale > 0.0f)
+	{
+		const auto& tree = thing.getRotWKObjectData();
+		const AsciiString& name = tree.isGrabbable ? rules->m_lowLodTreeName
+			: tree.isHarvestable ? rules->m_lowLodTreeNameNoGrab : rules->m_lowLodTreeNameNoHarvest;
+		const ThingTemplate* replacement = name.isEmpty() ? nullptr : TheThingFactory->findTemplate(name, FALSE);
+		const W3DTreeDrawModuleData* lowDetail = replacement ? getMapDrawData(*replacement) : nullptr;
+		if (lowDetail)
+		{
+			data = lowDetail;
+			scale = rules->m_lowLodTreeScale;
+		}
+	}
+#endif
 	const DrawableID id = TheGameClient->allocDrawableID();
 	const Bool added = std::isfinite(scale) && scale > 0.0f && (prop
 		? TheTerrainRenderObject->addProp(static_cast<Int>(id), pos, angle, scale, data->m_modelName)

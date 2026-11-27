@@ -1663,7 +1663,10 @@ Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const
 			break;
 
 		Coord3D target = bend;
-		for (Real scale = 1.0f; scale * scale * offsetSquared >= sqr(PATHFIND_CELL_SIZE_F); scale *= 0.5f)
+		const Real passageScale = TheAI->getAiData()->m_narrowPassageScale;
+		const Real firstReduction = passageScale > 0.0f && passageScale < 1.0f ? passageScale : 0.5f;
+		for (Real scale = 1.0f; scale * scale * offsetSquared >= sqr(PATHFIND_CELL_SIZE_F);
+			scale = scale == 1.0f ? firstReduction : scale * 0.5f)
 		{
 			Coord3D offsetBend = bend;
 			offsetBend.x += scale * offset.x;
@@ -1772,6 +1775,14 @@ Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType c
 	center.x /= movers.size();
 	center.y /= movers.size();
 	center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
+	const Real enemyDistance = TheAI->getAiData()->m_formationEnemyDistance;
+	if (enemyDistance > 0.0f && std::isfinite(enemyDistance) &&
+		TheAI->findClosestEnemy(movers.front().object, enemyDistance,
+			AI::IGNORE_INSIGNIFICANT_BUILDINGS | AI::UNFOGGED | AI::USE_HORDE_VISION))
+	{
+		useIndividualGroundOrders = TRUE;
+		return FALSE;
+	}
 	Real rotation = 0.0f;
 	const Real travelX = pos->x - center.x;
 	const Real travelY = pos->y - center.y;
@@ -1923,7 +1934,10 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 	if (retailMove)
 	{
 		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
-		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, useIndividualGroundOrders);
+		if (TheAI->getAiData()->m_useFormations)
+			didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, useIndividualGroundOrders);
+		else
+			useIndividualGroundOrders = TRUE;
 	}
 
 

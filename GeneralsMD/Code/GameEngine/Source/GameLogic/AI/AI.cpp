@@ -138,6 +138,26 @@ void AISideBuildList::addInfo(BuildListInfo *info)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+static void parseRetailAttackPriorityTarget(INI* ini, void*, void* store, const void*)
+{
+	const AsciiString target(ini->getNextToken());
+	auto& targets = *static_cast<std::map<AsciiString, Int>*>(store);
+	targets[target] = INI::scanInt(ini->getNextToken());
+}
+
+static void parseRetailAttackPriority(INI* ini, void* instance, void*, const void*)
+{
+	static const FieldParse fields[] = {
+		{ "Default", INI::parseInt, nullptr, offsetof(TAiData::AttackPriorityDefinition, defaultPriority) },
+		{ "Target", parseRetailAttackPriorityTarget, nullptr, offsetof(TAiData::AttackPriorityDefinition, targets) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	auto& data = *static_cast<TAiData*>(instance);
+	auto& definition = data.m_attackPriorityDefinitions[AsciiString(ini->getNextToken())];
+	definition.targets.clear();
+	ini->initFromINI(&definition, fields);
+}
+
 static const FieldParse TheAIFieldParseTable[] =
 {
 
@@ -174,6 +194,16 @@ static const FieldParse TheAIFieldParseTable[] =
 
 
 	{ "AttackPriorityDistanceModifier", INI::parseReal,nullptr, offsetof( TAiData, m_attackPriorityDistanceModifier) },
+	{ "AttackPriority", parseRetailAttackPriority, nullptr, 0 },
+	{ "UseFormations", INI::parseBool, nullptr, offsetof(TAiData, m_useFormations) },
+	{ "FormationEnemyDistance", INI::parseReal, nullptr, offsetof(TAiData, m_formationEnemyDistance) },
+	{ "NarrowPassageScale", INI::parseReal, nullptr, offsetof(TAiData, m_narrowPassageScale) },
+	{ "AllowForestFires", INI::parseBool, nullptr, offsetof(TAiData, m_allowForestFires) },
+	{ "UseLowLODTrees", INI::parseBool, nullptr, offsetof(TAiData, m_useLowLodTrees) },
+	{ "LowLodTreeScale", INI::parseReal, nullptr, offsetof(TAiData, m_lowLodTreeScale) },
+	{ "LowLodTreeName", INI::parseAsciiString, nullptr, offsetof(TAiData, m_lowLodTreeName) },
+	{ "LowLodTreeNameNoGrab", INI::parseAsciiString, nullptr, offsetof(TAiData, m_lowLodTreeNameNoGrab) },
+	{ "LowLodTreeNameNoHarvest", INI::parseAsciiString, nullptr, offsetof(TAiData, m_lowLodTreeNameNoHarvest) },
  	{ "MaxRecruitRadius",				INI::parseReal,nullptr,		offsetof( TAiData, m_maxRecruitDistance ) },
 	{ "SkirmishBaseDefenseExtraDistance",	INI::parseReal,nullptr,	offsetof( TAiData, m_skirmishBaseDefenseExtraDistance ) },
 
@@ -1064,6 +1094,31 @@ void TAiData::crc( Xfer *xfer )
 	xfer->xferReal( &m_skirmishBaseDefenseExtraDistance );
 	xfer->xferReal( &m_repulsedDistance );
 	xfer->xferBool( &m_enableRepulsors );
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferBool(&m_useFormations);
+		xfer->xferReal(&m_formationEnemyDistance);
+		xfer->xferReal(&m_narrowPassageScale);
+		xfer->xferBool(&m_allowForestFires);
+		UnsignedInt count = static_cast<UnsignedInt>(m_attackPriorityDefinitions.size());
+		xfer->xferUnsignedInt(&count);
+		for (const auto& [name, definition] : m_attackPriorityDefinitions)
+		{
+			AsciiString key = name;
+			xfer->xferAsciiString(&key);
+			Int priority = definition.defaultPriority;
+			xfer->xferInt(&priority);
+			count = static_cast<UnsignedInt>(definition.targets.size());
+			xfer->xferUnsignedInt(&count);
+			for (const auto& [target, value] : definition.targets)
+			{
+				AsciiString type = target;
+				xfer->xferAsciiString(&type);
+				priority = value;
+				xfer->xferInt(&priority);
+			}
+		}
+	}
 	CRCGEN_LOG(("CRC after AI TAiData for frame %d is 0x%8.8X", TheGameLogic->getFrame(), ((XferCRC *)xfer)->getCRC()));
 
 }
