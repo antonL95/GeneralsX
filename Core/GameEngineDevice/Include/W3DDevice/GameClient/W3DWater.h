@@ -49,6 +49,7 @@
 #define CV_PATCH_SCALE_OFFSET 10
 
 class PolygonTrigger;
+class RetailRiverWater;
 class RetailStandingWater;
 class WaterTracksRenderSystem;
 class Xfer;
@@ -252,9 +253,11 @@ protected:
 
 	Setting m_settings[ TIME_OF_DAY_COUNT ];	///< settings for each time of day
 	void drawRiverWater(PolygonTrigger *pTrig);
+	bool drawRetailRiverWater(const PolygonTrigger &polygon, Real vScale);
 	void drawStandingWater(const PolygonTrigger &polygon);
 	bool drawRetailStandingWater(const PolygonTrigger &polygon);
 	std::shared_ptr<RetailStandingWater> m_retailStandingWater;
+	std::shared_ptr<RetailRiverWater> m_retailRiverWater;
 	void drawTrapezoidWater(Vector3 points[4], Bool standingWater = false, Bool additive = false,
 		Real scroll = 0.0f);
 	void loadSetting ( Setting *skySetting, TimeOfDay timeOfDay );	///<init sky/water settings from GDF

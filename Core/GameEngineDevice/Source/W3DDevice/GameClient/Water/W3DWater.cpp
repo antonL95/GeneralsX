@@ -835,6 +835,7 @@ HRESULT WaterRenderObjClass::generateIndexBuffer(Int sizeX, Int sizeY)
 void WaterRenderObjClass::ReleaseResources()
 {
 	m_retailStandingWater.reset();
+	m_retailRiverWater.reset();
 
 	REF_PTR_RELEASE(m_indexBuffer);
 
@@ -1010,6 +1011,7 @@ void WaterRenderObjClass::ReAcquireResources()
 void WaterRenderObjClass::load()
 {
 	m_retailStandingWater.reset();
+	m_retailRiverWater.reset();
 	if (m_waterTrackSystem)
 		m_waterTrackSystem->loadTracks();
 }
@@ -2918,18 +2920,18 @@ Real WaterRenderObjClass::getWaterHeight(Real x, Real y)
 void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 {
 	const Int pointCount = pTrig->getNumPoints();
-	const Int rectangleCount = pointCount / 2 - 1;
+	const Int sectionCount = pointCount / 2;
+	const Int rectangleCount = sectionCount - 1;
 	Int innerNdx = pTrig->getRiverStart();
 	if (m_disableRiver || rectangleCount <= 0 || innerNdx < 0 || innerNdx >= pointCount - 1)
 		return;
 	Int outerNdx = innerNdx + 1;
 
-	//allocate 2 triangles per side with 3 indices per triangle
-	const Int indexCount = (rectangleCount+1)*2*3;
-	// TheSuperHackers @bugfix arcticdolphin 12/10/2026 Skip rivers that do not fit the 16 bit dynamic buffers.
-	DEBUG_ASSERTCRASH(indexCount <= DynamicIBAccessClass::MAX_INDEX_COUNT, ("River has too many points to draw"));
-	if (indexCount > DynamicIBAccessClass::MAX_INDEX_COUNT)
+	constexpr Int indicesPerSection = 2 * 3;
+	DEBUG_ASSERTCRASH(sectionCount <= DynamicIBAccessClass::MAX_INDEX_COUNT / indicesPerSection, ("River has too many points to draw"));
+	if (sectionCount > DynamicIBAccessClass::MAX_INDEX_COUNT / indicesPerSection)
 		return;
+	const Int indexCount = sectionCount * indicesPerSection;
 
 	const auto distance = [](const ICoord3D &a, const ICoord3D &b)
 	{
@@ -2952,6 +2954,11 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 	for (Int i = 1; i < pointCount; ++i)
 		totalLength += distance(*pTrig->getPoint(i - 1), *pTrig->getPoint(i));
 	const Real vScale = ((totalLength / 2) - endWidth) / textureWidth / rectangleCount;
+	if (!wireframeForDebug && drawRetailRiverWater(*pTrig, vScale))
+	{
+		m_drawingRiver = true;
+		return;
+	}
 
 	DX8Wrapper::Invalidate_Cached_Render_States();
 	m_drawingRiver = true;

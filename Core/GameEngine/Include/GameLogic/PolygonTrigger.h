@@ -85,6 +85,18 @@ public:
 		std::vector<std::array<Coord2D, 4>> patches;
 	};
 
+	struct RiverWaterSettings
+	{
+		AsciiString riverTexture;
+		AsciiString noiseTexture;
+		AsciiString opacityTexture;
+		AsciiString sparklesTexture;
+		UnsignedInt color;
+		Real opacity;
+		Real uvScrollSpeed;
+		Bool additive;
+	};
+
 protected:
 	PolygonTrigger*		m_nextPolygonTrigger;		///< linked list.
 	AsciiString				m_triggerName;		///< The name of this polygon area.
@@ -104,6 +116,7 @@ protected:
 	Bool				m_shouldRender;
 	Bool				m_selected;
 	std::unique_ptr<StandingWaterSettings> m_standingWater;
+	std::unique_ptr<RiverWaterSettings> m_riverWater;
 	std::optional<UnsignedInt> m_bfmeTriggerAreaId;
 	std::optional<ObjectID> m_castleAreaOwner;
 	std::vector<Coord2D> m_importedRiverBanks;
@@ -148,7 +161,10 @@ public:
 	static void installImportedPolygons(const std::vector<PolygonTrigger *> &polygons);
 	void setStandingWater(StandingWaterSettings settings);
 	const StandingWaterSettings *getStandingWater() const { return m_standingWater.get(); }
+	void setRiverWater(RiverWaterSettings settings) { m_riverWater = std::make_unique<RiverWaterSettings>(std::move(settings)); }
+	const RiverWaterSettings *getRiverWater() const { return m_riverWater.get(); }
 	void setImportedRiverBanks(std::vector<Coord2D> banks);
+	const std::vector<Coord2D> &getImportedRiverBanks() const { return m_importedRiverBanks; }
 	Bool isImportedRiver() const { return !m_importedRiverBanks.empty(); }
 	Bool pointInImportedRiver(Real x, Real y) const;
 	Int getAuthoredRiverHeight() const { return m_authoredRiverHeight; }

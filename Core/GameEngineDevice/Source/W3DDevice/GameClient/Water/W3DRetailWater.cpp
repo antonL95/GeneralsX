@@ -28,6 +28,7 @@
 #include <locale>
 #include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 
 namespace
@@ -267,6 +268,136 @@ public:
 	bool drewPca = false;
 	bool failed = false;
 };
+
+class RetailRiverWater
+{
+public:
+	std::unique_ptr<RetailFX::NativePass> pass;
+	std::map<std::string, Reference<TextureClass>> textures;
+	std::vector<RetailFX::RiverWaterVertex> vertices;
+	std::vector<uint16_t> indices;
+	std::set<Int> traced;
+};
+
+bool WaterRenderObjClass::drawRetailRiverWater(const PolygonTrigger &polygon, Real vScale)
+{
+	const auto *settings = polygon.getRiverWater();
+	const auto &banks = polygon.getImportedRiverBanks();
+	const auto sections = banks.size() / 2;
+	if (!settings || !m_pDev || !TheTerrainRenderObject || !TheGameLogic ||
+		banks.size() != static_cast<size_t>(polygon.getNumPoints()) || sections < 2 || banks.size() % 2)
+		return false;
+	auto *shroud = TheTerrainRenderObject->getShroud();
+	if (!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
+		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
+		return false;
+	auto *device = DX8Wrapper::Get_Effect_Device9();
+	if (!device)
+		return false;
+
+	if (!m_retailRiverWater)
+	{
+		m_retailRiverWater = std::make_shared<RetailRiverWater>();
+		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/riverwater.fxo"))
+			m_retailRiverWater->pass = RetailFX::NativePass::makeRiverWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+		if (!m_retailRiverWater->pass)
+			std::fprintf(stderr, "[RetailFX] Could not load RiverWater Default_M\n");
+	}
+	auto &runtime = *m_retailRiverWater;
+	if (!runtime.pass)
+		return false;
+	const auto texture = [&](const AsciiString &name, TextureClass *fallback) {
+		if (name.isEmpty())
+			return RetailFX::nativeTexture(fallback);
+		auto [entry, inserted] = runtime.textures.try_emplace(name.str());
+		if (inserted)
+			entry->second.reset(WW3DAssetManager::Get_Instance()->Get_Texture(name.str()));
+		return RetailFX::nativeTexture(entry->second.get());
+	};
+	const auto accessTexture = [&](std::string_view name) -> void * {
+		if (name == "ShroudTexture")
+			return RetailFX::nativeTexture(shroud->getShroudTexture());
+		if (name == "RiverTexture")
+			return texture(settings->riverTexture, m_riverTexture);
+		if (name == "NoiseTexture")
+			return texture(settings->noiseTexture, m_waterNoiseTexture);
+		if (name == "OpacityTexture")
+			return texture(settings->opacityTexture, m_riverAlphaEdge);
+		if (name == "SparklesTexture")
+			return texture(settings->sparklesTexture, m_waterSparklesTexture);
+		return nullptr;
+	};
+
+	D3DXMATRIX world, view, projection, inverseView, viewProjection;
+	if (FAILED(m_pDev->GetTransform(D3DTS_VIEW, &view)) ||
+		FAILED(m_pDev->GetTransform(D3DTS_PROJECTION, &projection)) ||
+		!D3DXMatrixInverse(&inverseView, nullptr, &view))
+		return false;
+	D3DXMatrixIdentity(&world);
+	D3DXMatrixMultiply(&viewProjection, &view, &projection);
+	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
+	const float scaleV = 1.0f / (shroud->getCellHeight() * static_cast<float>(shroud->getTextureHeight()));
+	const RetailFX::Register shroudUV{scaleU, scaleV,
+		(shroud->getCellWidth() - shroud->getDrawOriginX()) * scaleU,
+		(shroud->getCellHeight() - shroud->getDrawOriginY()) * scaleV};
+	const auto fog = RetailFX::fogBindings(m_pDev);
+	const float time = static_cast<float>(TheGameLogic->getFrame()) / static_cast<float>(LOGICFRAMES_PER_SECOND);
+	const auto setBinding = [&](const RetailFX::Binding &binding, std::span<RetailFX::Register> values, std::span<int>) {
+		if (values.empty())
+			return;
+		const auto &name = binding.name;
+		if (name == "WorldViewProjection")
+			RetailFX::writeMatrix(values, viewProjection);
+		else if (name == "World")
+			RetailFX::writeMatrix(values, world);
+		else if (name == "ViewI")
+			RetailFX::writeMatrix(values, inverseView);
+		else if (name == "Fog")
+			std::copy_n(fog.begin(), std::min(fog.size(), values.size()), values.begin());
+		else if (name == "Shroud")
+			values[0] = shroudUV;
+		else if (name == "Time")
+			values[0][0] = time;
+		else if (name == "UVScrollPerSecond")
+			values[0] = {settings->uvScrollSpeed, settings->uvScrollSpeed, 0, 0};
+		else if (name == "Opacity")
+			values[0][3] = settings->opacity;
+		else if (name == "IsAdditiveBlended")
+			values[0][0] = settings->additive;
+	};
+	auto &vertices = runtime.vertices;
+	auto &indices = runtime.indices;
+	vertices.clear();
+	indices.clear();
+	vertices.reserve(banks.size());
+	indices.reserve((sections - 1) * 6);
+	const float scroll = static_cast<float>(std::fmod(static_cast<double>(settings->uvScrollSpeed) * time, 1.0));
+	const auto color = settings->color;
+	const uint32_t argb = D3DCOLOR_XRGB(color & 255u, (color >> 8) & 255u, (color >> 16) & 255u);
+	const float height = static_cast<float>(polygon.getPoint(0)->z);
+	for (size_t section = 0; section < sections; ++section)
+	{
+		const float v = vScale * static_cast<float>(section);
+		const auto &inner = banks[sections + section];
+		const auto &outer = banks[sections - 1 - section];
+		vertices.push_back({{inner.x, inner.y, height}, argb, {0.5f, v - scroll}, {1.0f, v}});
+		vertices.push_back({{outer.x, outer.y, height}, argb, {0.0f, v - scroll}, {0.0f, v}});
+		if (section + 1 < sections)
+		{
+			const auto a = static_cast<uint16_t>(section * 2);
+			const auto b = static_cast<uint16_t>(a + 1);
+			const auto c = static_cast<uint16_t>(a + 2);
+			const auto d = static_cast<uint16_t>(a + 3);
+			indices.insert(indices.end(), {a, b, d, a, d, c});
+		}
+	}
+	if (!runtime.pass->drawRiverWater(device, vertices, indices, setBinding, accessTexture))
+		return false;
+	if (std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime.traced.insert(polygon.getID()).second)
+		std::fprintf(stderr, "[RetailFX] Drew RiverWater Default_M (%s) sections=%zu opacity=%.3f scroll=%.3f additive=%d\n",
+			polygon.getTriggerName().str(), sections, settings->opacity, settings->uvScrollSpeed, settings->additive);
+	return true;
+}
 
 bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 {

@@ -1717,9 +1717,11 @@ Bool WorldHeightMap::ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, 
 			const AsciiString layer = reader.readString();
 			const Real scroll = reader.read<Real>();
 			const UnsignedByte additive = reader.read<UnsignedByte>();
-			for (Int texture = 0; texture < 4; ++texture)
-				reader.readString();
-			reader.read<UnsignedInt>();
+			const AsciiString riverTexture = reader.readString();
+			const AsciiString noiseTexture = reader.readString();
+			const AsciiString opacityTexture = reader.readString();
+			const AsciiString sparklesTexture = reader.readString();
+			const UnsignedInt color = reader.read<UnsignedInt>();
 			const Real alpha = reader.read<Real>();
 			const UnsignedInt height = reader.read<UnsignedInt>();
 			if (info->version >= 2)
@@ -1746,6 +1748,8 @@ Bool WorldHeightMap::ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, 
 				polygon->addPoint({static_cast<Int>(bank.x), static_cast<Int>(bank.y), static_cast<Int>(height)});
 			polygon->setRiverStart(sections - 1);
 			polygon->setImportedRiverBanks(std::move(banks));
+			polygon->setRiverWater({riverTexture, noiseTexture, opacityTexture, sparklesTexture,
+				color, alpha, scroll, additive != 0});
 			rivers.push_back(std::move(polygon));
 		}
 		if (file.getChunkDataSizeLeft() != 0)

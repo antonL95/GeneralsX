@@ -21,6 +21,14 @@ struct WaterVertex
 	float wave[2]{};
 };
 
+struct RiverWaterVertex
+{
+	float position[3];
+	uint32_t color;
+	float uv[2];
+	float edge[2];
+};
+
 struct TerrainVertex
 {
 	float position[3];
@@ -59,6 +67,7 @@ public:
 	static std::unique_ptr<NativePass> makeWater(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeFullWater(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makePcaWater(void *device, const Effect &effect, CreateShader createShader);
+	static std::unique_ptr<NativePass> makeRiverWater(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeTerrain(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeTerrainWithShadows(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeNormalMapped(void *device, const Effect &effect, CreateShader createShader);
@@ -70,6 +79,8 @@ public:
 
 	bool drawWater(void *device, std::span<const WaterVertex> vertices, std::span<const uint16_t> indices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool additive);
+	bool drawRiverWater(void *device, std::span<const RiverWaterVertex> vertices, std::span<const uint16_t> indices,
+		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture);
 	bool drawTerrain(void *device, std::span<const TerrainVertex> base, std::span<const uint32_t> baseIndices,
 		std::span<const TerrainVertex> blend, std::span<const uint32_t> blendIndices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
@@ -83,7 +94,7 @@ public:
 private:
 	enum class Kind
 	{
-		Water, FullWater, PcaWater, Terrain, ShadowTerrain, NormalMapped, ShadowedNormalMapped,
+		Water, FullWater, PcaWater, RiverWater, Terrain, ShadowTerrain, NormalMapped, ShadowedNormalMapped,
 		NormalMappedComposite, DefaultMesh, Vegetation
 	};
 	struct Data;
