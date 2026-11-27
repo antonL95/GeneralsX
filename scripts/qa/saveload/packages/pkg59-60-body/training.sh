@@ -114,7 +114,7 @@ check_reactions() {
             expect 'TEST pkg60 recovery frame=250 duration=150'
         fi
     fi
-    for row in 251:500:0 252:240:1 279:240:1 280:335:0 402:335:0; do
+    for row in 251:500:0 252:240:1 279:240:1 280:430:0 402:430:0; do
         frame=${row%%:*}
         rest=${row#*:}
         if covers "$frame"; then
