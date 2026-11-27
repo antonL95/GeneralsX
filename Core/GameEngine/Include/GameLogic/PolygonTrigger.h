@@ -200,6 +200,7 @@ public:
 	const PolygonTrigger *getNext() const {return m_nextPolygonTrigger;}
 	const AsciiString& getTriggerName()  const {return m_triggerName;} ///< Gets the trigger name.
 	Bool pointInTrigger(ICoord3D &point) const;
+	Bool pointInTrigger(const Coord3D &point) const;
 	Bool doExportWithScripts() const {return m_exportWithScripts;}
 	void setDoExportWithScripts(Bool val) {m_exportWithScripts = val;}
 	Bool isWaterArea() const {return m_isWaterArea;}

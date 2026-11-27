@@ -1,0 +1,2 @@
+242 camera-entered-area-check Player_1 - 0
+245 camera-entered-area-check Player_1 - 0

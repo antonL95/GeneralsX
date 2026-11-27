@@ -649,6 +649,20 @@ Real PolygonTrigger::getRadius()	const
 /**
  PolygonTrigger - pointInTrigger.
 */
+Bool PolygonTrigger::pointInTrigger(const Coord3D &point) const
+{
+	if (m_boundsNeedsUpdate)
+		updateBounds();
+	const auto canReachBounds = [](Real value, Int lo, Int hi) {
+		return value > static_cast<double>(lo) - 1.0 && value < static_cast<double>(hi) + 1.0;
+	};
+	if (!canReachBounds(point.x, m_bounds.lo.x, m_bounds.hi.x) ||
+		!canReachBounds(point.y, m_bounds.lo.y, m_bounds.hi.y))
+		return FALSE;
+	ICoord3D ground = {static_cast<Int>(point.x), static_cast<Int>(point.y), 0};
+	return pointInTrigger(ground);
+}
+
 Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 {
 	if (isRetired())

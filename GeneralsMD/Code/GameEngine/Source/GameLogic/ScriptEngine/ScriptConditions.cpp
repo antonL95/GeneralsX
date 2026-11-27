@@ -3290,6 +3290,13 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			return BfmeScriptRules::skirmishOrMultiplayerIs(rts::isSkirmishGame(mode),
 				rts::isMultiplayerGame(mode), pCondition->getParameter(0)->getInt() != 0);
 		}
+		case Condition::CAMERA_ENTERED_AREA:
+		{
+			if (!TheTacticalView || TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInReplayGame())
+				return FALSE;
+			const PolygonTrigger *area = TheScriptEngine->getQualifiedTriggerAreaByName(pCondition->getParameter(0)->getString());
+			return area && area->pointInTrigger(TheTacticalView->getPosition());
+		}
 		case Condition::IS_GAME_MODE_ACTIVE:
 			return RetailFileLayers::enabled() && TheGameInfo &&
 				TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0 && TheGameInfo->getRetailSkirmishRules().ringHeroes &&

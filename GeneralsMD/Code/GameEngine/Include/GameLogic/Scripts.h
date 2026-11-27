@@ -1138,6 +1138,7 @@ public:
 		UNIT_THREAT_LEVEL,
 		PLAYER_HAS_KILLED_TYPE_UNITS,
 		COUNTER_COUNTER,
+		CAMERA_ENTERED_AREA,
 
 		NUM_ITEMS		 // Always the last condition.
 	};
