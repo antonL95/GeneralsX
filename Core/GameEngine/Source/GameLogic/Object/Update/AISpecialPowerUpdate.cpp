@@ -3,12 +3,16 @@
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 
 #include "Common/ActionManager.h"
+#include "Common/AttributeModifierRules.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -18,6 +22,7 @@
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #endif
 #include "GameLogic/Module/BodyModule.h"
@@ -94,6 +99,26 @@ void parseSpecialPowerAIType(INI* ini, void*, void* store, const void*)
 }
 
 #if RTS_ZEROHOUR
+constexpr UpdateSleepTime retailPolicyCooldown = UPDATE_SLEEP(LOGICFRAMES_PER_SECOND * 5);
+constexpr UpdateSleepTime retailPolicyPoll = UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND));
+
+Int stancePolicy(std::string_view policy)
+{
+	using namespace AttributeModifierRules;
+	if (policy == "AI_SPECIAL_POWER_STANCEBATTLE")
+		return STANCE_BATTLE;
+	if (policy == "AI_SPECIAL_POWER_STANCEAGGRESSIVE")
+		return STANCE_AGGRESSIVE;
+	if (policy == "AI_SPECIAL_POWER_STANCEHOLDGROUND")
+		return STANCE_HOLD_GROUND;
+	return STANCE_UNINITIALIZED;
+}
+
+Bool rollRetailPolicyActivation(const Player& player)
+{
+	return GameLogicRandomValueReal(0.0f, 1.0f) > 0.5f && AISkirmishPlayer::rollRetailSpecialPowerActivation(player);
+}
+
 Bool isActiveCommand(const Object& source, const CommandButton& button)
 {
 	const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source.getCommandSetString());
@@ -126,21 +151,49 @@ Real bodyHealthFraction(const Object& object)
 	return maximum > 0.0f ? body->getHealth() / maximum : 1.0f;
 }
 
-Bool canUseSelfBuff(const Object& source)
+Real combatHealthFraction(const Object& source)
 {
-	constexpr Real selfBuffHealthLimit = 0.8f;
 	const auto* horde = HordeContain::get(&source);
 	if (!horde)
-		return bodyHealthFraction(source) < selfBuffHealthLimit;
+		return bodyHealthFraction(source);
 
 	const Int capacity = horde->getContainMax();
 	if (capacity <= 0)
-		return FALSE;
+		return 1.0f;
 	Real total = 0.0f;
 	for (const Object* member : *horde->getContainedItemsList())
 		if (member && !member->isEffectivelyDead())
 			total += bodyHealthFraction(*member);
-	return total / static_cast<Real>(capacity) < selfBuffHealthLimit;
+	return total / static_cast<Real>(capacity);
+}
+
+Bool canUseSelfBuff(const Object& source)
+{
+	constexpr Real selfBuffHealthLimit = 0.8f;
+	return combatHealthFraction(source) < selfBuffHealthLimit;
+}
+
+UpdateSleepTime updateStancePolicy(Object& source, const Player& player, const CommandButton& button, Int policyStance)
+{
+	using namespace AttributeModifierRules;
+	if (policyStance == STANCE_HOLD_GROUND)
+		return UPDATE_SLEEP_FOREVER;
+
+	const StancesBehavior* stances = StancesBehavior::find(&source);
+	if (!stances || button.getCommandType() != GUI_COMMAND_SET_STANCE || button.getStances().empty() ||
+		(button.getRequiredRank() > 0 && source.getExperienceTracker()->getRank() < button.getRequiredRank()) ||
+		(BitIsSet(button.getOptions(), NEED_UPGRADE) && !HeroRoster::buttonUpgradesMet(&button, &player, &source)) ||
+		(policyStance == STANCE_AGGRESSIVE && stances->getStance() == STANCE_AGGRESSIVE))
+		return retailPolicyPoll;
+
+	constexpr Real battleHealthLimit = 0.35f;
+	const Bool battle = combatHealthFraction(source) <= battleHealthLimit;
+	if ((policyStance == STANCE_BATTLE) != battle || !button.isModelConditionAllowed(&source) ||
+		!button.isValidContainerForCommand(&source) || !rollRetailPolicyActivation(player))
+		return retailPolicyPoll;
+
+	source.doCommandButton(&button, CMD_FROM_AI);
+	return retailPolicyCooldown;
 }
 
 Real targetKillerRange(const Object& source, const SpecialPowerTemplate& power, Real authoredRange)
@@ -275,6 +328,11 @@ void AISpecialPowerUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	: UpdateModule(thing, data)
 {
+#if RTS_ZEROHOUR
+	const Int type = getAISpecialPowerUpdateModuleData()->m_specialPowerAIType;
+	if (type >= 0 && stancePolicy(specialPowerAITypes[type]) != AttributeModifierRules::STANCE_UNINITIALIZED)
+		setWakeFrame(getObject(), retailPolicyCooldown);
+#endif
 }
 
 AISpecialPowerUpdate::~AISpecialPowerUpdate() = default;
@@ -300,6 +358,10 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (!button || data->m_specialPowerAIType < 0 || !isActiveCommand(*source, *button))
 		return checkAgain;
 	const std::string_view policy(specialPowerAITypes[data->m_specialPowerAIType]);
+	const Int stance = stancePolicy(policy);
+	if (stance != AttributeModifierRules::STANCE_UNINITIALIZED)
+		return updateStancePolicy(*source, *player, *button, stance);
+
 	const Bool selfBuff = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF";
 	if (button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
 	{

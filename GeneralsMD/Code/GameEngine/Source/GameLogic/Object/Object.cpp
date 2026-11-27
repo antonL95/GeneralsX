@@ -6887,6 +6887,11 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 			return;
 		switch( commandButton->getCommandType() )
 		{
+			case GUI_COMMAND_SET_STANCE:
+				if (StancesBehavior* stances = StancesBehavior::find(this); stances && !commandButton->getStances().empty())
+					stances->setStance(commandButton->getStances().front());
+				return;
+
 			case GUI_COMMAND_WAKE_AUTO_PICKUP:
 				AutoPickUpUpdate::issueButton(this, commandButton);
 				return;
