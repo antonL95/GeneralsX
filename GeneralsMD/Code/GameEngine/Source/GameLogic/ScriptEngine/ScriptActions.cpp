@@ -7707,6 +7707,15 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::PLAY_SOUND_EFFECT_AT:
 			doPlaySoundEffectAt(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
+		case ScriptAction::DIM_WORLD_LIGHTS:
+			if (TheGameClient)
+			{
+				const RGBColor color = {pAction->getParameter(0)->getReal(), pAction->getParameter(1)->getReal(),
+					pAction->getParameter(2)->getReal()};
+				TheGameClient->setScriptWorldLight(color, pAction->getParameter(3)->getReal());
+			}
+			return;
+
 		case ScriptAction::SET_INFANTRY_LIGHTING_OVERRIDE:
 			doSetInfantryLightingOverride(pAction->getParameter(0)->getReal());
 			return;

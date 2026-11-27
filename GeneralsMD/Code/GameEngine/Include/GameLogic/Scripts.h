@@ -652,6 +652,7 @@ public:
 		SHOW_UI,
 		VICTORY_SCREEN,
 		DESELECT,
+		DIM_WORLD_LIGHTS,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

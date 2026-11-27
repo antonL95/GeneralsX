@@ -2524,6 +2524,18 @@ void W3DDisplay::draw()
 	if (TheGlobalData->m_headless)
 		return;
 
+#if RTS_ZEROHOUR
+	if (TheGameClient)
+	{
+		const RGBColor scale = TheGameClient->getScriptWorldLight(TheGameClient->getFrame());
+		if (scale.red != m_worldLightScale.red || scale.green != m_worldLightScale.green || scale.blue != m_worldLightScale.blue)
+		{
+			m_worldLightScale = scale;
+			refreshWorldLightColors(TheGlobalData->m_timeOfDay);
+		}
+	}
+#endif
+
 	if (std::getenv("GENERALSX_ASSET_SMOKE") && std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN") &&
 		TheGlobalData->m_initialFile.isNotEmpty())
 	{
@@ -3089,23 +3101,32 @@ void W3DDisplay::enableLetterBox(Bool enable)
 // W3DDisplay::setTimeOfDay ===================================================
 /** */
 //=============================================================================
+void W3DDisplay::refreshWorldLightColors(TimeOfDay tod)
+{
+	if (m_3DScene)
+	{
+		const RGBColor ambient = TheGlobalData->m_terrainObjectsLighting[tod][0].ambient * m_worldLightScale;
+		m_3DScene->Set_Ambient_Light(Vector3(ambient.red, ambient.green, ambient.blue));
+	}
+	for (Int i = 0; i < LightEnvironmentClass::MAX_LIGHTS; ++i)
+	{
+		if (!m_myLight[i])
+			continue;
+		const RGBColor diffuse = TheGlobalData->m_terrainObjectsLighting[tod][i].diffuse * m_worldLightScale;
+		m_myLight[i]->Set_Diffuse(Vector3(diffuse.red, diffuse.green, diffuse.blue));
+	}
+}
+
 void W3DDisplay::setTimeOfDay( TimeOfDay tod )
 {
-	const GlobalData::TerrainLighting *ol=&TheGlobalData->m_terrainObjectsLighting[tod][0];
-
-	if( m_3DScene )
-	{
-		m_3DScene->Set_Ambient_Light( Vector3(ol->ambient.red, ol->ambient.green, ol->ambient.blue) );
-	}
-
+	refreshWorldLightColors(tod);
 	for (Int i=0; i<LightEnvironmentClass::MAX_LIGHTS; i++)
 	{
 		if( m_myLight[i] )
 		{
-			ol=&TheGlobalData->m_terrainObjectsLighting[tod][i];
+			const auto *ol = &TheGlobalData->m_terrainObjectsLighting[tod][i];
 
 			m_myLight[i]->Set_Ambient( Vector3( 0.0f, 0.0f, 0.0f ) );
-			m_myLight[i]->Set_Diffuse( Vector3(ol->diffuse.red, ol->diffuse.green, ol->diffuse.blue ) );
 			m_myLight[i]->Set_Specular( Vector3(0,0,0) );
 			Matrix3D mtx;
 			mtx.Set(Vector3(1,0,0), Vector3(0,1,0), Vector3(ol->lightPos.x, ol->lightPos.y, ol->lightPos.z), Vector3(0,0,0));

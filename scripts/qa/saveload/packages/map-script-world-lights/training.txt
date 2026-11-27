@@ -1,0 +1,5 @@
+239 script-world-lights-check Player_1 - 0
+240 script-dim-world Player_1 - 0
+242 script-world-lights-check Player_1 - 0
+245 script-world-lights-check Player_1 - 0
+275 script-world-lights-check Player_1 - 0

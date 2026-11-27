@@ -2,6 +2,7 @@
 
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/GameClient.h"
 #include "GameClient/Snow.h"
 #include "GameLogic/TerrainLogic.h"
 #include "W3DDevice/GameClient/RetailEffectInput.h"
@@ -86,15 +87,19 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 
 	const auto fog = RetailFX::fogBindings(device8);
 	const auto cloud = W3DShaderManager::getRetailCloudUV();
-	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
-	const bool scaleWeather = weatherScale.red < 1.0f || weatherScale.green < 1.0f || weatherScale.blue < 1.0f;
+	RGBColor lightScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
+#if RTS_ZEROHOUR
+	if (TheGameClient)
+		lightScale *= TheGameClient->getScriptWorldLight(TheGameClient->getFrame());
+#endif
+	const bool scaleLight = lightScale.red < 1.0f || lightScale.green < 1.0f || lightScale.blue < 1.0f;
 	const bool applyTaint = TheGlobalData->m_taintOn && TheTerrainLogic->hasRetailTaint();
 	const RGBColor &taintColor = TheGlobalData->m_taintColor;
 	const auto tintTerrainVertex = [&](uint32_t rgba, float wx, float wy) -> uint32_t {
-		float redScale = weatherScale.red;
-		float greenScale = weatherScale.green;
-		float blueScale = weatherScale.blue;
-		bool tinted = scaleWeather;
+		float redScale = lightScale.red;
+		float greenScale = lightScale.green;
+		float blueScale = lightScale.blue;
+		bool tinted = scaleLight;
 		if (applyTaint)
 		{
 			const float weight = TheTerrainLogic->retailTaintWeight(wx, wy);
@@ -116,11 +121,9 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 			scaleChannel(8, greenScale) | scaleChannel(0, blueScale);
 	};
 	RGBColor sun = TheGlobalData->m_terrainDiffuse[0];
-	if (scaleWeather)
+	if (scaleLight)
 	{
-		sun.red *= weatherScale.red;
-		sun.green *= weatherScale.green;
-		sun.blue *= weatherScale.blue;
+		sun *= lightScale;
 	}
 	const auto &direction = TheGlobalData->m_terrainLightPos[0];
 	Vector3 sunRay(-direction.x, -direction.y, -direction.z);

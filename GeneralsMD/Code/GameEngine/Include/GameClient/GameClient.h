@@ -35,6 +35,7 @@
 #include "Common/SubsystemInterface.h"
 #include "GameClient/CommandXlat.h"
 #include "GameClient/Drawable.h"
+#include "Lib/RGBColor.h"
 
 // forward declarations
 class AsciiString;
@@ -132,6 +133,9 @@ public:
 	virtual void destroyDrawable( Drawable *draw );											///< Destroy the given drawable
 
 	virtual void setTimeOfDay( TimeOfDay tod );													///< Tell all the drawables what time of day it is now
+	void setScriptWorldLight(const RGBColor &color, Real seconds);
+	RGBColor getScriptWorldLight(UnsignedInt frame) const;
+	static constexpr RGBColor defaultWorldLight = {1.0f, 1.0f, 1.0f};
 
 	virtual void selectDrawablesInGroup( Int group );									///< select all drawables belong to the specifies group
 	virtual void assignSelectedDrawablesToGroup( Int group );						///< assign all selected drawables to the specified group
@@ -180,6 +184,15 @@ protected:
 	CommandTranslator *m_commandTranslator;											///< the command translator on the message stream
 
 private:
+	struct ScriptWorldLight
+	{
+		RGBColor source = defaultWorldLight;
+		RGBColor target = defaultWorldLight;
+		UnsignedInt startFrame = 0;
+		UnsignedInt duration = 0;
+	};
+
+	ScriptWorldLight m_scriptWorldLight;
 
 	Intro* m_intro;
 	UnsignedInt m_renderedObjectCount;													///< Keeps track of the number of rendered objects -- resets each frame.

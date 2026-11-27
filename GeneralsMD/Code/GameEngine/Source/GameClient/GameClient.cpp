@@ -46,6 +46,9 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include <cmath>
+#include <limits>
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailMusicScripts.h"
 #include "Common/ThingFactory.h"
@@ -482,6 +485,7 @@ void GameClient::init()
 /** Reset the game client for a new game */
 void GameClient::reset()
 {
+	m_scriptWorldLight = {};
 	if (RetailFileLayers::enabled())
 		RetailLargeGroupAudio::reset();
 	m_drawableHash.clear();
@@ -998,6 +1002,31 @@ void GameClient::unloadMap( AsciiString mapName )
 }
 
 //-------------------------------------------------------------------------------------------------
+void GameClient::setScriptWorldLight(const RGBColor &color, Real seconds)
+{
+	if (!std::isfinite(color.red) || !std::isfinite(color.green) || !std::isfinite(color.blue) ||
+		!std::isfinite(seconds))
+		return;
+	const double frames = std::clamp(static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND,
+		0.0, static_cast<double>(std::numeric_limits<UnsignedInt>::max()));
+	const RGBColor source = getScriptWorldLight(m_frame);
+	m_scriptWorldLight = {
+		source,
+		{std::clamp(color.red, 0.0f, 1.0f), std::clamp(color.green, 0.0f, 1.0f), std::clamp(color.blue, 0.0f, 1.0f)},
+		m_frame,
+		static_cast<UnsignedInt>(frames)
+	};
+}
+
+RGBColor GameClient::getScriptWorldLight(UnsignedInt frame) const
+{
+	const ScriptWorldLight &light = m_scriptWorldLight;
+	const UnsignedInt elapsed = frame - light.startFrame;
+	if (elapsed >= light.duration)
+		return light.target;
+	return light.source + (light.target - light.source) * (static_cast<Real>(elapsed) / light.duration);
+}
+
 void GameClient::setTimeOfDay( TimeOfDay tod )
 {
 	Drawable *draw = firstDrawable();
@@ -1450,7 +1479,7 @@ void GameClient::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1678,7 +1707,19 @@ void GameClient::xfer( Xfer *xfer )
 		}
 	}
 	if (RetailFileLayers::enabled())
+	{
 		RetailEva::xfer(xfer, version >= 4);
+		RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, version >= 5, {
+			{"script-world-light",
+				[this](Xfer *block) {
+					block->xferRGBColor(&m_scriptWorldLight.source);
+					block->xferRGBColor(&m_scriptWorldLight.target);
+					block->xferUnsignedInt(&m_scriptWorldLight.startFrame);
+					block->xferUnsignedInt(&m_scriptWorldLight.duration);
+				},
+				[this] { m_scriptWorldLight = {}; }},
+		});
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

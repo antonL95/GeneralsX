@@ -139,3 +139,4 @@
 3 map-script-hide-ui
 3 map-script-victory-screen
 3 map-script-deselect
+3 map-script-world-lights
