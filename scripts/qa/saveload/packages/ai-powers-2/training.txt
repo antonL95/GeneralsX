@@ -288,5 +288,21 @@
 1421 destroy Player_1 AiPowers3TameYoung 1
 1421 destroy Player_1 AiPowers3TameYoung 0
 1421 destroy Player_1 AiPowers3TameIneligible 0
+876 create Player_2 AiPowers3ArrowCaster 0 2800,1200,0
+876 create Player_2 AiPowers3ArrowCaster 1 2800,1800,0
+877 create Player_1 AiPowers3ArrowTarget 0 2890,1200,0
+877 create Player_1 AiPowers3ArrowTarget 1 2895,1200,0
+877 create Player_1 AiPowers3ArrowTarget 2 2840,1800,0
+877 create Player_1 AiPowers3ArrowTarget 3 2890,1800,0
+1120 powers-fire-state Player_2 AiPowers3ArrowCaster 1 AiPowers3Arrow
+1120 powers-fire-state Player_2 AiPowers3ArrowMarker 0
+1120 health Player_2 AiPowers3ArrowMarker 0
+1121 destroy Player_2 AiPowers3ArrowCaster 1
+1121 destroy Player_2 AiPowers3ArrowCaster 0
+1121 destroy Player_2 AiPowers3ArrowMarker 0
+1121 destroy Player_1 AiPowers3ArrowTarget 3
+1121 destroy Player_1 AiPowers3ArrowTarget 2
+1121 destroy Player_1 AiPowers3ArrowTarget 1
+1121 destroy Player_1 AiPowers3ArrowTarget 0
 1421 destroy Player_1 AiPowers3TameWounded 0
 1436 destroy Player_1 AiPowers2DominateFootman 0

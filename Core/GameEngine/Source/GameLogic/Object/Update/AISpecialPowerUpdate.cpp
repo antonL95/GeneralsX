@@ -1002,7 +1002,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
 		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" ||
 		policy == "AI_SPELLBOOK_CALLTHEHORDE" || policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE" ||
-		policy == "AI_SPELLBOOK_TREE_KILLER" || policy == "AI_SPECIAL_POWER_TAME_THE_BEAST")
+		policy == "AI_SPELLBOOK_TREE_KILLER" || policy == "AI_SPECIAL_POWER_TAME_THE_BEAST" ||
+		policy == "AI_SPECIAL_POWER_LEGOLAS_ARROWWIND")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -1190,6 +1191,24 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 				return retailPolicyPoll;
 			source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, options);
 		}
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_LEGOLAS_ARROWWIND")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+			return retailPolicyPoll;
+		constexpr Real searchRangeFactor = 2.0f;
+		constexpr Real minimumRangeFraction = 0.8f;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange) * searchRangeFactor;
+		const Object* target = nearestPowerEnemy(*source, range);
+		const Real minimumDistance = range * minimumRangeFraction;
+		if (!target || ThePartitionManager->getDistanceSquared(source, target, FROM_CENTER_3D) < minimumDistance * minimumDistance)
+			return retailPolicyPoll;
+		const auto location = findSummonLocation(*source, *button, *power, *data, *target->getPosition());
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
 		return retailPolicyCooldown;
 	}
 

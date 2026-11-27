@@ -76,6 +76,15 @@ check() {
             fi
         done
     fi
+    if covers 1120; then
+        expect 'TEST powers-fire-state frame=1120 template=AiPowers3ArrowCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=1120 template=AiPowers3ArrowMarker alive=1' || return 1
+        if ! grep -F 'TEST health 1120 Player_2 AiPowers3ArrowMarker 0 ' "$log" | grep -Fq ' pos=2890.0,1200.0'; then
+            printf 'Expected the volley at the nearest enemy in the distance band\n' >&2
+            grep -F 'TEST health 1120 Player_2 AiPowers3ArrowMarker 0 ' "$log" >&2 || true
+            return 1
+        fi
+    fi
     if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2Healer ' "$log" | awk '
         /cond=.*UNPACKING/ { pending++ }
         END { exit (pending != 2) }
