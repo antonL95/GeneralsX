@@ -1,0 +1,13 @@
+200 hordespawn Player_1 GondorFighterHorde 0 - 1800 450 0
+200 hordespawn PlyrCreeps GondorFighterHorde 0 - 2800 450 0
+210 orderattack Player_1 GondorFighterHorde 0 PlyrCreeps:GondorFighterHorde:0
+220 horde-contact-member Player_1 GondorFighterHorde 0 PlyrCreeps:GondorFighterHorde:0
+270 horde-contact-member Player_1 GondorFighterHorde 0 PlyrCreeps:GondorFighterHorde:0
+309 horde-contact-state Player_1 GondorFighterHorde 0
+310 horde-contact-state Player_1 GondorFighterHorde 0
+311 horde-contact-member Player_1 GondorFighterHorde 0 PlyrCreeps:GondorFighterHorde:0
+325 horde-contact-anchor Player_1 GondorFighterHorde 0 PlyrCreeps:GondorFighterHorde:0
+402 horde-contact-state Player_1 GondorFighterHorde 0
+415 horde-contact-state Player_1 GondorFighterHorde 0
+416 destroy Player_1 GondorFighterHorde 0
+416 destroy PlyrCreeps GondorFighterHorde 0

@@ -146,19 +146,22 @@ void HordeAIUpdate::crcReformState(Xfer* xfer)
 void HordeAIUpdate::memberCollided(Object* member, Object* target)
 {
 	Object* anchor = HordeContain::getAnchor(member);
-	if (!RetailFileLayers::enabled() || !anchor || !target || target->isEffectivelyDead() ||
-		anchor->getRelationship(target) != ENEMIES)
+	if (!RetailFileLayers::enabled() || !anchor || !target || target->isEffectivelyDead())
 		return;
 	auto* ai = anchor->getAI();
 	if (!ai || ai->getModuleNameKey() != NAMEKEY("HordeAIUpdate"))
 		return;
 	auto* horde = static_cast<HordeAIUpdate*>(ai);
-	const Object* targetAnchor = HordeContain::getAnchor(target);
-	if (horde->m_attackTarget == target->getID() || (targetAnchor && horde->m_attackTarget == targetAnchor->getID()))
+	if (horde->m_attackTarget != target->getID())
 	{
-		horde->m_contactTarget = horde->m_attackTarget;
-		horde->m_contactUntil = TheGameLogic->getFrame() + 3 * LOGICFRAMES_PER_SECOND;
+		if (horde->hasRecentContact())
+			return;
+		const Object* targetAnchor = HordeContain::getAnchor(target);
+		if (!targetAnchor || horde->m_attackTarget != targetAnchor->getID())
+			return;
 	}
+	horde->m_contactTarget = horde->m_attackTarget;
+	horde->m_contactUntil = TheGameLogic->getFrame() + 3 * LOGICFRAMES_PER_SECOND;
 }
 
 Bool HordeAIUpdate::hasRecentContact() const
