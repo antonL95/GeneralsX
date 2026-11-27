@@ -2470,6 +2470,13 @@ static Bool canPursue(Object *source, Weapon *weapon, Object *victim)
  * Result in m_goalPosition.
  * Return false if can't find a good spot.
  */
+static Real meleeApproachThreshold(const TAiData* tuning)
+{
+	if (!tuning || tuning->m_meleeApproachDistance <= 0.0f)
+		return 0.0f;
+	return tuning->m_meleeApproachDistance + std::max(0.0f, tuning->m_meleeApproachTolerance);
+}
+
 Bool AIAttackApproachTargetState::computePath()
 {
 	Bool forceRepath = false;
@@ -2533,17 +2540,17 @@ Bool AIAttackApproachTargetState::computePath()
 		}
 		setAdjustsDestination(true);
 		const TAiData* tuning = TheAI->getAiData();
+		const Real threshold = meleeApproachThreshold(tuning);
 		if (weapon->getTemplate()->isMeleeWeapon() && ai->isDoingGroundMovement() &&
 			source->getLayer() == victim->getLayer() && !HordeContain::getAnchor(source) &&
 			!source->isKindOf(KINDOF_HORDE) &&
-			tuning->m_meleeApproachDistance > 0.0f)
+			threshold > 0.0f)
 		{
 			const Coord3D& from = *source->getPosition();
 			const Real dx = from.x - m_prevVictimPos.x;
 			const Real dy = from.y - m_prevVictimPos.y;
 			const Real distanceSquared = dx * dx + dy * dy;
 			const Real approach = tuning->m_meleeApproachDistance;
-			const Real threshold = approach + std::max(0.0f, tuning->m_meleeApproachTolerance);
 			if (distanceSquared >= sqr(threshold))
 			{
 				const Real scale = approach / WWMath::SqrtfOrigin(distanceSquared);
@@ -2551,6 +2558,7 @@ Bool AIAttackApproachTargetState::computePath()
 				m_goalPosition.x += dx * scale;
 				m_goalPosition.y += dy * scale;
 				m_goalPosition.z = TheTerrainLogic->getLayerHeight(m_goalPosition.x, m_goalPosition.y, source->getLayer());
+				setAdjustsDestination(false);
 				ai->requestApproachPath(&m_goalPosition);
 				m_waitingForPath = true;
 				m_stopIfInRange = true;
@@ -2832,19 +2840,41 @@ StateReturnType AIAttackApproachTargetState::updateInternal()
 				return STATE_SUCCESS;
 			}
 		}
-		// find a good spot to shoot from
-		//CRCDEBUG_LOG(("AIAttackApproachTargetState::updateInternal() - calling computePath() to victim for object %d", getMachineOwner()->getID()));
+		const Bool onMeleeStagingPath = weapon && weapon->getTemplate()->isMeleeWeapon() &&
+			!ai->isAttackPath() &&
+			(m_goalPosition.x != m_prevVictimPos.x || m_goalPosition.y != m_prevVictimPos.y);
+		if (onMeleeStagingPath && !m_waitingForPath && !ai->isWaitingForPath())
+		{
+			const Real threshold = meleeApproachThreshold(TheAI->getAiData());
+			if (threshold > 0.0f)
+			{
+				const Coord3D& from = *source->getPosition();
+				const Coord3D& targetPos = *victim->getPosition();
+				const Real dx = from.x - targetPos.x;
+				const Real dy = from.y - targetPos.y;
+				if (dx * dx + dy * dy < sqr(threshold))
+				{
+					ai->destroyPath();
+				}
+			}
+		}
 		if (computePath() == false)
 			return STATE_SUCCESS;
 		code = AIInternalMoveToState::update();
 
-		if (code == STATE_SUCCESS && m_follow && weapon && weapon->getTemplate()->isMeleeWeapon() &&
-			!ai->isAttackPath() &&
-			(m_goalPosition.x != m_prevVictimPos.x || m_goalPosition.y != m_prevVictimPos.y))
+		if (code == STATE_SUCCESS && onMeleeStagingPath)
 		{
-			ai->destroyPath();
-			if (computePath())
-				return STATE_CONTINUE;
+			const Real threshold = meleeApproachThreshold(TheAI->getAiData());
+			const Coord3D& from = *source->getPosition();
+			const Coord3D& targetPos = *victim->getPosition();
+			const Real dx = from.x - targetPos.x;
+			const Real dy = from.y - targetPos.y;
+			if (threshold <= 0.0f || dx * dx + dy * dy < sqr(threshold))
+			{
+				ai->destroyPath();
+				if (computePath())
+					return STATE_CONTINUE;
+			}
 		}
 
 		if (code != STATE_CONTINUE)
