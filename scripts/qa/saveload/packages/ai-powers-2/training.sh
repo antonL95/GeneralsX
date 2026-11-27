@@ -65,6 +65,17 @@ check() {
         expect 'TEST powers-fire-state frame=620 template=AiPowers3TreeCaster alive=1 ready=1' || return 1
         expect 'TEST powers-fire-state frame=620 template=AiPowers3TreeMarker alive=1' || return 1
     fi
+    if covers 1420; then
+        expect 'TEST powers-fire-state frame=1420 template=AiPowers3TameCaster alive=1 ready=0' || return 1
+        expect 'TEST powers-fire-state frame=1420 template=AiPowers3TameControl alive=1 ready=1' || return 1
+        for subject in 'Player_2 AiPowers3TameMature 0' 'Player_1 AiPowers3TameYoung 0' \
+            'Player_1 AiPowers3TameYoung 1' 'Player_1 AiPowers3TameIneligible 0' 'Player_1 AiPowers3TameWounded 0'; do
+            if ! grep -F "TEST health 1420 $subject " "$log" | grep -Fq ' dead=0 '; then
+                printf 'Expected living target %s under its expected owner at frame 1420\n' "$subject" >&2
+                return 1
+            fi
+        done
+    fi
     if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2Healer ' "$log" | awk '
         /cond=.*UNPACKING/ { pending++ }
         END { exit (pending != 2) }

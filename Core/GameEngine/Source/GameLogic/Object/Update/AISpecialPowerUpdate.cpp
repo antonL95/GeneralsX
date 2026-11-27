@@ -465,6 +465,41 @@ Object* selectDominateTarget(const Object& source, const Player& player, Real ra
 	return targetsInRange >= minimumNearbyTargets ? best : nullptr;
 }
 
+Object* selectFilteredDominationTarget(const Object& source, const SpecialPowerTemplate& power, Real range)
+{
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return nullptr;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&source, range, FROM_CENTER_2D,
+		nullptr, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder hold(nearby);
+	Int nearbyCount = 0;
+	Int bestCost = 0;
+	Real bestDistance = 0.0f;
+	Object* best = nullptr;
+	for (Object* candidate = nearby->first(); candidate; candidate = nearby->next())
+	{
+		if (candidate->isEffectivelyDead() || candidate->getContainedBy() || source.getRelationship(candidate) == ALLIES)
+			continue;
+		++nearbyCount;
+		constexpr Real minimumHealth = 0.5f;
+		const Int cost = candidate->getTemplate()->friend_getBuildCost();
+		if (cost <= 0 || cost < bestCost || bodyHealthFraction(*candidate) <= minimumHealth ||
+			!power.getObjectFilter().matchesObject(&source, candidate))
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(&source, candidate, FROM_CENTER_2D);
+		if (!best || cost > bestCost || distance < bestDistance ||
+			(distance == bestDistance && candidate->getID() < best->getID()))
+		{
+			best = candidate;
+			bestCost = cost;
+			bestDistance = distance;
+		}
+	}
+	constexpr Int minimumNearbyTargets = 2;
+	return nearbyCount >= minimumNearbyTargets ? best : nullptr;
+}
+
 Bool canSummonAt(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
 	const AISpecialPowerUpdateModuleData& data, const Coord3D& location)
 {
@@ -967,7 +1002,7 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
 		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" ||
 		policy == "AI_SPELLBOOK_CALLTHEHORDE" || policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE" ||
-		policy == "AI_SPELLBOOK_TREE_KILLER")
+		policy == "AI_SPELLBOOK_TREE_KILLER" || policy == "AI_SPECIAL_POWER_TAME_THE_BEAST")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -1127,6 +1162,34 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_TAME_THE_BEAST")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+			return retailPolicyPoll;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		Object* target = selectFilteredDominationTarget(*source, *power, range);
+		if (!target)
+			return retailPolicyPoll;
+		const UnsignedInt options = button->getOptions();
+		if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
+		{
+			if (!module->isValidPowerTarget(target) ||
+				!button->isValidToUseOn(source, target, target->getPosition(), CMD_FROM_AI) ||
+				!power->isValidRetailTarget(source, target, nullptr, CMD_FROM_AI) ||
+				!AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+				return retailPolicyPoll;
+			source->doSpecialPowerAtObject(power, target, options);
+		}
+		else
+		{
+			const auto location = findSummonLocation(*source, *button, *power, *data, *target->getPosition());
+			if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+				return retailPolicyPoll;
+			source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, options);
+		}
 		return retailPolicyCooldown;
 	}
 
