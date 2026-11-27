@@ -240,4 +240,20 @@
 1270 pw-cp Player_2 - 0
 1271 destroy Player_2 AiPowers3ReinforcementsCaster 0
 1271 destroy Player_2 AiPowers3ReinforcementsMarker 0
+858 create Player_2 AiPowers3AttackHealCaster 0 2800,1429,0
+858 create Player_2 AiPowers3AttackHealCaster 1 2800,1650,0
+859 create Player_1 AiPowers3AttackHealTarget 0 2840,1429,0
+859 create Player_1 AiPowers3AttackHealTarget 1 2890,1650,0
+859 create Player_1 AiPowers3AttackHealTarget 2 2840,1650,0
+860 attack Player_2 AiPowers3AttackHealCaster 0 Player_1:AiPowers3AttackHealTarget:0
+860 attack Player_2 AiPowers3AttackHealCaster 1 Player_1:AiPowers3AttackHealTarget:1
+1080 powers-fire-state Player_2 AiPowers3AttackHealCaster 1 AiPowers3AttackHeal
+1080 powers-fire-state Player_2 AiPowers3AttackHealMarker 0
+1080 health Player_2 AiPowers3AttackHealMarker 0
+1081 destroy Player_2 AiPowers3AttackHealMarker 0
+1081 destroy Player_2 AiPowers3AttackHealCaster 0
+1081 destroy Player_2 AiPowers3AttackHealCaster 1
+1081 destroy Player_1 AiPowers3AttackHealTarget 0
+1081 destroy Player_1 AiPowers3AttackHealTarget 1
+1081 destroy Player_1 AiPowers3AttackHealTarget 2
 1436 destroy Player_1 AiPowers2DominateFootman 0

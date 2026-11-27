@@ -21,6 +21,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #if RTS_ZEROHOUR
 #include "Common/Team.h"
+#include "GameLogic/AIStateMachine.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
@@ -602,6 +603,60 @@ Bool teamHasActivePower(const Object& source, const SpecialPowerTemplate& power)
 	return FALSE;
 }
 
+const Object* nearestPowerEnemy(const Object& source, Real range)
+{
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return nullptr;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&source, range, FROM_CENTER_2D,
+		nullptr, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder hold(nearby);
+	const Object* closest = nullptr;
+	Real bestDistance = range * range;
+	for (const Object* object = nearby->first(); object; object = nearby->next())
+	{
+		if (object->isEffectivelyDead() || source.getRelationship(object) != ENEMIES)
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(&source, object, FROM_CENTER_2D);
+		if (distance > bestDistance)
+			break;
+		if (!closest || distance < bestDistance || object->getID() < closest->getID())
+		{
+			closest = object;
+			bestDistance = distance;
+		}
+	}
+	return closest;
+}
+
+const Object* selectAttackHealTarget(const Object& source, Real radius, Real range)
+{
+	if (!(radius > 0.0f) || !std::isfinite(radius))
+		return nullptr;
+
+	const AIUpdateInterface* ai = source.getAI();
+	const Object* victim = combatVictim(source);
+	const Coord3D* intent = victim ? victim->getPosition() : nullptr;
+	if (ai && ai->getCurrentStateID() == AI_ATTACK_MOVE_TO)
+		intent = ai->getGoalPosition();
+	else if (!intent && ai)
+		intent = ai->getCurrentVictimPos();
+	if (!intent)
+		return nullptr;
+
+	constexpr Real attackRadiusFactor = 0.8f;
+	constexpr Real minorAxisWeight = 0.25f;
+	const Coord3D delta = *intent - *source.getPosition();
+	const Real x = std::abs(delta.x);
+	const Real y = std::abs(delta.y);
+	const Real z = std::abs(delta.z);
+	const Real horizontal = std::max(x, y) + std::min(x, y) * minorAxisWeight;
+	const Real distance = std::max(horizontal, z) + std::min(horizontal, z) * minorAxisWeight;
+	if (distance >= radius * attackRadiusFactor)
+		return nullptr;
+	return nearestPowerEnemy(source, range);
+}
+
 std::optional<Coord3D> selectBattleFreezeLocation(const Object& source, Real range)
 {
 	if (!(range > 0.0f) || !std::isfinite(range))
@@ -910,7 +965,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
 	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
 		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
-		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" || policy == "AI_SPELLBOOK_CALLTHEHORDE")
+		policy == "AI_SPECIAL_POWER_ELENDIL" || policy == "AI_SPECIAL_POWER_SOUL_FREEZE" ||
+		policy == "AI_SPELLBOOK_CALLTHEHORDE" || policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -1039,6 +1095,21 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (!target)
 			return retailPolicyPoll;
 		const auto location = findSummonLocation(*source, *button, *power, *data, *target);
+		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_ATTACK_HEAL_AOE")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f || teamHasActivePower(*source, *power))
+			return retailPolicyPoll;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		const Object* target = selectAttackHealTarget(*source, data->m_specialPowerRadius, range);
+		if (!target)
+			return retailPolicyPoll;
+		const auto location = findSummonLocation(*source, *button, *power, *data, *target->getPosition());
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());

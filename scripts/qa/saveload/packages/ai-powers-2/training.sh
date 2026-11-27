@@ -43,6 +43,15 @@ check() {
         expect 'TEST powers-fire-state frame=1270 template=AiPowers3ReinforcementsCaster alive=1 ready=0' || return 1
         expect 'TEST powers-fire-state frame=1270 template=AiPowers3ReinforcementsMarker alive=1' || return 1
     fi
+    if covers 1080; then
+        expect 'TEST powers-fire-state frame=1080 template=AiPowers3AttackHealCaster alive=2 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=1080 template=AiPowers3AttackHealMarker alive=1' || return 1
+        if ! grep -F 'TEST health 1080 Player_2 AiPowers3AttackHealMarker 0 ' "$log" | grep -Fq ' pos=2840.0,1429.0'; then
+            printf 'Expected the attack heal at the nearest enemy\n' >&2
+            grep -F 'TEST health 1080 Player_2 AiPowers3AttackHealMarker 0 ' "$log" >&2 || true
+            return 1
+        fi
+    fi
     if covers 243 && ! grep -F 'TEST ability 243 Player_2 AiPowers2Healer ' "$log" | awk '
         /cond=.*UNPACKING/ { pending++ }
         END { exit (pending != 2) }
