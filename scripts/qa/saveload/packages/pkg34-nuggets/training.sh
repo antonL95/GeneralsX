@@ -50,9 +50,9 @@ check() {
 			}
 		' "$log" || return 1
 	fi
-	if covers 392; then
-		grep '^TEST pkg34 frame=392 label=lua-victim .* fear=1 ' "$log" || return 1
-		grep '^TEST pkg34 frame=392 label=lua-ally .* fear=0 ' "$log" || return 1
+	if covers 393; then
+		grep '^TEST pkg34 frame=393 label=lua-victim .* fear=1 ' "$log" || return 1
+		grep '^TEST pkg34 frame=393 label=lua-ally .* fear=0 ' "$log" || return 1
 	fi
 	if covers 470; then
 		grep '^TEST pkg34 frame=396 label=terror-same-side .* terror=0 ' "$log" || return 1
