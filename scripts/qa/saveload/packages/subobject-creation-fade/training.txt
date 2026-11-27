@@ -1,0 +1,29 @@
+202 create Player_1 SubObjectCreationFadeProducer 0 2870,250,0
+211 queue Player_1 SubObjectCreationFadeProducer 0 SubObjectCreationFadeTrained
+219 create Player_1 SubObjectCreationFadeSkip 0 2810,385,0
+241 create Player_1 SubObjectCreationFadeDirect 0 2930,385,0
+242 create Player_1 SubObjectCreationFadeBoundary 0 2990,385,0
+242 objupgrade Player_1 SubObjectCreationFadeTrained 0 SubObjectCreationFadeUpgrade
+242 objupgrade Player_1 SubObjectCreationFadeDirect 0 SubObjectCreationFadeUpgrade
+242 objupgrade Player_1 SubObjectCreationFadeSkip 0 SubObjectCreationFadeUpgrade
+242 subobject-creation-fade-probe Player_1 SubObjectCreationFadeTrained 0 Forged_Blade
+242 subobject-creation-fade-probe Player_1 SubObjectCreationFadeDirect 0 Forged_Blade
+242 subobject-creation-fade-probe Player_1 SubObjectCreationFadeSkip 0 Forged_Blade
+243 create Player_1 SubObjectCreationFadeYoung 0 3050,385,0
+243 subobject-creation-fade-revoke Player_1 SubObjectCreationFadeTrained 0 SubObjectCreationFadeUpgrade
+243 subobject-creation-fade-probe Player_1 SubObjectCreationFadeTrained 0 Forged_Blade
+245 objupgrade Player_1 SubObjectCreationFadeBoundary 0 SubObjectCreationFadeUpgrade
+245 objupgrade Player_1 SubObjectCreationFadeYoung 0 SubObjectCreationFadeUpgrade
+245 subobject-creation-fade-probe Player_1 SubObjectCreationFadeYoung 0 Forged_Blade
+245 subobject-creation-fade-probe Player_1 SubObjectCreationFadeTrained 0 Forged_Blade
+245 subobject-creation-fade-probe Player_1 SubObjectCreationFadeBoundary 0 Forged_Blade
+252 subobject-creation-fade-probe Player_1 SubObjectCreationFadeTrained 0 Forged_Blade
+252 subobject-creation-fade-probe Player_1 SubObjectCreationFadeBoundary 0 Forged_Blade
+280 subobject-creation-fade-probe Player_1 SubObjectCreationFadeTrained 0 Forged_Blade
+280 subobject-creation-fade-probe Player_1 SubObjectCreationFadeBoundary 0 Forged_Blade
+282 destroy Player_1 SubObjectCreationFadeTrained 0
+282 destroy Player_1 SubObjectCreationFadeDirect 0
+282 destroy Player_1 SubObjectCreationFadeSkip 0
+282 destroy Player_1 SubObjectCreationFadeBoundary 0
+282 destroy Player_1 SubObjectCreationFadeYoung 0
+282 destroy Player_1 SubObjectCreationFadeProducer 0

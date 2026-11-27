@@ -103,5 +103,6 @@ protected:
 private:
 	Bool applyUpgrade(Bool animate);
 	Bool canFade() const;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_creationFrame = 0;
 };

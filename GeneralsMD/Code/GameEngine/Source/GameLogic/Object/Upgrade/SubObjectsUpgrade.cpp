@@ -50,6 +50,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
@@ -137,7 +138,8 @@ Bool SubObjectsUpgrade::canFade() const
 	constexpr UnsignedInt creationFrames = 3;
 	return RetailFileLayers::enabled() && TheGameLogic &&
 		!getSubObjectsUpgradeModuleData()->m_skipFadeOnCreate &&
-		TheGameLogic->getFrame() - m_creationFrame >= creationFrames;
+		(getObject()->getProducerID() != INVALID_ID ||
+			TheGameLogic->getFrame() - m_creationFrame >= creationFrames);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -235,28 +237,27 @@ Bool SubObjectsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
 
 void SubObjectsUpgrade::crc( Xfer *xfer )
 {
-
-	// extend base class
-	UpgradeModule::crc( xfer );
-
+	UpgradeModule::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
-//------------------------------------------------------------------------------------------------
-// Xfer method
-// Version Info:
-// 1: Initial version
-//------------------------------------------------------------------------------------------------
 void SubObjectsUpgrade::xfer( Xfer *xfer )
 {
-
-	// version
-	XferVersion currentVersion = 1;
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
 	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	xfer->xferVersion(&version, currentVersion);
+	UpgradeModule::xfer(xfer);
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
+}
 
-	// extend base class
-	UpgradeModule::xfer( xfer );
-
+void SubObjectsUpgrade::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"subobject-creation-frame", [this](Xfer* block) { block->xferUnsignedInt(&m_creationFrame); }, {}},
+	});
 }
 
 //------------------------------------------------------------------------------------------------
