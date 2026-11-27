@@ -18,12 +18,12 @@ check() {
     expect_tree 1430 0 1 1
     for frame in 260 800; do
         if covers "$frame"; then
-            expect "TEST tree-depletion selectable frame=$frame TreeLothlorienBase08 object=0 drawable=0"
+            expect "TEST tree-depletion selectable frame=$frame TreeLothlorienBase08 object=1 drawable=1"
             expect "TEST tree-depletion selectable frame=$frame MordorLumberMill object=1 drawable=1"
         fi
     done
     if covers 800; then
-        expect "TEST tree-depletion selectable frame=800 ElvenWoodTreeOpt object=0 drawable=0"
+        expect "TEST tree-depletion selectable frame=800 ElvenWoodTreeOpt object=1 drawable=1"
     fi
     if covers 300; then
         expect "TEST tree-depletion mill frame=300 rank=1 experience=1976"

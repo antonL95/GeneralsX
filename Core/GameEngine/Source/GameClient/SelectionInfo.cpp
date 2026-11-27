@@ -343,7 +343,7 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	}
 #endif
 
-	if (!pds->drawableListToFill)
+	if (!pds->drawableListToFill || draw->isKindOf(KINDOF_MOVE_ONLY))
 		return FALSE;
 
 #if !RTS_GENERALS || !PRESERVE_OCCUPANT_DETECTION_VIA_DRAG_SELECTION

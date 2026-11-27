@@ -1,0 +1,24 @@
+205 create Player_1 TreeLothlorienBase08 0 3900,3030,0
+205 create Player_1 SelectableKindsDrone 0 3840,3030,0
+205 create Player_1 SelectableKindsAlways 0 3960,3030,0
+205 create Player_1 SelectableKindsMoveOnly 0 3900,3090,0
+230 selectable-kinds-probe Player_1 TreeLothlorienBase08 0
+230 selectable-kinds-probe Player_1 SelectableKindsDrone 0
+230 selectable-kinds-probe Player_1 SelectableKindsAlways 0
+230 selectable-kinds-probe Player_1 SelectableKindsMoveOnly 0
+232 selectable-kinds-drag Player_1 TreeLothlorienBase08 0
+236 selectable-kinds-selected Player_1 TreeLothlorienBase08 0
+237 selectable-kinds-drag Player_1 SelectableKindsMoveOnly 0
+241 selectable-kinds-selected Player_1 SelectableKindsMoveOnly 0
+270 selectable-kinds-probe Player_1 TreeLothlorienBase08 0
+270 selectable-kinds-probe Player_1 SelectableKindsDrone 0
+270 selectable-kinds-probe Player_1 SelectableKindsAlways 0
+270 selectable-kinds-probe Player_1 SelectableKindsMoveOnly 0
+272 selectable-kinds-drag Player_1 TreeLothlorienBase08 0
+276 selectable-kinds-selected Player_1 TreeLothlorienBase08 0
+277 selectable-kinds-drag Player_1 SelectableKindsMoveOnly 0
+281 selectable-kinds-selected Player_1 SelectableKindsMoveOnly 0
+282 destroy Player_1 TreeLothlorienBase08 0
+282 destroy Player_1 SelectableKindsDrone 0
+282 destroy Player_1 SelectableKindsAlways 0
+282 destroy Player_1 SelectableKindsMoveOnly 0

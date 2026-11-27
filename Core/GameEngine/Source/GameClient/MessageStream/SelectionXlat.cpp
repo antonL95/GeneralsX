@@ -125,6 +125,9 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 	}
 	const Object *obj = draw->getObject();
 
+	if (obj->isKindOf(KINDOF_MOVE_ONLY))
+		return FALSE;
+
 	if (obj->isEffectivelyDead() && !obj->isSelectable())
 		return FALSE;
 
@@ -182,9 +185,6 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 
 	if (const Object* horde = obj->getContainedBy(); HordeContain::get(horde))
 		obj = horde;
-
-	if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_TREE) && obj->isKindOf(KINDOF_SHRUBBERY))
-		return FALSE;
 
 	// You cannot select something that has a logic override of unselectability or masked
 	if( obj->getStatusBits().testForAny( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED ) ) )
@@ -653,6 +653,8 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 
 	// only allow things that are selectable. Also, we aren't allowed to
 	Drawable *picked = TheTacticalView->pickDrawable( &region.lo, FALSE, PICK_TYPE_SELECTABLE);
+	if (picked && picked->isKindOf(KINDOF_MOVE_ONLY))
+		return KEEP_MESSAGE;
 	picked = HordeContain::resolveSelection(picked);
 
 	// If there wasn't anyone to pick, then we want to propagate this double click.

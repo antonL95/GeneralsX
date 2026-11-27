@@ -3644,33 +3644,22 @@ void Object::setSelectable(Bool selectable)
 //-------------------------------------------------------------------------------------------------
 Bool Object::isSelectable() const
 {
-//	return getTemplate()->isKindOf(KINDOF_ALWAYS_SELECTABLE)
-//				|| (m_isSelectable
-//						&& !testStatus(OBJECT_STATUS_UNSELECTABLE)
-//						&& !isEffectivelyDead()
-//						&& !getTemplate()->isKindOf(KINDOF_DRONE)//Most drones are unselectable from being slaved, but the SpyDrone needs help
-//						);
-
-
 	if (StrafeAreaUpdate::isFlying(*this))
 		return FALSE;
 
-	if (RetailFileLayers::enabled() && isKindOf(KINDOF_TREE) && isKindOf(KINDOF_SHRUBBERY))
+	if (isKindOf(KINDOF_ALWAYS_SELECTABLE))
+		return TRUE;
+
+	if (!m_isSelectable || testStatus(OBJECT_STATUS_UNSELECTABLE) || isKindOf(KINDOF_DRONE))
 		return FALSE;
 
-	if (getTemplate()->isKindOf(KINDOF_ALWAYS_SELECTABLE))
-    return TRUE;
-
-	const Bool selectableRubble = RetailFileLayers::enabled() && isEffectivelyDead() &&
-		getTemplate()->getRotWKObjectData().keepSelectableWhenDead;
-	if (selectableRubble || (m_isSelectable && !isEffectivelyDead()))
-    if ( !testStatus(OBJECT_STATUS_UNSELECTABLE) )
 #if !RETAIL_COMPATIBLE_CRC
-				if ( !getTemplate()->isKindOf(KINDOF_NO_SELECT) )
+	if (isKindOf(KINDOF_NO_SELECT))
+		return FALSE;
 #endif
-					return TRUE;
 
-  return FALSE;
+	return !isEffectivelyDead() ||
+		(RetailFileLayers::enabled() && getTemplate()->getRotWKObjectData().keepSelectableWhenDead);
 }
 
 //-------------------------------------------------------------------------------------------------
