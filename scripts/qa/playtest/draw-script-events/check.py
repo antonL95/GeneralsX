@@ -1,6 +1,8 @@
 import re
 
-render_env = {"GENERALSX_TEST_DRAWTRACE": "GoblinCaveTroll,DrawEntryProbe,DrawCaptureFlagProbe"}
+render_env = {
+    "GENERALSX_TEST_DRAWTRACE": "GoblinCaveTroll,DrawEntryProbe,DrawCaptureFlagProbe,DrawOwnerFlagProbe,DrawSpearProbe",
+}
 
 
 def check(log):
@@ -26,6 +28,15 @@ def check(log):
         failures.append("troll did not fire the rock weapon")
     if not re.search(r"^AUDIO TRACE frame=\d+ kind=sound-queue .* event=DrawEventProbeSound$", log, re.MULTILINE):
         failures.append("draw script sound was not queued")
+    for probe, mesh, failure in (
+        ("DrawOwnerFlagProbe", "FLAG_MEN", "campaign banner did not use its owner when no capture was active"),
+        ("DrawSpearProbe", "SPEAR", "snow troll Frame:1 event did not reveal the spear"),
+    ):
+        if not re.search(
+            rf"^TEST draw frame \d+ id \d+ {probe} .* subobjects \S*\.{mesh}:shown(?:,|$)",
+            log, re.MULTILINE | re.IGNORECASE,
+        ):
+            failures.append(failure)
     if not re.search(
         r"^TEST draw frame \d+ id \d+ DrawCaptureFlagProbe module ModuleTag_DrawMain "
         r".*flags \S*START_CAPTURE\S* subobjects \S*\.FLAG_MEN:shown",
