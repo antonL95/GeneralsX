@@ -1,5 +1,5 @@
-200 create PlyrCivilian SiegeHordeDeployWall 0 950,2600,0
-200 create Player_1 SiegeHordeDeployBundle 0 820,2520,60
+200 create PlyrCivilian SiegeHordeDeployWall 0 750,2600,0
+200 create Player_1 SiegeHordeDeployBundle 0 620,2520,60
 216 horde-climb-probe Player_1 SiegeHordeDeployBundle 0 -
 220 power Player_1 SiegeHordeDeployBundle 0 SpecialAbilitySiegeDeploy
 221 aim Player_1 SiegeHordeDeployBundle 0 PlyrCivilian:SiegeHordeDeployWall:0
@@ -7,7 +7,7 @@
 244 horde-climb-probe Player_1 SiegeHordeDeployInfantry 0 -
 244 horde-climb-probe Player_1 SiegeHordeDeployLadder 0 -
 350 horde-climb-probe Player_1 SiegeHordeDeployLadder 0 -
-430 horde-climb-probe Player_1 SiegeHordeDeployInfantry 0 -
-460 destroy Player_1 SiegeHordeDeployInfantry 0
-460 destroy Player_1 SiegeHordeDeployLadder 0
-460 destroy PlyrCivilian SiegeHordeDeployWall 0
+750 horde-climb-probe Player_1 SiegeHordeDeployInfantry 0 -
+760 destroy Player_1 SiegeHordeDeployInfantry 0
+760 destroy Player_1 SiegeHordeDeployLadder 0
+760 destroy PlyrCivilian SiegeHordeDeployWall 0

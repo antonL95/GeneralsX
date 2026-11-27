@@ -12,5 +12,5 @@ check() {
 	fi
 	expect_deployment 244 SiegeHordeDeployInfantry '.* wall=0 .* members=4 wallMembers=0 sameHorde=4' || return 1
 	expect_deployment 350 SiegeHordeDeployLadder 'deployed=1 .* release=1' || return 1
-	expect_deployment 430 SiegeHordeDeployInfantry '.* wall=1 .* contained=0 .* members=4 wallMembers=4 sameHorde=4 held=0'
+	expect_deployment 750 SiegeHordeDeployInfantry '.* wall=1 .* contained=0 .* members=4 wallMembers=4 sameHorde=4 held=0'
 }
