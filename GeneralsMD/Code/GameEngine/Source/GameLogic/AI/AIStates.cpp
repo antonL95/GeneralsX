@@ -7077,6 +7077,7 @@ StateReturnType AIGuardState::onEnter()
 	{
 		case GUARDTARGET_LOCATION: m_guardMachine->setTargetPositionToGuard( ai->getGuardLocation() ); break;
 		case GUARDTARGET_OBJECT: m_guardMachine->setTargetToGuard( TheGameLogic->findObjectByID(ai->getGuardObject()) ); break;
+		case GUARDTARGET_TEAM: m_guardMachine->setTargetPositionToGuard(obj->getPosition()); break;
 		case GUARDTARGET_AREA: m_guardMachine->setAreaToGuard( ai->getAreaToGuard() ); break;
 	}
 	m_guardMachine->setGuardMode(ai->getGuardMode());

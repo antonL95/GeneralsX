@@ -97,7 +97,8 @@ enum GuardTargetType CPP_11(: Int)
 	GUARDTARGET_LOCATION,	// Guard a coord3d
 	GUARDTARGET_OBJECT,		// Guard an object
 	GUARDTARGET_AREA,			// Guard a Polygon trigger
-	GUARDTARGET_NONE				// Currently not guarding
+	GUARDTARGET_NONE,
+	GUARDTARGET_TEAM
 };
 
 #ifdef DEFINE_LOCOMOTORSET_NAMES
@@ -387,9 +388,16 @@ public:
 
 	virtual const Coord3D *getGuardLocation() const { return &m_locationToGuard;	}
 	virtual ObjectID getGuardObject() const { return m_objectToGuard; }
+	UnsignedInt getGuardTeamID() const { return m_teamToGuard; }
 	virtual const PolygonTrigger *getAreaToGuard() const { return m_areaToGuard; }
 	virtual GuardTargetType getGuardTargetType() const { return m_guardTargetType[1]; }
-	virtual void clearGuardTargetType() { m_guardTargetType[1] = m_guardTargetType[0]; m_guardTargetType[0] = GUARDTARGET_NONE; }
+	virtual void clearGuardTargetType()
+	{
+		m_guardTargetType[1] = m_guardTargetType[0];
+		m_guardTargetType[0] = GUARDTARGET_NONE;
+		if (m_guardTargetType[1] != GUARDTARGET_TEAM)
+			m_teamToGuard = 0;
+	}
 	virtual GuardMode getGuardMode() const { return m_guardMode; }
 
 	virtual Object* construct( const ThingTemplate *what,
@@ -760,6 +768,7 @@ public:
 	virtual void friend_notifyStateMachineChanged();
 
 private:
+	void privateGuardTeam(UnsignedInt teamID, CommandSourceType cmdSource);
 	UpdateSleepTime updateRetailEngaged();
 	Bool isRetailAttackingBeyondEngagedDistance();
 	// this should only be called by load/save, or by chooseLocomotorSet.
@@ -784,6 +793,7 @@ private:
 	GuardTargetType				m_guardTargetType[2];
 	Coord3D								m_locationToGuard;
 	ObjectID							m_objectToGuard;
+	UnsignedInt m_teamToGuard = 0;
 	const PolygonTrigger*	m_areaToGuard;
 
 	// Attack Info --------------------------------------------------------------------------------------------

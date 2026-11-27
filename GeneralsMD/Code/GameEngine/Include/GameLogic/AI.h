@@ -444,6 +444,7 @@ enum AICommandType CPP_11(: Int)	// Stored in save file, do not reorder/renumber
 	AICMD_GUARD_AREA_FROM_POSITION,
 	AICMD_MOVE_TO_POSITION_AND_ORIENT,
 	AICMD_ATTACKMOVE_TO_POSITION_AND_ORIENT,
+	AICMD_GUARD_TEAM,
 };
 
 struct AICommandParms

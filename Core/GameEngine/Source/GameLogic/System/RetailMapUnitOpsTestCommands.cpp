@@ -748,6 +748,42 @@ void teamGarrisonProbe(const RetailTestCommands::Context& ctx)
 		ctx.frame, distributed, missing);
 }
 
+void teamGuardProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	const Object* target = ctx.findTarget();
+	if (!unit || !unit->getAI() || !target)
+		return;
+	AIUpdateInterface* ai = unit->getAI();
+	Bool missing = TRUE;
+	if (ctx.frame == 242)
+	{
+		const Int type = ScriptEngine::findRotwkActionByRetailIndex(399);
+		const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+		if (definition && definition->m_internalName == "TEAM_GUARD_TEAM" &&
+			definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::TEAM &&
+			definition->getParameterType(1) == Parameter::TEAM)
+		{
+			Team* original = unit->getTeam();
+			Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+			unit->setTemporaryTeam(team);
+			auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+			action->getParameter(0)->friend_setString("<This Team>");
+			action->getParameter(1)->friend_setString("MapScriptGuardMissing");
+			TheScriptEngine->friend_executeAction(action, team);
+			missing = ai->getCurrentStateID() != AI_GUARD;
+			action->getParameter(1)->friend_setString(target->getTeam()->getName());
+			TheScriptEngine->friend_executeAction(action, team);
+			deleteInstance(action);
+			unit->setTemporaryTeam(original);
+			deleteInstance(team);
+		}
+	}
+	const Bool ordered = ai->getCurrentStateID() == AI_GUARD && ai->getLastCommandSource() == CMD_FROM_SCRIPT &&
+		ai->getGuardTeamID() == target->getTeam()->getID();
+	std::fprintf(stderr, "TEST map-unit-ops guard team frame=%u ordered=%d missing=%d\n", ctx.frame, ordered, missing);
+}
+
 void probe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -774,6 +810,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-attack", probe);
 	registerAction("map-unit-ops-teleport", teleportProbe);
 	registerAction("map-unit-ops-team-teleport", teamTeleportProbe);
+	registerAction("map-unit-ops-guard-team", teamGuardProbe);
 	registerAction("map-unit-ops-garrison-team", teamGarrisonProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-set-xp", setExperienceProbe);

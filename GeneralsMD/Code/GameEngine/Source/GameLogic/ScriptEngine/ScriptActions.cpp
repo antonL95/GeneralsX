@@ -7805,6 +7805,26 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_GUARD_OBJECT:
 			doTeamGuardObject(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
+		case ScriptAction::TEAM_GUARD_TEAM:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			Team* target = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString());
+			if (!team || !target)
+				return;
+			AICommandParms order(AICMD_GUARD_TEAM, CMD_FROM_SCRIPT);
+			order.m_intValue = static_cast<Int>(target->getID());
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				Object* unit = member.cur();
+				AIUpdateInterface* ai = unit->getAI();
+				if (!ai || unit->isDestroyed() || unit->isEffectivelyDead() ||
+					unit->testStatus(OBJECT_STATUS_HORDE_MEMBER) || HordeContain::get(unit->getContainedBy()))
+					continue;
+				unit->leaveGroup();
+				ai->aiDoCommand(&order);
+			}
+			return;
+		}
 		case ScriptAction::TEAM_GUARD_AREA:
 			doTeamGuardArea(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;

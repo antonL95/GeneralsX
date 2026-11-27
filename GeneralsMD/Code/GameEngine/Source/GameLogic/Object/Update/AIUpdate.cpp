@@ -3335,6 +3335,9 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 			privateGuardObject(parms->m_obj, (GuardMode)parms->m_intValue, parms->m_cmdSource);
 			break;
 		}
+		case AICMD_GUARD_TEAM:
+			privateGuardTeam(static_cast<UnsignedInt>(parms->m_intValue), parms->m_cmdSource);
+			break;
 		case AICMD_GUARD_TUNNEL_NETWORK:
 		{
 			//Kris: Aug 18, 2003 -- If you were retaliating and ordered to enter guard mode,
@@ -4913,6 +4916,19 @@ void AIUpdateInterface::privateGuardObject( Object *objectToGuard, GuardMode gua
 	getStateMachine()->setState( AI_GUARD );
 }
 
+void AIUpdateInterface::privateGuardTeam(UnsignedInt teamID, CommandSourceType cmdSource)
+{
+	if (!TheTeamFactory->findTeamByID(teamID) || !getObject()->isMobile() || getObject()->isKindOf(KINDOF_PROJECTILE))
+		return;
+	getStateMachine()->clear();
+	m_guardTargetType[0] = GUARDTARGET_NONE;
+	m_guardTargetType[1] = GUARDTARGET_TEAM;
+	m_guardMode = GUARDMODE_NORMAL;
+	m_teamToGuard = teamID;
+	setLastCommandSource(cmdSource);
+	getStateMachine()->setState(AI_GUARD);
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 /**
@@ -6198,6 +6214,11 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "guard-team", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_teamToGuard);
+		}, [this] {
+			m_teamToGuard = TEAM_ID_INVALID;
+		} },
 		{ "group-route", [this](Xfer* x) {
 			x->xferObjectID(&m_retailGroupRouteLeader);
 			x->xferUnsignedInt(&m_retailGroupRouteFrame);

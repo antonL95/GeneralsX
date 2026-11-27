@@ -4,6 +4,7 @@ check() {
             expect "TEST map-unit-ops team teleport frame=$frame moved=1 missing=1"
             expect "TEST map-unit-ops set xp frame=$frame baseline=1 amount=1 missing=1"
             expect "TEST map-unit-ops garrison team frame=$frame distributed=1 missing=1"
+            expect "TEST map-unit-ops guard team frame=$frame ordered=1 missing=1"
         fi
     done
     if covers 248; then

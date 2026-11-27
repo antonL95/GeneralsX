@@ -212,6 +212,47 @@ AIGuardMachine::~AIGuardMachine()
 }
 
 //--------------------------------------------------------------------------------------
+Bool AIGuardMachine::getMovingTargetPosition(Coord3D& position) const
+{
+	if (const Object* target = TheGameLogic->findObjectByID(m_targetToGuard))
+	{
+		position = *target->getPosition();
+		return TRUE;
+	}
+	const Object* owner = getOwner();
+	const AIUpdateInterface* ai = owner->getAI();
+	if (!ai || ai->getGuardTargetType() != GUARDTARGET_TEAM)
+		return FALSE;
+
+	Coord3D center{};
+	Int count = 0;
+	if (const Team* team = TheTeamFactory->findTeamByID(ai->getGuardTeamID()))
+	{
+		for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+		{
+			const Coord3D* location = member.cur()->getPosition();
+			center.x += location->x;
+			center.y += location->y;
+			center.z += location->z;
+			++count;
+		}
+	}
+	position = *owner->getPosition();
+	if (count && (center.x != 0.0f || center.y != 0.0f))
+	{
+		const Real inverseCount = 1.0f / INT_TO_REAL(count);
+		position.set(center.x * inverseCount, center.y * inverseCount, center.z * inverseCount);
+	}
+	return TRUE;
+}
+
+Coord3D AIGuardMachine::getPositionToGuard() const
+{
+	Coord3D position = m_positionToGuard;
+	getMovingTargetPosition(position);
+	return position;
+}
+
 Bool AIGuardMachine::lookForInnerTarget()
 {
 	Object* owner = getOwner();
@@ -232,8 +273,7 @@ Bool AIGuardMachine::lookForInnerTarget()
 		}
 	}
 
-	Object* targetToGuard = findTargetToGuardByID();
-	Coord3D pos = targetToGuard ? *targetToGuard->getPosition() : *getPositionToGuard();
+	Coord3D pos = getPositionToGuard();
 
 	const PolygonTrigger*								area = getAreaToGuard();
 	PartitionFilterRelationship					f1(owner, PartitionFilterRelationship::ALLOW_ENEMIES);
@@ -456,8 +496,7 @@ StateReturnType AIGuardInnerState::onEnter()
 	// Or try to destroy the target
 	else
 	{
-		Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-		Coord3D pos = targetToGuard ? *targetToGuard->getPosition() : *getGuardMachine()->getPositionToGuard();
+		Coord3D pos = getGuardMachine()->getPositionToGuard();
 		Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
 		if (nemesis == nullptr)
 		{
@@ -488,12 +527,7 @@ StateReturnType AIGuardInnerState::update()
 {
 	if (m_attackState)
 	{
-		// if the position has moved (IE we're guarding an object), move with it.
-		Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-		if (targetToGuard)
-		{
-			m_exitConditions.m_center = *targetToGuard->getPosition();
-		}
+		getGuardMachine()->getMovingTargetPosition(m_exitConditions.m_center);
 
 		return m_attackState->update();
 	}
@@ -574,8 +608,7 @@ StateReturnType AIGuardOuterState::onEnter()
 		return STATE_SUCCESS;
 	}
 
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	Coord3D pos = targetToGuard ? *targetToGuard->getPosition() : *getGuardMachine()->getPositionToGuard();
+	Coord3D pos = getGuardMachine()->getPositionToGuard();
 
 	Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
 	if (nemesis == nullptr)
@@ -618,12 +651,7 @@ StateReturnType AIGuardOuterState::update()
 {
 	if (m_attackState==nullptr) return STATE_SUCCESS;
 
-	// if the position has moved (IE we're guarding an object), move with it.
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	if (targetToGuard)
-	{
-		m_exitConditions.m_center = *targetToGuard->getPosition();
-	}
+	getGuardMachine()->getMovingTargetPosition(m_exitConditions.m_center);
 
 	Object* goalObj = m_attackState->getMachineGoalObject();
 	if (goalObj)
@@ -705,8 +733,7 @@ StateReturnType AIGuardReturnState::onEnter()
 //	if (getGuardMachine()->lookForInnerTarget())
 //		return STATE_FAILURE; // early termination because we found a target.
 
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	m_goalPosition = targetToGuard ? *targetToGuard->getPosition() : *getGuardMachine()->getPositionToGuard();
+	m_goalPosition = getGuardMachine()->getPositionToGuard();
 
 	AIUpdateInterface *ai = getMachineOwner()->getAIUpdateInterface();
 	if (ai && getGuardMachine()->getAreaToGuard())
@@ -808,11 +835,9 @@ StateReturnType AIGuardIdleState::update()
 		return STATE_SUCCESS;	// Transitions to AIGuardInnerState.
 	}
 
-	// See if the object we are guarding moved.
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	if (targetToGuard)
+	Coord3D pos;
+	if (getGuardMachine()->getMovingTargetPosition(pos))
 	{
-		Coord3D pos = *targetToGuard->getPosition();
 		Real delta = m_guardeePos.x-pos.x;
 		if (delta*delta > 4*PATHFIND_CELL_SIZE_F*PATHFIND_CELL_SIZE_F) {
 			m_guardeePos = pos;
@@ -902,8 +927,7 @@ StateReturnType AIGuardAttackAggressorState::onEnter()
 		return STATE_SUCCESS;
 	}
 
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	Coord3D pos = targetToGuard ? *targetToGuard->getPosition() : *getGuardMachine()->getPositionToGuard();
+	Coord3D pos = getGuardMachine()->getPositionToGuard();
 	//Don't allow guarding units to leave their guard radius!
 	m_exitConditions.m_center = pos;
 	m_exitConditions.m_radiusSqr = sqr(AIGuardMachine::getStdGuardRange(getMachineOwner()));
@@ -928,12 +952,7 @@ StateReturnType AIGuardAttackAggressorState::onEnter()
 StateReturnType AIGuardAttackAggressorState::update()
 {
 	if (m_attackState==nullptr) return STATE_SUCCESS;
-	// if the position has moved (IE we're guarding an object), move with it.
-	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
-	if (targetToGuard)
-	{
-		m_exitConditions.m_center = *targetToGuard->getPosition();
-	}
+	getGuardMachine()->getMovingTargetPosition(m_exitConditions.m_center);
 
 	return m_attackState->update();
 }

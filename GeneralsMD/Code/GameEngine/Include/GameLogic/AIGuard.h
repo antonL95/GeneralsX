@@ -111,10 +111,10 @@ public:
 	 * used by this machine.
 	 */
 	AIGuardMachine( Object *owner );
-	Object* findTargetToGuardByID() { return TheGameLogic->findObjectByID(m_targetToGuard); }
 	void setTargetToGuard( const Object *object ) { m_targetToGuard = object ? object->getID() : INVALID_ID; }
 
-	const Coord3D *getPositionToGuard() const { return &m_positionToGuard; }
+	Bool getMovingTargetPosition(Coord3D& position) const;
+	Coord3D getPositionToGuard() const;
 	void setTargetPositionToGuard( const Coord3D *pos) { m_positionToGuard = *pos; }
 
 	const PolygonTrigger *getAreaToGuard() const { return m_areaToGuard; }
