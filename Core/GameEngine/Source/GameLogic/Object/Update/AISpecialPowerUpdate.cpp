@@ -297,6 +297,30 @@ Bool canUseSelfBuff(const Object& source)
 	return combatHealthFraction(source) < selfBuffHealthLimit;
 }
 
+Bool shouldCastCombatFear(const Object& source, Real radius)
+{
+	constexpr Real healthLimit = 0.7f;
+	if (!combatVictim(source) || bodyHealthFraction(source) >= healthLimit || radius < 0.0f || !std::isfinite(radius))
+		return FALSE;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(source.getPosition(), radius, FROM_CENTER_2D,
+		nullptr, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder hold(nearby);
+	Int enemyBalance = 0;
+	for (const Object* object = nearby->first(); object; object = nearby->next())
+	{
+		if (object->isEffectivelyDead())
+			continue;
+
+		const Relationship relationship = source.getRelationship(object);
+		if (relationship == ALLIES)
+			--enemyBalance;
+		else if (relationship == ENEMIES && !object->isKindOf(KINDOF_BANNER) && object->getExperienceTracker()->getRank() <= 1)
+			++enemyBalance;
+	}
+	return enemyBalance > 0;
+}
+
 UpdateSleepTime updateStancePolicy(Object& source, const Player& player, const CommandButton& button, Int policyStance)
 {
 	using namespace AttributeModifierRules;
@@ -765,7 +789,8 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 	const Int type = getAISpecialPowerUpdateModuleData()->m_specialPowerAIType;
 	const std::string_view policy(type >= 0 ? specialPowerAITypes[type] : "");
 	if (stancePolicy(policy) != AttributeModifierRules::STANCE_UNINITIALIZED ||
-		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON")
+		combatPowerTargets(policy) != CombatPowerTargets::None || policy == "AI_SPECIAL_POWER_TARGETAOE_SUMMON" ||
+		policy == "AI_SPECIAL_POWER_ELENDIL")
 		setWakeFrame(getObject(), retailPolicyCooldown);
 #endif
 }
@@ -865,6 +890,18 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 			!power->isValidRetailTarget(source, nullptr, nullptr, CMD_FROM_AI) ||
 			GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f ||
 			!shouldHealHeroes(*source, data->m_specialPowerRadius) || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+			return retailPolicyPoll;
+		source->doSpecialPower(power, options);
+		return retailPolicyCooldown;
+	}
+
+	if (policy == "AI_SPECIAL_POWER_ELENDIL")
+	{
+		const UnsignedInt options = button->getOptions();
+		if (!shouldCastCombatFear(*source, data->m_specialPowerRadius) ||
+			!button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) ||
+			!power->isValidRetailTarget(source, nullptr, nullptr, CMD_FROM_AI) ||
+			!rollRetailPolicyActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPower(power, options);
 		return retailPolicyCooldown;

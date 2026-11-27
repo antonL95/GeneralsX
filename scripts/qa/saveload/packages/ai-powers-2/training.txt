@@ -188,4 +188,25 @@
 1436 destroy Player_1 AiPowers2DominateWounded 1
 1436 destroy Player_1 AiPowers2DominateWounded 0
 1436 destroy Player_1 AiPowers2DominateFootman 1
+40 create Player_2 AiPowers3FearCaster 0 2870,2070,0
+40 create Player_2 AiPowers3FearCaster 1 3020,1690,0
+41 create Player_1 AiPowers3FearTarget 0 2900,2070,0
+41 create Player_1 AiPowers3FearTarget 1 2900,2090,0
+41 create Player_1 AiPowers3FearTarget 2 3050,1690,0
+41 create Player_1 AiPowers3FearBanner 0 3050,1710,0
+42 damage Player_2 AiPowers3FearCaster 0 450
+42 damage Player_2 AiPowers3FearCaster 1 450
+43 attack Player_2 AiPowers3FearCaster 0 Player_1:AiPowers3FearTarget:0
+43 attack Player_2 AiPowers3FearCaster 1 Player_1:AiPowers3FearTarget:2
+243 ability Player_2 AiPowers3FearCaster 0
+243 ability Player_2 AiPowers3FearCaster 1
+385 powers-fire-state Player_2 AiPowers3FearCaster 1 AiPowers3Fear
+385 health Player_2 AiPowers3FearCaster 0
+385 health Player_2 AiPowers3FearCaster 1
+386 destroy Player_2 AiPowers3FearCaster 0
+386 destroy Player_2 AiPowers3FearCaster 1
+386 destroy Player_1 AiPowers3FearTarget 0
+386 destroy Player_1 AiPowers3FearTarget 1
+386 destroy Player_1 AiPowers3FearTarget 2
+386 destroy Player_1 AiPowers3FearBanner 0
 1436 destroy Player_1 AiPowers2DominateFootman 0
