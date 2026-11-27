@@ -137,7 +137,8 @@ public:
 
 	void convertBonePosToWorldPos(const Coord3D* bonePos, const Matrix3D* boneTransform, Coord3D* worldPos, Matrix3D* worldTransform) const;
 
-	void setTransformMatrix( const Matrix3D *mx );												///< set the world transformation matrix
+	void setTransformMatrix( const Matrix3D *mx );
+	void setTransformMatrixNoDirty(const Matrix3D* mx);
 	const Matrix3D* getTransformMatrix() const { return &m_transform; }		///< return the world transformation matrix
 
 	void xferTransformCache(Xfer *xfer);
@@ -155,6 +156,7 @@ protected:
 	virtual const Drawable *asDrawableMeth() const { return nullptr; }
 
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) = 0;
+	virtual void reactToTransformChangeNoDirty() {}
 
 private:
 

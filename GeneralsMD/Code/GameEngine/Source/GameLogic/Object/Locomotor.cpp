@@ -713,6 +713,7 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "SwoopTerminalVelocity", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopTerminalVelocity) },
 		{ "SwoopAccelerationRate", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopAccelerationRate) },
 		{ "LookAheadMult", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_lookAheadMult) },
+		{ "NonDirtyTransform", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_nonDirtyTransform) },
 		{ "CirclingRadius", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_circlingRadius) },
 		{ "Extra2DFriction", parseFrictionPerSec, nullptr, offsetof(LocomotorTemplate, m_extra2DFriction) },
 		{ "SpeedLimitZ", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_speedLimitZ) },

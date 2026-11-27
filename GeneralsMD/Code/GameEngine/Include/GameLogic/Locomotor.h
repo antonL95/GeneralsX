@@ -276,6 +276,7 @@ private:
 	Real m_swoopTerminalVelocity = 0.0f;
 	Real m_swoopAccelerationRate = 0.0f;
 	Real m_lookAheadMult = 1.0f;
+	Bool m_nonDirtyTransform = FALSE;
 	Real m_slowTurnRadius = 0.0f;
 	Real m_fastTurnRadius = 0.0f;
 	Bool											m_waitForFormation;
@@ -332,6 +333,7 @@ public:
 
 	Real getPreferredAttackHeight() const { return m_template->m_preferredAttackHeight; }
 	Real getLookAheadMult() const { return m_template->m_lookAheadMult; }
+	Bool getNonDirtyTransform() const { return m_template->m_nonDirtyTransform; }
 	Real getPreferredHeight() const { return m_preferredHeight;} ///< Just return preferredheight, no damage consideration
 	void restorePreferredHeightFromTemplate() { m_preferredHeight = m_template->m_preferredHeight; };
 	Real getPreferredHeightDamping() const { return m_preferredHeightDamping;}

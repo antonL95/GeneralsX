@@ -682,7 +682,7 @@ UpdateSleepTime PhysicsBehavior::update()
 	if (retail && m_impactEndFrame != 0)
 		updateImpactRecovery();
 
-	if (!obj->isDisabledByType(DISABLED_HELD))
+	if (!obj->isDisabledByType(DISABLED_HELD) && !pathFlight)
 	{
 		Matrix3D mtx = *obj->getTransformMatrix();
 
@@ -695,7 +695,7 @@ UpdateSleepTime PhysicsBehavior::update()
 			m_vel.z = m_impactStart.z * u + m_impactEnd.z * t +
 				3.0f * t * u * m_impactHeight * (u * d->m_firstHeight + t * d->m_secondHeight) - prevPos.z;
 		}
-		else if (!pathFlight)
+		else
 		{
 			if (!scalingWall)
 				applyGravitationalForces();
@@ -706,19 +706,18 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 
 		const Real minVelocityComponent = 0.001f;
-		if (!pathFlight && (impactFlight || !obj->getLogicModelConditions().test(MODELCONDITION_BACKING_UP)))
+		if (impactFlight || !obj->getLogicModelConditions().test(MODELCONDITION_BACKING_UP))
 		{
 			if (fabsf(m_vel.x) < minVelocityComponent) m_vel.x = 0.0f;
 			if (fabsf(m_vel.y) < minVelocityComponent) m_vel.y = 0.0f;
 		}
-		if (!pathFlight && fabsf(m_vel.z) < minVelocityComponent) m_vel.z = 0.0f;
+		if (fabsf(m_vel.z) < minVelocityComponent) m_vel.z = 0.0f;
 
 		m_velMag = INVALID_VEL_MAG;
 
 		Real oldPosZ = mtx.Get_Z_Translation();
 
-		// integrate velocity into position
-		if (impactFlight || pathFlight)
+		if (impactFlight)
 		{
 			mtx.Adjust_X_Translation(m_vel.x);
 			mtx.Adjust_Y_Translation(m_vel.y);

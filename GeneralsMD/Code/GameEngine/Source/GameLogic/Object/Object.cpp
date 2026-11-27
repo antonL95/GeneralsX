@@ -2342,7 +2342,7 @@ void Object::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPo
 
 	if (posDiff)
 	{
-		setTriggerAreaFlagsForChangeInPosition(); // Update for entered/exited
+		setTriggerAreaFlagsForChangeInPosition();
 
 		Region3D mapExtent;
 		TheTerrainLogic->getExtent(&mapExtent);
@@ -2351,6 +2351,14 @@ void Object::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPo
 		else
 			m_privateStatus |= OFF_MAP;
 	}
+}
+
+void Object::reactToTransformChangeNoDirty()
+{
+	if (m_partitionData)
+		m_partitionData->makeDirty(true);
+	if (getContain())
+		getContain()->containReactToTransformChange();
 }
 
 //-------------------------------------------------------------------------------------------------

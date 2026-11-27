@@ -277,6 +277,7 @@ public:
 	void friend_setUndetectedDefector(Bool status);
 
 	inline Bool isOffMap() const { return BitIsSet(m_privateStatus, OFF_MAP); }
+	inline const ICoord3D& getTriggerAreaPosition() const { return m_iPos; }
 
 	inline Bool isCaptured() const { return BitIsSet(m_privateStatus, CAPTURED); }
 	void setCaptured(Bool isCaptured);
@@ -725,6 +726,7 @@ protected:
 	void removeThreat();
 
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
+	virtual void reactToTransformChangeNoDirty() override;
 
 #if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 	void removeFromTunnelContain();

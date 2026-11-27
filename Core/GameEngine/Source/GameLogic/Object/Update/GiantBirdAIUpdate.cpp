@@ -502,15 +502,33 @@ void GiantBirdAIUpdate::advanceFlightPath(Locomotor& locomotor, Real desiredSpee
 		m_flightSpeed = std::clamp(m_flightSpeed * (1.0f - 0.4f * slope), std::min(locomotor.getMinSpeed(), maxSpeed), maxSpeed);
 		m_nextSpeedFrame = now + FRAMES_PER_RETAIL_TICK;
 	}
+	const Coord3D previousPosition = *bird.getPosition();
 	m_flightDistance = std::min(end, m_flightDistance + m_flightSpeed);
-	Coord3D position = flightPosition(m_flightDistance);
+	const Coord3D sampled = flightPosition(m_flightDistance);
+	Matrix3D transform = *bird.getTransformMatrix();
+	transform.Set_Translation(Vector3(sampled.x, sampled.y, sampled.z));
+	if (locomotor.getNonDirtyTransform())
+		bird.setTransformMatrixNoDirty(&transform);
+	Coord3D position = sampled;
 	position.z = std::max(position.z, TheTerrainLogic->getGroundHeight(position.x, position.y) + radius * 0.25f);
 	if (turn != 0.0f)
-		bird.setOrientation(facing + std::clamp(turn, -turnRate, turnRate));
+	{
+		const Real yaw = facing + std::clamp(turn, -turnRate, turnRate);
+		const Real c = WWMath::CosTrig(yaw);
+		const Real s = WWMath::SinTrig(yaw);
+		transform.Set(c, -s, 0.0f, position.x,
+			s, c, 0.0f, position.y,
+			0.0f, 0.0f, 1.0f, position.z);
+	}
+	else
+	{
+		transform.Set_Translation(Vector3(position.x, position.y, position.z));
+	}
+	bird.setTransformMatrix(&transform);
 	physics.setTurning(m_flightTurn < 0.0f ? TURN_NEGATIVE : m_flightTurn > 0.0f ? TURN_POSITIVE : TURN_NONE);
 	locomotor.setPhysicsOptions(&bird);
 	bird.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BRAKING));
-	physics.setFlightPathVelocity(position - *bird.getPosition());
+	physics.setFlightPathVelocity(position - previousPosition);
 	updateAirborneTargetStatus();
 }
 

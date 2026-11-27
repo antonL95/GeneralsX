@@ -289,6 +289,19 @@ void Thing::setTransformMatrix( const Matrix3D *mx )
 	DEBUG_ASSERTCRASH(!(_isnan(getPosition()->x) || _isnan(getPosition()->y) || _isnan(getPosition()->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
 }
 
+void Thing::setTransformMatrixNoDirty(const Matrix3D* mx)
+{
+	const Real oldAngle = m_cachedAngle;
+	const Coord3D oldPos = m_cachedPos;
+	m_transform = *mx;
+	m_cachedPos = {mx->Get_X_Translation(), mx->Get_Y_Translation(), mx->Get_Z_Translation()};
+	m_cachedAngle = mx->Get_Z_Rotation();
+	m_cacheFlags = 0;
+	if (oldAngle == m_cachedAngle && oldPos == m_cachedPos)
+		return;
+	reactToTransformChangeNoDirty();
+}
+
 void Thing::xferTransformCache(Xfer *xfer)
 {
 	xfer->xferCoord3D(&m_cachedPos);
