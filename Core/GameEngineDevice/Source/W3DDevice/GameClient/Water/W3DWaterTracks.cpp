@@ -47,8 +47,10 @@
 #include "W3DDevice/GameClient/W3DWaterTracks.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
+#include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Water.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/TerrainLogic.h"
 #include "Common/FramePacer.h"
 #include "Common/GlobalData.h"
@@ -63,6 +65,12 @@
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8wrapper.h"
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+
+static constexpr Int WaterTrackCapacity = 2000;
 
 //number of vertex pages allocated - allows double buffering of vertex updates.
 //while one is being rendered, another is being updated.  Improves HW parallelism.
@@ -179,7 +187,17 @@ Int WaterTracksObj::freeWaterTracksResources()
 //=============================================================================
 void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const Vector2 &end, const Char *texturename, Int waveTimeOffset)
 {
-	freeWaterTracksResources();	//free old resources used by this track
+	waveInfo info = waveTypeInfo[m_type];
+	info.m_finalHeight = width;
+	info.m_finalWidth = length;
+	info.m_textureName = texturename;
+	init(info, start, end, waveTimeOffset);
+}
+
+void WaterTracksObj::init(const waveInfo &info, const Vector2 &start, const Vector2 &end, Int waveTimeOffset)
+{
+	freeWaterTracksResources();
+	m_retailWave.reset();
 
 	//save original settings used to create this wave
 	m_initStartPos = start;
@@ -203,20 +221,20 @@ void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const 
 	//m_startPos -= m_waveDir*m_width;
 	//move back initial tip off of wave a couple units off the final position
 	//to give it some room to travel. Travel vector is stored in m_waveDir.
-	m_waveDistance = waveTypeInfo[m_type].m_waveDistance;	//total distance traveled by wave front
+	m_waveDistance = info.m_waveDistance;
 
 	m_waveDir *= m_waveDistance;
 	m_startPos -= m_waveDir;	//move start point down away from shoreline
 
-	m_initialVelocity=waveTypeInfo[m_type].m_initialVelocity;			//velocity per ms
+	m_initialVelocity = info.m_initialVelocity;
 	m_totalMs = m_waveDistance/m_initialVelocity; //amount of time for wave to travel complete distance
 
-	m_fadeMs = waveTypeInfo[m_type].m_fadeMs;		//time for wave to fade out after it stops on beach
+	m_fadeMs = info.m_fadeMs;
 
-	m_waveInitialWidth=length * waveTypeInfo[m_type].m_initialWidthFraction;///<width of wave segment when it first appears
-	m_waveInitialHeight=m_waveInitialWidth * waveTypeInfo[m_type].m_initialHeightWidthFraction;	///<height of wave segment when it first appears
-	m_waveFinalWidth=length;	///<width of wave segment at full size
-	m_waveFinalHeight=width;		///<final height of unstretched wave
+	m_waveInitialWidth = info.m_finalWidth * info.m_initialWidthFraction;
+	m_waveInitialHeight = m_waveInitialWidth * info.m_initialHeightWidthFraction;
+	m_waveFinalWidth = info.m_finalWidth;
+	m_waveFinalHeight = info.m_finalHeight;
 
 	//get total time for front to complete its cycle
 	m_timeToReachBeach=(m_waveDistance - m_waveFinalHeight)/m_initialVelocity;
@@ -225,7 +243,7 @@ void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const 
 	m_timeToRetreat = sqrt(fabs(2.0f*m_waveFinalHeight/m_frontSlowDownAcc));
 	m_totalMs = m_timeToReachBeach + m_timeToStop + m_timeToRetreat;	//total time that wave front is on screen
 	m_backSlowDownAcc = (2.0f*m_waveInitialHeight/(m_timeToStop*m_timeToStop));//((m_waveInitialHeight - m_velocity*m_timeToStop)*2.0f)/(m_timeToStop*m_timeToStop);
-	m_timeToCompress = waveTypeInfo[m_type].m_timeToCompress;	//time for back of wave to continue moving forward after front starts retreating.
+	m_timeToCompress = info.m_timeToCompress;
 
 
 	if (m_type == WaveTypeStationary)
@@ -237,7 +255,7 @@ void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const 
 		m_fadeMs = 1000;		//time for wave to fade out after it stops on beach
 	}
 
-	m_stageZeroTexture=WW3DAssetManager::Get_Instance()->Get_Texture(texturename);
+	m_stageZeroTexture = WW3DAssetManager::Get_Instance()->Get_Texture(info.m_textureName);
 }
 
 //=============================================================================
@@ -252,6 +270,7 @@ void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const 
 //=============================================================================
 void WaterTracksObj::init( Real width, const Vector2 &start, const Vector2 &end, const Char *texturename)
 {
+	m_retailWave.reset();
 	freeWaterTracksResources();	//free old resources used by this track
 	m_boundingSphere.Init(Vector3(0,0,0),400);
 	m_boundingBox.Center.Set(0.0f, 0.0f, 0.0f);
@@ -298,13 +317,20 @@ Int WaterTracksObj::update(Int msElapsed)
 
 Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 {
-	// TheSuperHackers @tweak The wave movement time step is now decoupled from the render update.
-	m_elapsedMs += TheFramePacer->getLogicTimeStepMilliseconds();
+	Real scroll = 0.0f;
+	if (m_retailWave)
+	{
+		const auto elapsed = uint64_t(TheGameLogic->getFrame()) * 1000 / LOGICFRAMES_PER_SECOND;
+		m_elapsedMs = static_cast<Int>((elapsed + m_initTimeOffset) % m_totalMs);
+		scroll = static_cast<Real>(std::fmod(elapsed * 0.001 * m_retailWave->uvScroll, 1.0));
+	}
+	else
+		m_elapsedMs += TheFramePacer->getLogicTimeStepMilliseconds();
 
 	VertexFormatXYZDUV1 *vb;
 	Vector2	waveTailOrigin,waveFrontOrigin;
 	Real	ooWaveDirLen=1.0f/m_waveDir.Length();	//one over length
-	Real	waterHeight;
+	Real waterHeight = m_retailWave ? m_retailWave->waterHeight : TheWaterTracksRenderSystem->m_level;
 	Real	waveAlpha;
 	Real	widthFrac;
 	Real	heightFrac;
@@ -433,7 +459,8 @@ Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 
 	//First insert tail of wave:
 	Vector2 testPoint(waveTailOrigin);
-	TheTerrainLogic->isUnderwater(testPoint.X,testPoint.Y,&waterHeight);
+	if (!m_retailWave)
+		TheTerrainLogic->isUnderwater(testPoint.X, testPoint.Y, &waterHeight);
 	vb->x=	testPoint.X;
 	vb->y=	testPoint.Y;
 	vb->z=waterHeight+1.5f;
@@ -442,7 +469,7 @@ Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 		vb->u1=1;
 	else
 		vb->u1=0;
-	vb->v1=0;
+	vb->v1 = scroll;
 	vb++;
 	testPoint.Set(waveTailOrigin + m_perpDir*m_waveFinalWidth*widthFrac);
 	vb->x=	testPoint.X;
@@ -453,7 +480,7 @@ Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 		vb->u1=0.0f;
 	else
 		vb->u1=1.0f;
-	vb->v1=0;
+	vb->v1 = scroll;
 	vb++;
 	//insert front of wave
 	testPoint.Set(waveFrontOrigin);
@@ -465,7 +492,7 @@ Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 		vb->u1=1;
 	else
 		vb->u1=0;
-	vb->v1=1.0f;
+	vb->v1 = 1.0f + scroll;
 	vb++;
 	testPoint.Set(waveFrontOrigin + m_perpDir*m_waveFinalWidth*widthFrac);
 	vb->x=	testPoint.X;
@@ -476,7 +503,7 @@ Int WaterTracksObj::render(DX8VertexBufferClass	*vertexBuffer, Int batchStart)
 		vb->u1=0;
 	else
 		vb->u1=1.0f;
-	vb->v1=1.0f;
+	vb->v1 = 1.0f + scroll;
 	vb++;
 
 	vertexBuffer->Get_DX8_Vertex_Buffer()->Unlock();
@@ -707,7 +734,6 @@ void WaterTracksRenderSystem::ReleaseResources()
 //=============================================================================
 void WaterTracksRenderSystem::init()
 {
-	const Int numModules=2000;	///@todo: Get a value out of gdf
 	Int i;
 	WaterTracksObj *mod;
 
@@ -734,7 +760,7 @@ void WaterTracksRenderSystem::init()
 	}
 
 	// allocate our modules for this system
-	for( i = 0; i < numModules; i++ )
+	for (i = 0; i < WaterTrackCapacity; ++i)
 	{
 
 		mod = NEW WaterTracksObj;
@@ -869,11 +895,11 @@ Try improving the fit to vertical surfaces like cliffs.
 */
 	Int	diffuseLight;
 
-	if (!TheGlobalData->m_showSoftWaterEdge || TheWaterTransparency->m_transparentWaterDepth ==0 )
+	const auto* map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	const bool authored = map && !map->getRetailStandingWaves().empty();
+	if (!authored && (!TheGlobalData->m_showSoftWaterEdge || TheWaterTransparency->m_transparentWaterDepth == 0))
 		return;
 
-	if (TheGlobalData->m_usingWaterTrackEditor)
-	// GeneralsX @bugfix BenderAI 13/02/2026 Windows-only debug function
 #ifdef _WIN32
 	if (TheGlobalData->m_usingWaterTrackEditor)
 		TestWaterUpdate();
@@ -883,8 +909,9 @@ Try improving the fit to vertical surfaces like cliffs.
 
 	rinfo.Camera.Apply();
 
-	if (!m_usedModules || ShaderClass::Is_Backface_Culling_Inverted())
-		return;	//don't render track marks in reflections.
+	if (!m_usedModules || !m_vertexBuffer || !m_indexBuffer || (authored && !TheGameLogic) ||
+		ShaderClass::Is_Backface_Culling_Inverted())
+		return;
 
 	//According to Nvidia there's a D3D bug that happens if you don't start with a
 	//new dynamic VB each frame - so we force a DISCARD by overflowing the counter.
@@ -937,21 +964,34 @@ Try improving the fit to vertical surfaces like cliffs.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 	}
 
-	Int LastTextureType=-1;
-
-	WaterTracksObj *mod=m_usedModules;
-
-	while( mod )
+	TextureClass* previousTexture = nullptr;
+	Bool additive = FALSE;
+	Int waveQuads = 0;
+	for (WaterTracksObj* mod = m_usedModules; mod; mod = mod->m_nextSystem)
 	{
-		if (LastTextureType != mod->m_type)
-			DX8Wrapper::Set_Texture(0,mod->m_stageZeroTexture);
-
-		Int vertsRendered=mod->render(m_vertexBuffer,m_batchStart);
-
-		m_batchStart = vertsRendered;	//advance past vertices already in buffer
-
-		mod = mod->m_nextSystem;
+		if (mod->m_retailWave && rinfo.Camera.Cull_Sphere(mod->m_boundingSphere))
+			continue;
+		if (previousTexture != mod->m_stageZeroTexture)
+		{
+			previousTexture = mod->m_stageZeroTexture;
+			DX8Wrapper::Set_Texture(0, previousTexture);
+		}
+		const Bool add = mod->m_retailWave && mod->m_retailWave->additive;
+		if (add != additive)
+		{
+			additive = add;
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, additive ? D3DBLEND_ONE : D3DBLEND_INVSRCALPHA);
+		}
+		const Int next = mod->render(m_vertexBuffer, m_batchStart);
+		if (mod->m_retailWave && next != m_batchStart)
+			++waveQuads;
+		m_batchStart = next;
 	}
+	if (additive)
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	static const bool trace = std::getenv("GENERALSX_TEST_STANDING_WAVE_DRAW") != nullptr;
+	if (trace && authored)
+		std::fprintf(stderr, "TEST map-standing-wave-draw frame=%u quads=%d\n", TheGameLogic->getFrame(), waveQuads);
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZBIAS,0);
 
@@ -1015,11 +1055,93 @@ void WaterTracksRenderSystem::saveTracks()
 	}
 }
 
+void WaterTracksRenderSystem::loadRetailTracks(const WorldHeightMap &map)
+{
+	reset();
+	Region3D extent{};
+	TheTerrainLogic->getExtentIncludingBorder(&extent);
+	const auto sample = [&](const Vector2 &point, Real &level)
+	{
+		return point.X >= extent.lo.x && point.X <= extent.hi.x &&
+			point.Y >= extent.lo.y && point.Y <= extent.hi.y &&
+			TheTerrainLogic->isUnderwater(point.X, point.Y, &level);
+	};
+	for (const auto &area : map.getRetailStandingWaves())
+	{
+		if (area.texture.isEmpty() || area.texture.isNone() || area.finalWidth <= 0 ||
+			area.finalHeight <= 0 || area.distanceFromShore <= area.finalHeight ||
+			area.initialVelocity <= 0 || area.timeToFade <= 0 || area.timeToCompress < 0 ||
+			area.initialWidthFraction < 0 || area.initialHeightFraction < 0 || area.secondaryWaveOffset < 0)
+			continue;
+		const Real velocity = area.initialVelocity * 0.001f;
+		const Real cycle = (area.distanceFromShore + 3.0f * area.finalHeight) / velocity;
+		if (cycle < 1.0f || cycle >= static_cast<Real>(std::numeric_limits<Int>::max()))
+			continue;
+		waveInfo info{0.0f, static_cast<Real>(area.finalHeight),
+			static_cast<Real>(area.distanceFromShore), velocity, area.timeToFade,
+			area.initialWidthFraction * 0.01f, area.initialHeightFraction * 0.01f, area.timeToCompress,
+			area.secondaryWaveOffset, area.texture.str(), nullptr};
+		for (std::size_t i = 1; i < area.points.size(); ++i)
+		{
+			const Vector2 from(area.points[i - 1].x, area.points[i - 1].y);
+			const Vector2 to(area.points[i].x, area.points[i].y);
+			const Vector2 span = to - from;
+			const Real length = span.Length();
+			if (!(length > 0.0f) || !std::isfinite(length))
+				continue;
+			const Int segments = static_cast<Int>(std::clamp(std::ceil(length / area.finalWidth), 1.0f,
+				static_cast<Real>(WaterTrackCapacity)));
+			const Vector2 normal(-span.Y / length, span.X / length);
+			info.m_finalWidth = length / segments;
+			for (Int segment = 0; segment < segments; ++segment)
+			{
+				const Vector2 origin = from + span * ((segment + 0.5f) / segments);
+				Vector2 direction = normal;
+				Real level = 0.0f;
+				if (!sample(origin - direction * info.m_waveDistance, level))
+				{
+					if (!sample(origin + direction * info.m_waveDistance, level))
+						continue;
+					direction = -direction;
+				}
+				const auto addWave = [&](Int offset, Bool flip)
+				{
+					auto* track = bindTrack(WaveTypeOcean);
+					if (!track)
+						return false;
+					track->init(info, origin, origin + direction, offset);
+					if (track->m_stageZeroTexture)
+						track->m_stageZeroTexture->Init();
+					if (!track->m_stageZeroTexture || track->m_stageZeroTexture->Is_Missing_Texture())
+					{
+						unbindTrack(track);
+						return true;
+					}
+					track->m_flipU = flip;
+					track->m_retailWave = WaterTracksObj::RetailWave{level, area.uvScroll, area.additive};
+					track->m_boundingSphere.Init(Vector3(origin.X, origin.Y, level),
+						info.m_waveDistance + info.m_finalWidth + track->m_waveInitialHeight);
+					return true;
+				};
+				const Bool flip = (segment % 2) != 0;
+				if (!addWave(0, flip) || (info.m_secondWaveTimeOffset > 0 && !addWave(info.m_secondWaveTimeOffset, !flip)))
+					return;
+			}
+		}
+	}
+}
+
 void WaterTracksRenderSystem::loadTracks()
 {
 
 	if (!TheTerrainLogic)
 		return;
+	const auto* map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	if (map && !map->getRetailStandingWaves().empty())
+	{
+		loadRetailTracks(*map);
+		return;
+	}
 
 	AsciiString fileName=TheTerrainLogic->getSourceFilename();
 	FileSystem::removeExtension(fileName);

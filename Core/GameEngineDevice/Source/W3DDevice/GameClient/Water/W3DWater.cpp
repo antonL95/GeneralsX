@@ -1675,6 +1675,8 @@ void WaterRenderObjClass::Render(RenderInfoClass & rinfo)
 		{
 			for (const auto &polygon : standingWater)
 				drawStandingWater(*polygon);
+			if (m_waterTrackSystem && !TheTerrainRenderObject->getMap()->getRetailStandingWaves().empty())
+				m_waterTrackSystem->flush(rinfo);
 			return;
 		}
 	}

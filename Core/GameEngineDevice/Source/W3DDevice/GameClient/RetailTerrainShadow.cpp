@@ -299,7 +299,7 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	if (sun.z >= -0.01f || !prepare(std::clamp(size, 256, 4096)))
 		return;
 
-	m_centre = centre;
+	m_centre.Set(centre.X, centre.Y, std::max(centre.Z, settings.minTerrainHeight));
 	m_ray.Set(sun.x, sun.y, sun.z);
 	m_ray.Normalize();
 	Vector3::Cross_Product(Vector3(0, 0, 1), m_ray, &m_right);
@@ -381,7 +381,7 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	if (tracingShadows())
 		std::fprintf(stderr,
 			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d view=%.3f minTerrain=%.3f float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u casterStage1Mismatches=%u\n",
-			shadowTrace.sequence, TheGameLogic->getFrame(), centre.X, centre.Y, centre.Z, m_size,
+			shadowTrace.sequence, TheGameLogic->getFrame(), m_centre.X, m_centre.Y, m_centre.Z, m_size,
 			m_viewDistance, settings.minTerrainHeight, m_floatDepth,
 			static_cast<unsigned>(targetResult), static_cast<unsigned>(clearResult), shadowTrace.props, shadowTrace.trees,
 			shadowTrace.treeCutouts, shadowTrace.treeHash, shadowTrace.failures, static_cast<unsigned>(coordIndex),

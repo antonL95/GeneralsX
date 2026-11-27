@@ -24,7 +24,12 @@
 
 #pragma once
 
+#include <optional>
+
 enum waveType CPP_11(: Int);	//forward reference
+
+class WorldHeightMap;
+struct waveInfo;
 
 /// Custom render object that draws animated tracks/waves on the water.
 /**
@@ -51,6 +56,16 @@ public:
 	Int render(DX8VertexBufferClass	*vertexBuffer, Int batchStart);	///<draw this object
 
 protected:
+	struct RetailWave
+	{
+		Real waterHeight;
+		Real uvScroll;
+		Bool additive;
+	};
+
+	void init(const waveInfo &info, const Vector2 &start, const Vector2 &end, Int waveTimeOffset);
+	std::optional<RetailWave> m_retailWave;
+
 	TextureClass *m_stageZeroTexture;	///<primary texture
 	SphereClass	m_boundingSphere;		///<bounding sphere of WaterTracks
 	AABoxClass	m_boundingBox;			///<bounding box of WaterTracks
@@ -124,6 +139,8 @@ public:
 	WaterTracksObj *findTrack(Vector2 &start, Vector2 &end, waveType type);
 
 protected:
+	void loadRetailTracks(const WorldHeightMap &map);
+
 	DX8VertexBufferClass		*m_vertexBuffer;	///<vertex buffer used to draw all tracks
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining triangles in maximum length track
 	VertexMaterialClass	  	  *m_vertexMaterialClass;	///< vertex lighting material
