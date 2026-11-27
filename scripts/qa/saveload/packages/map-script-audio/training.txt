@@ -1,0 +1,7 @@
+236 create Player_1 AudioScriptFixtureActor 0 315,280,0
+237 script-audio-arm Player_1 AudioScriptFixtureActor 0
+242 script-audio-named Player_1 AudioScriptFixtureActor 0
+243 script-audio-volume Player_1 AudioScriptFixtureActor 0
+245 script-audio-named Player_1 AudioScriptFixtureActor 0
+246 script-audio-volume Player_1 AudioScriptFixtureActor 0
+310 destroy Player_1 AudioScriptFixtureActor 0

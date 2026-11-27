@@ -223,13 +223,18 @@ void BfmeMapScripts::readScript(DataChunkInput &file, SidesList &sides, Script &
 			else
 				(isFalse ? script.m_actionFalse : script.m_action) = action;
 			tail = action;
-			action->m_actionType = static_cast<ScriptAction::ScriptActionType>(
-				readOpcode(file, action->m_bfme, action->m_parms, action->m_numParms, childVersion, false));
+			readAction(file, *action);
 			if (sides.m_scriptDump)
 				sides.m_scriptDump(isFalse ? "false-action" : "action", action->m_bfme.name, depth + 1);
 		}
 		file.closeDataChunk();
 	}
+}
+
+void BfmeMapScripts::readAction(DataChunkInput &file, ScriptAction &action)
+{
+	action.m_actionType = static_cast<ScriptAction::ScriptActionType>(
+		readOpcode(file, action.m_bfme, action.m_parms, action.m_numParms, file.getChunkVersion(), false));
 }
 
 void BfmeMapScripts::readOr(DataChunkInput &file, SidesList &sides, OrCondition &clause, Int depth)

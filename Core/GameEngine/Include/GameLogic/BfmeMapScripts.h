@@ -34,6 +34,7 @@ public:
 	static void reportRuntime(SidesList &sides);
 	static void attachPlayerTemplate(SidesList &sides, SidesInfo &source, SidesInfo &target, Int start);
 	static void append(ScriptList &target, ScriptList &source);
+	static void readAction(DataChunkInput &file, ScriptAction &action);
 
 	static ScriptAction *copyAction(const ScriptAction &action, const AsciiString *qualifier = nullptr,
 		const AsciiString *playerTemplate = nullptr, const AsciiString *newPlayer = nullptr);
