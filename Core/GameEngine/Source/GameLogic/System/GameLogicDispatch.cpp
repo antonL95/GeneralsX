@@ -33,6 +33,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
+#include "Common/MiscAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
@@ -2862,11 +2863,12 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			s.format(TheGameText->fetch("GUI:BeaconPlaced"), msgPlayer->getPlayerDisplayName().str());
 			TheInGameUI->message( s );
 
-			// play a sound
-			static AudioEventRTS aSound("BeaconPlaced");
-			aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
-			aSound.setPosition(&pos);
-			TheAudio->addAudioEvent(&aSound);
+			AudioEventRTS sound = TheAudio->getMiscAudio()->m_beaconPlacedSound;
+			if (sound.getEventName().isEmpty())
+				sound.setEventName("BeaconPlaced");
+			sound.setPlayerIndex(msgPlayer->getPlayerIndex());
+			sound.setPosition(&pos);
+			TheAudio->addAudioEvent(&sound);
 
 			if (RetailFileLayers::enabled())
 			{
