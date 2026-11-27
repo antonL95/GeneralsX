@@ -12,6 +12,7 @@
 35 audio-loop-condition Player_1 DrawEntryProbe 0 raising-on
 40 weapon-upgrade-toggle Player_1 GoblinCaveTroll 0 Command_ToggleCaveTrollRockThrow
 45 audio-loop-condition Player_1 DrawEntryProbe 0 raising-off
+52 lua-visibility Player_1 DrawEntryProbe 0 ROCK
 50 radar-capture Player_1 DrawCaptureProbe 0 *:DrawCaptureFlagProbe:0
 145 create PlyrCreeps GondorFarm 0 3080,650,0
 150 orderattack Player_1 GoblinCaveTroll 0 PlyrCreeps:GondorFarm:0

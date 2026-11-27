@@ -19,6 +19,8 @@ def check(log):
         failures.append("entry probe did not start with a hidden rock")
     if not any(frame >= 46 and ".rock:shown" in subobjects for frame, subobjects in entry):
         failures.append("OnStateEnter did not reveal the rock")
+    if "TEST lua visibility frame=52 part=ROCK hidden=1" not in log:
+        failures.append("OnStateEnter changed the saved rock visibility override")
     if not any(pose < 24 and ".rock:shown" in subobjects for pose, subobjects in toss):
         failures.append("troll did not begin a throw with a visible rock")
     if not any(pose >= 24 and ".rock:hidden" in subobjects for pose, subobjects in toss):
