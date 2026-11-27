@@ -6865,6 +6865,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			if (TheAudio)
 				TheAudio->getScriptAudio().setRoom(pAction->getParameter(0)->getString());
 			return;
+		case ScriptAction::AUDIO_SET_REVERB_SUPPRESSION_POLYGON:
+			if (TheAudio)
+			{
+				const auto* polygon = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(0)->getString());
+				if (polygon)
+					TheAudio->getScriptAudio().setSuppression(polygon->getTriggerName(), pAction->getParameter(1)->getReal());
+			}
+			return;
 		case ScriptAction::AUDIO_POP_MUSIC:
 		case ScriptAction::MUSIC_SCRIPT_POP_MUSIC:
 		case ScriptAction::MUSIC_RETURN_TO_MUSIC_SCRIPTING:

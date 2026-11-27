@@ -11,6 +11,7 @@
 #include "Common/Team.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 
@@ -65,6 +66,24 @@ struct ScriptWireValue
 
 constexpr char fixtureUnitName[] = "AudioScriptFixtureNamedUnit";
 constexpr char fixtureSound[] = "AudioScriptFixtureSound";
+constexpr char fixtureArea[] = "AudioScriptFixtureArea";
+constexpr Int fixtureAreaHalfWidth = 16;
+
+void ensureArea(const Object& unit)
+{
+	if (PolygonTrigger::findByName(fixtureArea))
+		return;
+	const Int x = static_cast<Int>(unit.getPosition()->x);
+	const Int y = static_cast<Int>(unit.getPosition()->y);
+	auto* polygon = newInstance(PolygonTrigger)(4);
+	polygon->setTriggerName(fixtureArea);
+	polygon->setCastleAreaOwner(unit.getID());
+	polygon->addPoint({x - fixtureAreaHalfWidth, y - fixtureAreaHalfWidth, 0});
+	polygon->addPoint({x + fixtureAreaHalfWidth, y - fixtureAreaHalfWidth, 0});
+	polygon->addPoint({x + fixtureAreaHalfWidth, y + fixtureAreaHalfWidth, 0});
+	polygon->addPoint({x - fixtureAreaHalfWidth, y + fixtureAreaHalfWidth, 0});
+	PolygonTrigger::addPolygonTrigger(polygon);
+}
 
 ScriptAction* parseAction(const char* name, Int wireAction,
 	std::initializer_list<ScriptWireValue> parameters)
@@ -103,6 +122,7 @@ void arm(const RetailTestCommands::Context& ctx)
 	{
 		unit->setName(fixtureUnitName);
 		TheScriptEngine->addObjectToCache(unit);
+		ensureArea(*unit);
 	}
 }
 
@@ -161,12 +181,35 @@ void runMixAction(const RetailTestCommands::Context& ctx)
 	const std::string_view kind(ctx.argument);
 	if (kind == "room")
 		action = parseAction("AUDIO_SET_REVERB_ROOM_TYPE", 448, {{60, "Cave"}});
+	else if (kind == "polygon")
+		action = parseAction("AUDIO_SET_REVERB_SUPPRESSION_POLYGON", 525, {{9, fixtureArea}, {52, "", 0.25f}});
 	else
 		return;
 	const Bool mapped = action->getActionType() != ScriptAction::NO_OP;
 	std::fprintf(stderr, "TEST script audio %s frame=%u mapped=%d\n", ctx.argument, ctx.frame, mapped);
 	TheScriptEngine->friend_executeAction(action);
 	deleteInstance(action);
+}
+
+void probeMix(const RetailTestCommands::Context& ctx)
+{
+	const Object* unit = ctx.requireObject();
+	if (!unit)
+		return;
+	Coord3D outside = *unit->getPosition();
+	outside.x += 2 * fixtureAreaHalfWidth;
+	const auto& mix = TheAudio->getScriptAudio();
+	const Real gain = mix.fadeMultiplier("AudioScriptFixtureOther");
+	if (std::string_view(ctx.argument) == "transition")
+	{
+		std::fprintf(stderr, "TEST script audio transition frame=%u active=%d\n", ctx.frame,
+			gain > 0.25f && gain < 1.0f);
+		return;
+	}
+	std::fprintf(stderr,
+		"TEST script audio mix-state frame=%u room=%d inside=%.2f outside=%.2f immune=%.2f fade=%.2f\n",
+		ctx.frame, mix.getRoom() == RetailScriptAudio::Cave, mix.suppressionAt(unit->getPosition()),
+		mix.suppressionAt(&outside), mix.fadeMultiplier(fixtureSound), gain);
 }
 }
 #endif
@@ -181,6 +224,7 @@ void registerRetailScriptAudioTestCommands()
 	registerAction("script-audio-volume", overrideVolume);
 	registerAction("script-audio-team", playTeam);
 	registerAction("script-audio-mix", runMixAction);
+	registerAction("script-audio-mix-state", probeMix);
 #endif
 }
 }
