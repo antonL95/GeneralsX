@@ -74,4 +74,15 @@ check() {
         expect 'TEST powers-fire-state frame=1320 template=AiPowers2CitadelControl alive=1 ready=1' || return 1
         expect 'TEST powers-fire-state frame=1320 template=AiPowers2CitadelMarker alive=1' || return 1
     fi
+    if covers 1435; then
+        expect 'TEST powers-fire-state frame=1435 template=AiPowers2DominateAreaCaster alive=2 ready=1' || return 1
+        for subject in 'Player_2 AiPowers2DominateElite 0' 'Player_2 AiPowers2DominateTroll 0' \
+            'Player_1 AiPowers2DominateWounded 0' 'Player_1 AiPowers2DominateWounded 1' \
+            'Player_1 AiPowers2DominateFootman 0' 'Player_1 AiPowers2DominateFootman 1'; do
+            if ! grep -F "TEST health 1435 $subject " "$log" | grep -Fq ' dead=0 '; then
+                printf 'Expected living target %s under its expected owner at frame 1435\n' "$subject" >&2
+                return 1
+            fi
+        done
+    fi
 }

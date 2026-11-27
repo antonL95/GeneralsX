@@ -342,6 +342,48 @@ Object* selectCombatPowerTarget(const Object& source, const Player& player, cons
 	return best;
 }
 
+Object* selectDominateTarget(const Object& source, const Player& player, Real range, Bool troll)
+{
+	if (!(range > 0.0f) || !std::isfinite(range))
+		return nullptr;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&source, range, FROM_CENTER_2D);
+	MemoryPoolObjectHolder hold(nearby);
+	Int targetsInRange = 0;
+	Int highestCost = 0;
+	Real bestDistance = 0.0f;
+	Object* best = nullptr;
+	for (Object* candidate = nearby->first(); candidate; candidate = nearby->next())
+	{
+		if (candidate->isEffectivelyDead() || candidate->getContainedBy() || source.getRelationship(candidate) == ALLIES)
+			continue;
+		const auto shroud = candidate->getShroudedStatus(player.getPlayerIndex());
+		if ((shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR) ||
+			(candidate->testStatus(OBJECT_STATUS_STEALTHED) && !candidate->testStatus(OBJECT_STATUS_DETECTED)))
+			continue;
+		++targetsInRange;
+
+		const Bool suitableKind = troll ? candidate->isKindOf(KINDOF_TROLL)
+			: !candidate->isKindOf(KINDOF_DOZER) && !candidate->isKindOf(KINDOF_HERO) &&
+				!candidate->isKindOf(KINDOF_STRUCTURE) && !candidate->isKindOf(KINDOF_ARMY_OF_DEAD) &&
+				!candidate->isKindOf(KINDOF_MOVE_ONLY);
+		constexpr Real minimumHealth = 0.5f;
+		const Int cost = candidate->getTemplate()->getRotWKObjectData().commandPoints;
+		if (!suitableKind || bodyHealthFraction(*candidate) <= minimumHealth || cost <= 0)
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(&source, candidate, FROM_CENTER_2D);
+		if (cost > highestCost || (cost == highestCost && best &&
+			(distance < bestDistance || (distance == bestDistance && candidate->getID() < best->getID()))))
+		{
+			best = candidate;
+			highestCost = cost;
+			bestDistance = distance;
+		}
+	}
+	constexpr Int minimumNearbyTargets = 2;
+	return targetsInRange >= minimumNearbyTargets ? best : nullptr;
+}
+
 Bool canSummonAt(const Object& source, const CommandButton& button, const SpecialPowerTemplate& power,
 	const AISpecialPowerUpdateModuleData& data, const Coord3D& location)
 {
@@ -796,6 +838,35 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());
+		return retailPolicyCooldown;
+	}
+
+	const Bool dominateTroll = policy == "AI_SPECIAL_POWER_DOMINATE_TROLL";
+	if (dominateTroll || policy == "AI_SPECIAL_POWER_DOMINATE_ENEMY")
+	{
+		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
+			return retailPolicyPoll;
+		const Real range = specialPowerSearchRange(*source, *power, data->m_specialPowerRange);
+		Object* target = selectDominateTarget(*source, *player, range, dominateTroll);
+		if (!target)
+			return retailPolicyPoll;
+		const UnsignedInt options = button->getOptions();
+		if (dominateTroll)
+		{
+			if (!module->isValidPowerTarget(target) ||
+				!button->isValidToUseOn(source, target, target->getPosition(), CMD_FROM_AI) ||
+				!power->isValidRetailTarget(source, target, nullptr, CMD_FROM_AI) ||
+				!AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+				return retailPolicyPoll;
+			source->doSpecialPowerAtObject(power, target, options);
+		}
+		else
+		{
+			const auto location = findSummonLocation(*source, *button, *power, *data, *target->getPosition());
+			if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+				return retailPolicyPoll;
+			source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, options);
+		}
 		return retailPolicyCooldown;
 	}
 

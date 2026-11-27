@@ -132,3 +132,29 @@
 1321 destroy Player_2 AiPowers2CitadelControl 0
 1321 destroy Player_2 AiPowers2CitadelMarker 0
 1321 destroy Player_2 AiPowers2CitadelBlocker 0
+1330 create Player_2 AiPowers2DominateAreaCaster 0 2800,1320,0
+1330 create Player_2 AiPowers2DominateTrollCaster 0 2800,1510,0
+1330 create Player_2 AiPowers2DominateAreaCaster 1 3160,1250,0
+1331 create Player_1 AiPowers2DominateFootman 0 2830,1320,0
+1331 create Player_1 AiPowers2DominateElite 0 2880,1320,0
+1331 create Player_1 AiPowers2DominateWounded 0 2850,1340,0
+1331 create Player_1 AiPowers2DominateTroll 0 2835,1510,0
+1331 create Player_1 AiPowers2DominateWounded 1 2860,1510,0
+1331 create Player_1 AiPowers2DominateFootman 1 3205,1280,0
+1332 damage Player_1 AiPowers2DominateWounded 0 550
+1435 powers-fire-state Player_2 AiPowers2DominateAreaCaster 1 AiPowers2DominateAreaPower
+1435 health Player_2 AiPowers2DominateElite 0
+1435 health Player_2 AiPowers2DominateTroll 0
+1435 health Player_1 AiPowers2DominateWounded 0
+1435 health Player_1 AiPowers2DominateWounded 1
+1435 health Player_1 AiPowers2DominateFootman 0
+1435 health Player_1 AiPowers2DominateFootman 1
+1436 destroy Player_2 AiPowers2DominateAreaCaster 1
+1436 destroy Player_2 AiPowers2DominateAreaCaster 0
+1436 destroy Player_2 AiPowers2DominateTrollCaster 0
+1436 destroy Player_2 AiPowers2DominateElite 0
+1436 destroy Player_2 AiPowers2DominateTroll 0
+1436 destroy Player_1 AiPowers2DominateWounded 1
+1436 destroy Player_1 AiPowers2DominateWounded 0
+1436 destroy Player_1 AiPowers2DominateFootman 1
+1436 destroy Player_1 AiPowers2DominateFootman 0
