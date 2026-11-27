@@ -2090,7 +2090,7 @@ void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)
 }
 
 #if !RTS_GENERALS
-Bool HordeContain::splitHorde()
+Bool HordeContain::splitHorde(std::vector<Object*>* results)
 {
 	Object* anchor = getObject();
 	const auto* formation = getActiveFormation();
@@ -2231,6 +2231,8 @@ Bool HordeContain::splitHorde()
 			if (member->getExperienceTracker()->getExperienceSink() == anchor->getID())
 				member->getExperienceTracker()->setExperienceSink(group.result->getID());
 		}
+		if (results)
+			results->push_back(group.result);
 		const auto& allowed = group.contain->getHordeContainModuleData()->m_bannerCarriersAllowed;
 		const auto acceptsBanner = [&](const AsciiString& name)
 		{

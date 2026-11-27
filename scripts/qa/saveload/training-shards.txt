@@ -116,3 +116,4 @@
 1 castle-area-backfill
 4 lua-logic
 4 map-script-audio
+3 siege-horde-deploy

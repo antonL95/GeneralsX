@@ -21,6 +21,7 @@ public:
 	HordeAIUpdate(Thing* thing, const ModuleData* data);
 	UpdateSleepTime update() override;
 	void aiDoCommand(const AICommandParms* parms) override;
+	void startSiegeDeployment(ObjectID carrier, ObjectID wall);
 	Bool issuePlannerOrder(Object* target, const Coord3D& position);
 	static void retaliate(Object* victim, Object* attacker);
 	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
@@ -52,7 +53,17 @@ public:
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 private:
+	enum class SiegeDeploymentPhase { Follow, Wait, Board };
+	struct SiegeDeployment
+	{
+		ObjectID carrier = INVALID_ID;
+		ObjectID wall = INVALID_ID;
+		UnsignedInt nextFrame = 0;
+		SiegeDeploymentPhase phase = SiegeDeploymentPhase::Follow;
+	};
+
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;
+	Bool advanceSiegeDeployment();
 	void respondToAttack(Object* attacker, Int maxShots, CommandSourceType source);
 	Object* updateOrder(Object* anchor, Object* target, Bool refresh);
 	void approach(const Coord3D& position, Bool inRange);
@@ -84,4 +95,5 @@ private:
 	UnsignedInt m_advanceRouteRevision = 0;
 	UnsignedInt m_plannerOrderFrame = 0;
 	UnsignedInt m_blockedPlannerRevision = 0;
+	SiegeDeployment m_siegeDeployment;
 };

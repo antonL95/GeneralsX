@@ -13,7 +13,9 @@
 #include "Common/RetailSaveBlocks.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/RetailSiegeContain.h"
@@ -720,11 +722,10 @@ Object* SiegeDeployHordeSpecialPower::findMemberCarrier(const Object* target) co
 		return nullptr;
 	for (Object* member : *horde->getContainedItemsList())
 	{
-		if (!SiegeAIUpdate::find(member) || member->isEffectivelyDead())
+		if (!member || member->isEffectivelyDead() || !member->isKindOf(KINDOF_SIEGE_TOWER))
 			continue;
-		const auto* power = member->findSpecialPowerModuleInterface(SPECIAL_SIEGEDEPLOY);
-		if (power && power->isReady() && power->isValidPowerTarget(target))
-			return member;
+		const auto* power = member->findSpecialPowerModuleInterface(getSpecialPowerTemplate()->getSpecialPowerType());
+		return power && power->isReady() && power->isValidPowerTarget(target) ? member : nullptr;
 	}
 	return nullptr;
 }
@@ -737,14 +738,41 @@ void SiegeDeployHordeSpecialPower::doSpecialPowerAtObject(Object* target, Unsign
 		return;
 	if (getSiegeDeployHordeSpecialPowerModuleData()->m_hordeDeploy)
 	{
-		if (Object* member = findMemberCarrier(target))
+		Object* member = findMemberCarrier(target);
+		if (!member)
+			return;
+		const auto type = getSpecialPowerTemplate()->getSpecialPowerType();
+		auto* power = member->findSpecialPowerModuleInterface(type);
+		if (!power->isRetailCastAllowed(options) ||
+			!CommandButton::isRetailPowerObjectTargetAllowed(member, power->getSpecialPowerTemplate(), target))
+			return;
+		auto* horde = static_cast<HordeContain*>(getObject()->getContain());
+		horde->removeFromContain(member);
+		if (auto* ai = member->getAI())
+			ai->aiIdle(CMD_FROM_AI);
+		power->doSpecialPowerAtObject(target, options);
+		m_lastCastAccepted = power->wasLastCastAccepted();
+		if (!m_lastCastAccepted)
 		{
-			auto* power = member->findSpecialPowerModuleInterface(SPECIAL_SIEGEDEPLOY);
-			power->doSpecialPowerAtObject(target, options);
-			m_lastCastAccepted = power->wasLastCastAccepted();
+			horde->addToContain(member);
+			return;
 		}
-		if (m_lastCastAccepted)
-			markSpecialPowerTriggered(target->getPosition());
+		auto* tracker = member->getExperienceTracker();
+		if (tracker->getExperienceSink() == getObject()->getID())
+			tracker->setExperienceSink(INVALID_ID);
+		markSpecialPowerTriggered(target->getPosition());
+#if !RTS_GENERALS
+		std::vector<Object*> results;
+		if (!horde->splitHorde(&results))
+			return;
+		for (Object* result : results)
+		{
+			if (!dynamic_cast<SiegeDeployHordeSpecialPower*>(result->findSpecialPowerModuleInterface(type)))
+				continue;
+			if (auto* ai = dynamic_cast<HordeAIUpdate*>(result->getAI()))
+				ai->startSiegeDeployment(member->getID(), target->getID());
+		}
+#endif
 		return;
 	}
 	Object* carrier = findCarrier(target);

@@ -172,7 +172,7 @@ public:
 	void setAlternateFormation(Bool alternate);
 	void toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled);
 #if !RTS_GENERALS
-	Bool splitHorde();
+	Bool splitHorde(std::vector<Object*>* results = nullptr);
 	static Bool allowsBannerSpawn(const Object* anchor);
 #endif
 	static const HordeContain* get(const Object* object);

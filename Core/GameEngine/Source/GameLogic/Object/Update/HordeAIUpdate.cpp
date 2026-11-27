@@ -13,6 +13,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -225,7 +226,7 @@ void HordeAIUpdate::retaliate(Object* victim, Object* attacker)
 
 void HordeAIUpdate::respondToAttack(Object* attacker, Int maxShots, CommandSourceType source)
 {
-	if (!attacker || attacker->isEffectivelyDead() || liveTarget(m_attackTarget) ||
+	if (m_siegeDeployment.carrier != INVALID_ID || !attacker || attacker->isEffectivelyDead() || liveTarget(m_attackTarget) ||
 		m_order == AICMD_ATTACK_POSITION || (m_order == NO_ORDER && !isIdle()))
 		return;
 	Object* target = enemyHordeOrUnit(attacker);
@@ -255,8 +256,16 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 {
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
-
 	const auto command = parms->m_cmd;
+	if (m_siegeDeployment.carrier != INVALID_ID)
+	{
+		if (parms->m_cmdSource != CMD_FROM_AI && !m_updatingAnchor)
+			m_siegeDeployment = {};
+		else if (command == AICMD_ATTACK_OBJECT || command == AICMD_FORCE_ATTACK_OBJECT ||
+			command == AICMD_ATTACKMOVE_TO_POSITION || command == AICMD_ATTACK_POSITION ||
+			command == AICMD_HUNT || isGuardOrder(command))
+			return;
+	}
 	if (m_updatingAnchor && m_order != NO_ORDER && command == AICMD_ATTACKMOVE_TO_POSITION)
 		return;
 	if (!m_updatingAnchor)
@@ -326,6 +335,8 @@ Bool HordeAIUpdate::hasGuardOrder() const
 
 Bool HordeAIUpdate::issuePlannerOrder(Object* target, const Coord3D& position)
 {
+	if (m_siegeDeployment.carrier != INVALID_ID)
+		return FALSE;
 	AICommandParms parms(target ? AICMD_ATTACK_OBJECT : AICMD_ATTACKMOVE_TO_POSITION, CMD_FROM_AI);
 	parms.m_obj = target;
 	parms.m_pos = position;
@@ -469,8 +480,70 @@ void HordeAIUpdate::setCavalryStartupHeading(Real heading)
 	m_cavalryReforming = TRUE;
 }
 
+void HordeAIUpdate::startSiegeDeployment(ObjectID carrier, ObjectID wall)
+{
+	aiIdle(CMD_FROM_AI);
+	m_siegeDeployment = {carrier, wall, TheGameLogic->getFrame() + 1, SiegeDeploymentPhase::Follow};
+}
+
+Bool HordeAIUpdate::advanceSiegeDeployment()
+{
+	if (m_siegeDeployment.carrier == INVALID_ID)
+		return FALSE;
+
+	Object* carrier = liveTarget(m_siegeDeployment.carrier);
+	const auto* siege = SiegeAIUpdate::find(carrier);
+	if (!siege || !siege->isUsingDock() || !liveTarget(m_siegeDeployment.wall) ||
+		carrier->getControllingPlayer() != getObject()->getControllingPlayer())
+	{
+		m_siegeDeployment = {};
+		privateIdle(CMD_FROM_AI);
+		return FALSE;
+	}
+	if (m_siegeDeployment.phase == SiegeDeploymentPhase::Board)
+	{
+		if (getEnterTarget() == carrier || getObject()->getContainedBy() == carrier)
+			return TRUE;
+		m_siegeDeployment = {};
+		return FALSE;
+	}
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (!siege->isDocked())
+	{
+		m_siegeDeployment.phase = SiegeDeploymentPhase::Follow;
+		if (frame >= m_siegeDeployment.nextFrame && (isIdle() || getGoalObject() != carrier))
+			privateMoveToObject(carrier, CMD_FROM_AI);
+		return TRUE;
+	}
+	if (m_siegeDeployment.phase == SiegeDeploymentPhase::Follow)
+	{
+		m_siegeDeployment.phase = SiegeDeploymentPhase::Wait;
+		m_siegeDeployment.nextFrame = frame + LOGICFRAMES_PER_SECOND;
+		privateIdle(CMD_FROM_AI);
+	}
+	if (frame >= m_siegeDeployment.nextFrame)
+	{
+		Coord3D landing;
+		if (!siege->getReleasePosition(landing))
+		{
+			m_siegeDeployment = {};
+			return FALSE;
+		}
+		m_siegeDeployment.phase = SiegeDeploymentPhase::Board;
+		aiEnter(carrier, CMD_FROM_AI);
+	}
+	return TRUE;
+}
+
 UpdateSleepTime HordeAIUpdate::update()
 {
+	if (advanceSiegeDeployment())
+	{
+		m_updatingAnchor = TRUE;
+		AIUpdateInterface::update();
+		m_updatingAnchor = FALSE;
+		return UPDATE_SLEEP_NONE;
+	}
 	Object* horde = getObject();
 	Object* target = liveTarget(m_attackTarget);
 	if (m_plannerOrder && target && horde->getRelationship(target) != ENEMIES)
@@ -861,6 +934,12 @@ void HordeAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 			else
 				m_cavalryStartupHeading.reset();
 		}, [this] { m_cavalryStartupHeading.reset(); }},
+		{ "siege-deployment", [this](Xfer* block) {
+			block->xferObjectID(&m_siegeDeployment.carrier);
+			block->xferObjectID(&m_siegeDeployment.wall);
+			block->xferUnsignedInt(&m_siegeDeployment.nextFrame);
+			block->xferUser(&m_siegeDeployment.phase, sizeof(m_siegeDeployment.phase));
+		}, [this] { m_siegeDeployment = {}; } }
 	});
 }
 
