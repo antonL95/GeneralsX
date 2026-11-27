@@ -521,6 +521,50 @@ std::optional<Coord3D> selectAreaBuffLocation(const Object& source, const Player
 	return findSummonLocation(source, button, power, data, *nearest->getPosition());
 }
 
+const Waypoint* playerStartWaypoint(Player& player)
+{
+	const Int index = player.getMpStartIndex();
+	if (index < 0 || index >= MAX_PLAYER_COUNT)
+		return nullptr;
+	AsciiString name;
+	name.format("Player_%d_Start", index + 1);
+	return TheTerrainLogic->getWaypointByName(name);
+}
+
+std::optional<Coord3D> selectCitadelLocation(const Object& source, Player& player, const CommandButton& button,
+	const SpecialPowerTemplate& power, const AISpecialPowerUpdateModuleData& data)
+{
+	const Player* enemy = player.getCurrentEnemy();
+	if (!enemy || !enemy->isPlayerActive() || player.getRelationship(enemy->getDefaultTeam()) != ENEMIES)
+		return std::nullopt;
+
+	const Object* factory = nullptr;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		if (object->getControllingPlayer() == enemy && object->isKindOf(KINDOF_DOZER_FACTORY) &&
+			!object->isEffectivelyDead() && (!factory || object->getID() < factory->getID()))
+			factory = object;
+	if (!factory)
+		return std::nullopt;
+
+	Coord3D base;
+	if (!player.getAiBaseCenter(&base))
+	{
+		const auto* start = playerStartWaypoint(player);
+		if (!start)
+			return std::nullopt;
+		base = *start->getLocation();
+	}
+	const Coord3D towardEnemy = *factory->getPosition() - base;
+	const Real along = GameLogicRandomValueReal(0.0f, 1.0f);
+	const Real across = GameLogicRandomValueReal(-1.0f, 1.0f);
+	const Coord3D location{
+		base.x + towardEnemy.x * along + towardEnemy.y * across,
+		base.y + towardEnemy.y * along - towardEnemy.x * across,
+		base.z + towardEnemy.z * along
+	};
+	return findSummonLocation(source, button, power, data, location);
+}
+
 void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
 {
 	constexpr Int samplesPerAxis = 16;
@@ -542,15 +586,7 @@ void scoutWithPower(Object& source, const CommandButton& button, const SpecialPo
 	if (search.width() <= 0.0f || search.height() <= 0.0f)
 		return;
 
-	const auto startFor = [](Player& slot) -> const Waypoint* {
-		const Int index = slot.getMpStartIndex();
-		if (index < 0 || index >= MAX_PLAYER_COUNT)
-			return nullptr;
-		AsciiString name;
-		name.format("Player_%d_Start", index + 1);
-		return TheTerrainLogic->getWaypointByName(name);
-	};
-	const Waypoint* ownStart = startFor(*player);
+	const Waypoint* ownStart = playerStartWaypoint(*player);
 	const Coord3D& from = ownStart && range <= 0.0f ? *ownStart->getLocation() : origin;
 
 	for (const auto desired : {CELLSHROUD_SHROUDED, CELLSHROUD_FOGGED})
@@ -584,7 +620,7 @@ void scoutWithPower(Object& source, const CommandButton& button, const SpecialPo
 			if (!opponent || !opponent->isPlayableSide() || !opponent->isPlayerActive() ||
 				player->getRelationship(opponent->getDefaultTeam()) != ENEMIES)
 				continue;
-			const Waypoint* start = startFor(*opponent);
+			const Waypoint* start = playerStartWaypoint(*opponent);
 			if (!start)
 				continue;
 			const Coord3D direction = *start->getLocation() - from;
@@ -749,11 +785,14 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		return retailPolicyCooldown;
 	}
 
-	if (policy == "AI_SPECIAL_POWER_AOE_AND_BUFF")
+	const Bool citadel = policy == "AI_SPELLBOOK_CITADEL";
+	if (citadel || policy == "AI_SPECIAL_POWER_AOE_AND_BUFF")
 	{
 		if (GameLogicRandomValueReal(0.0f, 1.0f) <= 0.5f)
 			return retailPolicyPoll;
-		const auto location = selectAreaBuffLocation(*source, *player, *button, *power, *data);
+		const auto location = citadel
+			? selectCitadelLocation(*source, *player, *button, *power, *data)
+			: selectAreaBuffLocation(*source, *player, *button, *power, *data);
 		if (!location || !AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			return retailPolicyPoll;
 		source->doSpecialPowerAtLocation(power, &*location, INVALID_ANGLE, button->getOptions());

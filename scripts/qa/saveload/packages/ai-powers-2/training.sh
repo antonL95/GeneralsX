@@ -69,4 +69,9 @@ check() {
             return 1
         fi
     fi
+    if covers 1320; then
+        expect 'TEST powers-fire-state frame=1320 template=AiPowers2CitadelCaster alive=1 ready=0' || return 1
+        expect 'TEST powers-fire-state frame=1320 template=AiPowers2CitadelControl alive=1 ready=1' || return 1
+        expect 'TEST powers-fire-state frame=1320 template=AiPowers2CitadelMarker alive=1' || return 1
+    fi
 }

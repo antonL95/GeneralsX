@@ -122,3 +122,13 @@
 1061 destroy Player_1 AiPowers2BuffTarget 2
 1061 destroy Player_1 AiPowers2BuffTarget 1
 1061 destroy Player_1 AiPowers2BuffTarget 0
+1070 create Player_2 AiPowers2CitadelBlocker 0 3160,1250,0
+1071 create Player_2 AiPowers2CitadelCaster 0 2800,1320,0
+1071 create Player_2 AiPowers2CitadelControl 0 3160,1250,0
+1320 powers-fire-state Player_2 AiPowers2CitadelCaster 0 AiPowers2Citadel
+1320 powers-fire-state Player_2 AiPowers2CitadelControl 0 AiPowers2CitadelRestricted
+1320 powers-fire-state Player_2 AiPowers2CitadelMarker 0
+1321 destroy Player_2 AiPowers2CitadelCaster 0
+1321 destroy Player_2 AiPowers2CitadelControl 0
+1321 destroy Player_2 AiPowers2CitadelMarker 0
+1321 destroy Player_2 AiPowers2CitadelBlocker 0
