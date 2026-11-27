@@ -42,27 +42,31 @@ def read_scenario(name, checks):
     commands = [line for line in fixture_text("commands.txt").splitlines() if line.strip()]
     for line in commands:
         command_frame, action, *_ = line.split()
-        if not 0 < int(command_frame) < end_frame or action in ("quit", "camera"):
+        if not 0 < int(command_frame) < end_frame or action in ("quit", "camera", "playtest-camera-follow"):
             raise ValueError(f"Invalid scenario command: {line}")
     camera_lines = [line for line in fixture_text("camera.txt").splitlines() if line.strip()]
     if not camera_lines:
-        raise ValueError("Expected at least one FRAME PLAYER OBJECT X Y ZOOM line in camera.txt")
+        raise ValueError("Expected at least one camera cue in camera.txt")
     camera_frames = []
     for line in camera_lines:
         camera = line.split()
-        if len(camera) != 6:
-            raise ValueError("Expected FRAME PLAYER OBJECT X Y ZOOM in camera.txt")
+        if len(camera) not in (4, 6):
+            raise ValueError("Expected FRAME PLAYER OBJECT ZOOM or FRAME PLAYER OBJECT X Y ZOOM in camera.txt")
         frame, player, actor = camera[:3]
-        x, y, zoom = map(float, camera[3:])
+        *location, zoom = map(float, camera[3:])
         frame_number = int(frame)
-        if not all(map(math.isfinite, (x, y, zoom))) or zoom <= 0:
-            raise ValueError(f"Camera requires finite X, Y and positive finite ZOOM: {line}")
+        if not all(map(math.isfinite, (*location, zoom))) or zoom <= 0:
+            raise ValueError(f"Camera requires positive finite ZOOM and finite coordinates when given: {line}")
         if not 0 < frame_number < end_frame:
             raise ValueError(f"Camera frame must be positive and before quit: {line}")
         if camera_frames and frame_number <= camera_frames[-1]:
             raise ValueError("Camera frames must be strictly increasing")
         camera_frames.append(frame_number)
-        commands.append(f"{frame_number} camera {player} {actor} 0 - {x} {y} {zoom}")
+        if location:
+            x, y = location
+            commands.append(f"{frame_number} camera {player} {actor} 0 - {x} {y} {zoom}")
+        else:
+            commands.append(f"{frame_number} playtest-camera-follow {player} {actor} 0 {zoom}")
     if camera_frames[0] >= frames[0]:
         raise ValueError("The first camera command must run before the first capture")
     commands.sort(key=lambda line: int(line.split()[0]))

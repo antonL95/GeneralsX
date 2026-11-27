@@ -1,0 +1,5 @@
+10 create Player_1 GondorPippin 0 2280,1180,0
+11 reveal Player_1 GondorPippin 0
+26 playtest-camera-measure Player_1 GondorPippin 0
+43 guard-save-relocate Player_1 GondorPippin 0 2780,1330
+52 playtest-camera-measure Player_1 GondorPippin 0
