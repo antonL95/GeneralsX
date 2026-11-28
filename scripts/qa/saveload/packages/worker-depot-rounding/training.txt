@@ -1,0 +1,6 @@
+260 create PlyrCivilian WorkerDepotRoundingFixture 0 3650,970,0
+261 deposit-xp-modifier PlyrCivilian WorkerDepotRoundingFixture 0 WorkerDepotRoundingProduction
+262 deposit-xp-probe PlyrCivilian WorkerDepotRoundingFixture 0 rounding-a
+265 worker-depot-place-tree PlyrCivilian WorkerDepotRoundingTree 0 - 3560 888
+500 deposit-xp-probe PlyrCivilian WorkerDepotRoundingFixture 0 rounding-b
+510 destroy PlyrCivilian WorkerDepotRoundingFixture 0

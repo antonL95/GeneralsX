@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "Common/INIAudit.h"
@@ -217,12 +218,13 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 				{
 					const Real boxValue = static_cast<Real>(m_numberBoxes) * player->getSupplyBoxValue();
 					const Real scaledValue = boxValue * AttributeModifiers::productionFactor(depot);
-					if (scaledValue >= 1.0f)
+					if (scaledValue > 0.0f)
 					{
-						const Int amount = static_cast<Int>(std::min<double>(scaledValue, std::numeric_limits<Int>::max()));
+						const Int amount = static_cast<Int>(std::min<double>(std::ceil(scaledValue),
+							static_cast<double>(std::numeric_limits<Int>::max())));
 						player->getMoney()->deposit(amount);
 						player->getScoreKeeper()->addMoneyEarned(amount);
-						depot->getExperienceTracker()->addRetailExperience(static_cast<Real>(amount));
+						depot->getExperienceTracker()->addRetailExperience(scaledValue);
 						RetailWorldUI::showPayout(*depot, amount, FALSE);
 					}
 					m_numberBoxes = 0;
