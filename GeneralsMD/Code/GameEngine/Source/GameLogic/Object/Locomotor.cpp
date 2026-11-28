@@ -3657,12 +3657,14 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 				m_template->m_appearance == LOCO_HORDE))
 		{
 			updateRetailGait(obj, 0.0f, TRUE, scalarBefore);
+			obj->setModelConditionState(MODELCONDITION_MOVING);
 			requiresConstantCalling = TRUE;
 		}
 		else
 		{
-			if (m_template->m_appearance != LOCO_THRUST && m_template->m_appearance != LOCO_WINGS)
-				m_retailScalarSpeed = 0.0f;
+			const AIUpdateInterface* ai = obj->getAI();
+			if (m_retailWasRunning && (!ai || !ai->isMoving() || obj->getLogicModelConditions().test(MODELCONDITION_DECELERATE)))
+				obj->clearModelConditionState(MODELCONDITION_MOVING);
 			clearRetailGait(obj);
 		}
 	}
