@@ -84,23 +84,32 @@ UnpauseSpecialPowerUpgrade::~UnpauseSpecialPowerUpgrade()
 //-------------------------------------------------------------------------------------------------
 void UnpauseSpecialPowerUpgrade::upgradeImplementation()
 {
+	const UnpauseSpecialPowerUpgradeModuleData* data = getUnpauseSpecialPowerUpgradeModuleData();
 	for (BehaviorModule** m = getObject()->getBehaviorModules(); *m; ++m)
 	{
 		SpecialPowerModuleInterface* sp = (*m)->getSpecialPower();
-		if (!sp)
+		if (!sp || sp->getSpecialPowerTemplate() != data->m_specialPower)
 			continue;
 
-		if( sp->getSpecialPowerTemplate() == getUnpauseSpecialPowerUpgradeModuleData()->m_specialPower )
-		{
-			sp->pauseCountdown( FALSE );
-
-			if (sp->startsReady())
-			{
-				UnsignedInt now = TheGameLogic->getFrame();
-				sp->setReadyFrame(now);
-			}
-		}
+		sp->pauseCountdown(FALSE);
+		if (!data->m_obeyRechargeOnTrigger)
+			sp->setReadyFrame(TheGameLogic->getFrame());
 	}
+}
+
+Bool UnpauseSpecialPowerUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	if (!UpgradeModule::resetUpgrade(keyMask))
+		return FALSE;
+
+	const UnpauseSpecialPowerUpgradeModuleData* data = getUnpauseSpecialPowerUpgradeModuleData();
+	for (BehaviorModule** m = getObject()->getBehaviorModules(); *m; ++m)
+	{
+		SpecialPowerModuleInterface* sp = (*m)->getSpecialPower();
+		if (sp && sp->getSpecialPowerTemplate() == data->m_specialPower)
+			sp->pauseCountdown(TRUE);
+	}
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------

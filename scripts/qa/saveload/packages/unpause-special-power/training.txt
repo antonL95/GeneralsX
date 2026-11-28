@@ -1,0 +1,30 @@
+200 create PlyrCreeps UnpauseSpCaster 0 3000,950,0
+201 reveal PlyrCreeps UnpauseSpCaster 0
+202 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+202 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+205 objupgrade PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediateTrigger
+205 objupgrade PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyTrigger
+206 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+206 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+208 unpause-sp-cast PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediateButton 3020 950
+208 unpause-sp-cast PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyButton 3020 950
+235 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+235 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+250 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+250 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+260 unpause-sp-remove PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediateTrigger
+260 unpause-sp-remove PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyTrigger
+265 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+265 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+265 unpause-sp-cast PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediateButton 3020 950
+275 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+285 objupgrade PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediateTrigger
+285 objupgrade PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyTrigger
+287 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpImmediatePower
+287 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+355 unpause-sp-probe PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyPower
+356 unpause-sp-cast PlyrCreeps UnpauseSpCaster 0 UnpauseSpObeyButton 3020 950
+395 unreveal PlyrCreeps UnpauseSpCaster 0
+395 destroy PlyrCreeps UnpauseSpMarker 1
+395 destroy PlyrCreeps UnpauseSpMarker 0
+395 destroy PlyrCreeps UnpauseSpCaster 0

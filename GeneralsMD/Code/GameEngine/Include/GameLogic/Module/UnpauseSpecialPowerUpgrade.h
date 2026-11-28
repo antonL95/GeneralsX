@@ -67,6 +67,7 @@ public:
 
 	UnpauseSpecialPowerUpgrade( Thing *thing, const ModuleData* moduleData );
 	const UnpauseSpecialPowerUpgradeModuleData* getUnpauseData() const { return getUnpauseSpecialPowerUpgradeModuleData(); }
+	Bool resetUpgrade(const UpgradeMaskType& keyMask) override;
 	// virtual destructor prototype defined by MemoryPoolObject
 
 protected:
