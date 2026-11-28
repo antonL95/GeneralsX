@@ -1201,6 +1201,12 @@ void WaterRenderObjClass::reset()
 
 	if (m_waterTrackSystem)
 		m_waterTrackSystem->reset();
+
+	m_reflectionLevel = 0.0f;
+	m_reflectionTextureValid = FALSE;
+	m_reflectionReused = FALSE;
+	m_retailReflectionSourceValid = false;
+	++m_reflectionRevision;
 }
 
 void WaterRenderObjClass::enableWaterGrid(Bool state)
@@ -1456,18 +1462,20 @@ void WaterRenderObjClass::updateRenderTargetTextures(CameraClass *cam)
 		renderMirror(cam, m_level);	//generate texture containing reflected scene
 	}
 
-	// GeneralsX @feature fbraz3 08/10/2026 Water reflection toggle via INI/Options for translucent water
-	if (m_waterType != WATER_TYPE_0_TRANSLUCENT || !m_pReflectionTexture || !m_pReflectionZTexture || (TheGlobalData && !TheGlobalData->isWaterReflections()))
+	const Bool retailReflectionEnabled = !RetailFileLayers::enabled() || !TheWaterTransparency || TheWaterTransparency->m_reflectionOn;
+	if (m_waterType != WATER_TYPE_0_TRANSLUCENT || !m_pReflectionTexture || !m_pReflectionZTexture ||
+		(TheGlobalData && !TheGlobalData->isWaterReflections()) || !retailReflectionEnabled)
 	{
 		m_retailReflectionSourceValid = false;
+		m_reflectionTextureValid = FALSE;
 		return;
 	}
 
-	// A camera that has not moved looks at the same water from the same place, so a reflection one
-	// frame old lines up with it exactly and only what moved in it is a frame late.  Such a frame
-	// keeps the last texture, and the one after it draws a new one.
+	const Real expectedLevel = (RetailFileLayers::enabled() && TheWaterTransparency)
+		? TheWaterTransparency->m_reflectionPlaneZ
+		: m_reflectionLevel;
 	const Bool cameraMoved = memcmp(&cam->Get_Transform(), &m_reflectionCameraTransform, sizeof(Matrix3D)) != 0;
-	if (!cameraMoved && !m_reflectionReused && m_reflectionTextureValid)
+	if (!cameraMoved && !m_reflectionReused && m_reflectionTextureValid && m_reflectionLevel == expectedLevel)
 	{
 		m_reflectionReused = TRUE;
 		return;
@@ -1495,7 +1503,9 @@ void WaterRenderObjClass::updateRenderTargetTextures(CameraClass *cam)
 			continue;
 
 		if (!waterInView)
-			m_reflectionLevel = pTrig->getPoint(0)->z;
+			m_reflectionLevel = (RetailFileLayers::enabled() && TheWaterTransparency)
+				? TheWaterTransparency->m_reflectionPlaneZ
+				: pTrig->getPoint(0)->z;
 		waterInView = TRUE;
 
 		for (Int pointIndex = 0; pointIndex < pTrig->getNumPoints(); ++pointIndex)
@@ -3148,8 +3158,8 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 //-------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::drawReflection(Int triangleCount, Int vertexCount)
 {
-	// GeneralsX @feature fbraz3 08/10/2026 Water reflection toggle via INI/Options
-	if (TheGlobalData && !TheGlobalData->isWaterReflections())
+	if ((TheGlobalData && !TheGlobalData->isWaterReflections()) ||
+		(RetailFileLayers::enabled() && TheWaterTransparency && !TheWaterTransparency->m_reflectionOn))
 		return;
 
 	// GeneralsX @bugfix fbraz3 09/10/2026 Translucent water reflections are only computed for WATER_TYPE_0_TRANSLUCENT.

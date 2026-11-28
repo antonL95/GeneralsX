@@ -437,9 +437,11 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	auto &water = *entry->second;
 	const bool usePca = runtime.pcaPass && water.pca && useUltraWater();
 	const bool useFull = runtime.fullPass && water.material.technique == 1;
+	const bool retailReflectionEnabled = !RetailFileLayers::enabled() || !TheWaterTransparency || TheWaterTransparency->m_reflectionOn;
+	const bool reflectionPlaneMatches = RetailFileLayers::enabled() || m_reflectionLevel == static_cast<Real>(polygon.getPoint(0)->z);
 	void *reflection = nullptr;
-	if ((useFull || usePca) && m_retailReflectionSourceValid &&
-		m_reflectionLevel == static_cast<Real>(polygon.getPoint(0)->z) && TheGlobalData && TheGlobalData->isWaterReflections())
+	if ((useFull || usePca) && m_retailReflectionSourceValid && reflectionPlaneMatches &&
+		retailReflectionEnabled && TheGlobalData && TheGlobalData->isWaterReflections())
 	{
 		if (runtime.reflectionRevision != m_reflectionRevision)
 		{

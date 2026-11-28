@@ -73,6 +73,10 @@ const FieldParse WaterTransparencySetting::m_waterTransparencySettingFieldParseT
 	{ "SkyboxTextureS",							INI::parseAsciiString,nullptr,			offsetof( WaterTransparencySetting, m_skyboxTextureS ) },
 	{ "SkyboxTextureW",							INI::parseAsciiString,nullptr,			offsetof( WaterTransparencySetting, m_skyboxTextureW ) },
 	{ "SkyboxTextureT",							INI::parseAsciiString,nullptr,			offsetof( WaterTransparencySetting, m_skyboxTextureT ) },
+	{ "RiverTransparencyMultiplier",	INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_riverTransparencyMultiplier ) },
+	{ "ReflectionPlaneZ",				INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_reflectionPlaneZ ) },
+	{ "ReflectionOn",					INI::parseBool,				nullptr,			offsetof( WaterTransparencySetting, m_reflectionOn ) },
+	{ "ReflectionGuard",				INI::parseCoord2D,			nullptr,			offsetof( WaterTransparencySetting, m_reflectionGuard ) },
 
 
 	{ nullptr, nullptr, nullptr, 0 },

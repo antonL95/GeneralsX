@@ -1,0 +1,2 @@
+21 Player_1 MenFortressCitadel 2200 2700 1.00
+47 Player_1 MenFortressCitadel 3350 2700 0.72

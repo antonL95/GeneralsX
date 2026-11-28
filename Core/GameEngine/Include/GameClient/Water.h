@@ -88,6 +88,10 @@ class WaterTransparencySetting : public Overridable
 		AsciiString m_skyboxTextureS;
 		AsciiString m_skyboxTextureW;
 		AsciiString m_skyboxTextureT;
+		Real m_riverTransparencyMultiplier;
+		Real m_reflectionPlaneZ;
+		Bool m_reflectionOn;
+		Coord2D m_reflectionGuard;
 
 	public:
 		WaterTransparencySetting()
@@ -108,6 +112,11 @@ class WaterTransparencySetting : public Overridable
 			m_skyboxTextureS = "TSMorningS.tga";
 			m_skyboxTextureW = "TSMorningW.tga";
 			m_skyboxTextureT = "TSMorningT.tga";
+			m_riverTransparencyMultiplier = 1.0f;
+			m_reflectionPlaneZ = 50.0f;
+			m_reflectionOn = FALSE;
+			m_reflectionGuard.x = 0.0f;
+			m_reflectionGuard.y = 0.0f;
 		}
 
 		static const FieldParse m_waterTransparencySettingFieldParseTable[];		///< the parse table for INI definition
