@@ -58,6 +58,7 @@
 
 const Real CLOSE_ENOUGH = (25.0f);
 const Real MELEE_RETALIATE_RANGE_FACTOR_00C12234 = 1.15f;
+const Real GUARD_RETALIATE_INNER_SCAN_FACTOR_00C81028 = 0.3f;
 const UnsignedInt MELEE_RETALIATE_CHASE_EXTRA_SHIFT_0094C144 = 1;
 
 static Bool hasMeleeCurrentWeapon(const Object* obj)
@@ -294,20 +295,11 @@ Bool AIGuardRetaliateMachine::lookForInnerTarget()
 
 	filters[count++] = &filterMapStatus;
 
-	Real visionRange = AIGuardRetaliateMachine::getStdGuardRange(owner);
+	Real visionRange = TheAI->getAiData()->m_maxRetaliateDistance * GUARD_RETALIATE_INNER_SCAN_FACTOR_00C81028;
 
 	filters[count++] = nullptr;
 
-//	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(
-//					&pos, visionRange, FROM_CENTER_2D, filters, ITER_SORTED_NEAR_TO_FAR);
-//	MemoryPoolObjectHolder hold(iter);
-//	Object* target = iter->first();
-//
-// srj sez: the above code is stupid and slow. since we only want the closest object,
-// just ask for that; the above has to find ALL objects in range, but we ignore all
-// but the first (closest).
-//
-	const Coord3D *pos = getPositionToGuard();
+	const Coord3D *pos = owner->getPosition();
 	Object* target = ThePartitionManager->getClosestObject(pos, visionRange, FROM_CENTER_2D, filters);
 	if (target)
 	{
