@@ -45,6 +45,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/UiPixelSpaceTest.cpp
     GameEngine/Common/UiRadialRingTest.cpp
     GameEngine/Common/UiRelayoutTest.cpp
+    GameEngine/Common/WeightedAudioRulesTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp
     Libraries/WW3D2/W3dFxMaterialTest.cpp

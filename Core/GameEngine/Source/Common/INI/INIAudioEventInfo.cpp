@@ -33,26 +33,15 @@
 #include "Common/GameAudio.h"
 #include "Common/AudioEventInfo.h"
 #include "Common/AudioRandomValue.h"
+#include "Common/WeightedAudio.h"
 
-#include <algorithm>
-#include <charconv>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-
-WeightedAudioName::WeightedAudioName(const char* token) : name(token)
+WeightedAudioName::WeightedAudioName(const char* token)
 {
-	const char* suffix = std::strrchr(token, ':');
-	if (!suffix || suffix == token)
-		return;
-	const char* end = token + std::strlen(token);
-	Int parsed;
-	const auto result = std::from_chars(suffix + 1, end, parsed);
-	if (result.ec != std::errc() || result.ptr != end || parsed < 1)
-		return;
-	authoredName = name;
-	name.set(token, static_cast<Int>(suffix - token));
-	weight = parsed;
+	const ParsedWeightedAudioToken parsed = parseWeightedAudioToken(token);
+	name.set(parsed.name.c_str());
+	if (!parsed.authoredName.empty())
+		authoredName.set(parsed.authoredName.c_str());
+	weight = parsed.weight;
 }
 
 const AsciiString& WeightedAudioName::getName(Bool useAuthoredName) const
@@ -62,33 +51,12 @@ const AsciiString& WeightedAudioName::getName(Bool useAuthoredName) const
 
 Int pickWeightedAudioName(const std::vector<WeightedAudioName>& names, Int previous)
 {
-	const Int count = static_cast<Int>(names.size());
-	if (count < 2)
-		return count - 1;
-	if (previous < 0 || previous >= count)
-		previous = -1;
-
-	std::uint64_t total = 0;
-	for (Int i = 0; i < count; ++i)
-		if (i != previous)
-			total += names[i].weight;
-
-	std::uint64_t draw;
-	if (total <= std::numeric_limits<Int>::max())
-		draw = GameAudioRandomValue(0, static_cast<Int>(total) - 1);
-	else
-		draw = std::min(total - 1, static_cast<std::uint64_t>(GameAudioRandomValueReal(0.0f, 1.0f) * static_cast<double>(total)));
-
-	for (Int i = 0; i < count; ++i)
-	{
-		if (i == previous)
-			continue;
-		const auto weight = static_cast<std::uint64_t>(names[i].weight);
-		if (draw < weight)
-			return i;
-		draw -= weight;
-	}
-	return -1;
+	return pickWeightedAudioIndex(
+		static_cast<int>(names.size()),
+		previous,
+		[&](int index) { return names[static_cast<std::size_t>(index)].weight; },
+		[](int lo, int hi) { return GameAudioRandomValue(lo, hi); },
+		[](float lo, float hi) { return GameAudioRandomValueReal(lo, hi); });
 }
 
 AudioEventInfo::~AudioEventInfo()
