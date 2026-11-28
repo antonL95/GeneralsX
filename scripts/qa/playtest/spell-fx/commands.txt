@@ -28,3 +28,6 @@
 843 damage Player_1 GondorElessar 0 175
 850 power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
 851 ability Player_1 GondorElessar 0
+918 create Player_1 MordorSpellBook 0 3500,690,0
+919 reveal Player_1 MordorSpellBook 0
+921 pkg35-cast Player_1 MordorSpellBook 0 SpellBookRainOfFire 3200 600
