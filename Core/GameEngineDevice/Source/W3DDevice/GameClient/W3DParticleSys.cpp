@@ -38,6 +38,7 @@
 #include "W3DDevice/GameClient/W3DRetailGpuParticles.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
+#include "W3DDevice/GameClient/W3DBillboardParticles.h"
 #include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
@@ -173,6 +174,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 
 	m_pointGroup = nullptr;
 	m_streakLine = nullptr;
+	m_billboardParticles = nullptr;
 	m_terrainParticles = nullptr;
 	m_posBuffer = nullptr;
 	m_RGBABuffer = nullptr;
@@ -185,6 +187,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_pointGroup = NEW PointGroupClass();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
+	m_billboardParticles = NEW W3DBillboardParticles();
 	m_terrainParticles = NEW W3DTerrainParticles();
 
 	m_posBuffer = NEW_REF( ShareBufferClass<Vector3>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_posBuffer") );
@@ -203,6 +206,9 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 	{
 		REF_PTR_RELEASE(m_streakLine);
 	}
+
+	delete m_billboardParticles;
+	m_billboardParticles = nullptr;
 
 	delete m_terrainParticles;
 	m_terrainParticles = nullptr;
@@ -770,7 +776,17 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 			m_terrainParticles->setBoundingBox( m_currentBoundingBox );
 			m_terrainParticles->render();
 		}
-		else // draw regular point group
+		else if (m_batchParticleAlignment == ParticleSystemInfo::PARTICLE_ALIGNMENT_BILLBOARD &&
+			m_batchShaderType == ParticleSystemInfo::ALPHA &&
+			m_billboardParticles &&
+			m_billboardParticles->canRenderGroundFaded())
+		{
+			m_billboardParticles->setTexture(m_batchTexture.Peek());
+			m_billboardParticles->setShader(shader);
+			m_billboardParticles->setArrays(m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount);
+			m_billboardParticles->render(rinfo);
+		}
+		else
 		{
 			m_pointGroup->Set_Texture(m_batchTexture.Peek());
 			m_pointGroup->Set_Shader(shader);

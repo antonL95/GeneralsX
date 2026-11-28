@@ -36,6 +36,7 @@
 #include <memory>
 #include <vector>
 
+class W3DBillboardParticles;
 class W3DTerrainParticles;
 namespace RetailFX { class GpuParticlePass; }
 
@@ -71,6 +72,7 @@ private:
 	std::vector<AsciiString> m_tracedGpuTemplates;
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
 	StreakLineClass *m_streakLine;							///< the streak class that contains all of the streaks
+	W3DBillboardParticles *m_billboardParticles;
 	W3DTerrainParticles *m_terrainParticles;			///< the terrain-conforming particles renderer
 	ShareBufferClass<Vector3> *m_posBuffer;			///< array of particle positions
 	ShareBufferClass<Vector4> *m_RGBABuffer;		///< array of particle color and alpha

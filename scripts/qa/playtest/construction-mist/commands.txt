@@ -1,0 +1,8 @@
+18 player Player_1
+19 reveal Player_1 - 0
+20 spawn Player_1 MenPorter 3230 750 0
+22 construct Player_1 MenPorter 2 GondorStable 3250 750 0
+70 particle-systems Player_1 - 0 BuildingContructDust
+110 particle-systems Player_1 - 0 BuildingContructDust
+145 particle-systems Player_1 - 0 BuildingContructDust
+175 particle-systems Player_1 - 0 BuildingContructDust
