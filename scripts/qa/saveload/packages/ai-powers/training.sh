@@ -34,7 +34,7 @@ expect_pending() {
 expect_combat_impacts() {
     if ! awk '
         $1 == "TEST" && $2 == "impact" && $4 == "weapon=AiPowersSpecialWeapon" {
-            if ($7 == "pos=3128.0,1480.0") charge++
+            if ($7 == "pos=3478.0,1310.0") charge++
             else if ($7 == "pos=3440.0,1475.0") morgul++
             else unexpected++
         }

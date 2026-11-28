@@ -1,9 +1,9 @@
-35 create Player_2 AiPowersChargeCaster 0 3100,1450,0
+35 create Player_2 AiPowersChargeCaster 0 3450,1280,0
 35 create Player_2 AiPowersChargeCaster 1 3650,1750,0
 35 create Player_2 AiPowersMorgulCaster 0 3390,1450,0
-36 create Player_1 AiPowersCombatTarget 0 3140,1450,0
-36 create Player_1 AiPowersCombatTarget 1 3128,1480,0
-36 create Player_1 AiPowersCombatTarget 2 3180,1450,0
+36 create Player_1 AiPowersCombatTarget 0 3490,1280,0
+36 create Player_1 AiPowersCombatTarget 1 3478,1310,0
+36 create Player_1 AiPowersCombatTarget 2 3530,1280,0
 36 create Player_1 AiPowersCombatTarget 3 3685,1750,0
 36 create Player_1 AiPowersCombatTarget 4 3430,1450,0
 36 create Player_1 AiPowersMonsterTarget 0 3418,1470,0
@@ -44,10 +44,10 @@
 575 mods Player_2 AiPowersStanceInjured 0
 576 destroy Player_2 AiPowersStanceInjured 0
 600 create Player_2 AiPowersSummonCaster 0 3390,1450,0
-600 create Player_2 AiPowersSummonCaster 1 3100,1450,0
+600 create Player_2 AiPowersSummonCaster 1 3650,1150,0
 601 create Player_1 AiPowersCombatTarget 0 3430,1450,0
 601 create Player_1 AiPowersCombatTarget 1 3435,1430,0
-601 create Player_1 AiPowersCombatTarget 2 3140,1450,0
+601 create Player_1 AiPowersCombatTarget 2 3690,1150,0
 602 attack Player_2 AiPowersSummonCaster 0 Player_1:AiPowersCombatTarget:0
 602 attack Player_2 AiPowersSummonCaster 1 Player_1:AiPowersCombatTarget:2
 745 powers-fire-state Player_2 AiPowersSummonMarker 0
@@ -60,12 +60,12 @@
 876 destroy Player_1 AiPowersCombatTarget 2
 876 destroy Player_1 AiPowersCombatTarget 1
 876 destroy Player_1 AiPowersCombatTarget 0
-890 create Player_2 AiPowersWeaponToggle 0 3100,1450,0
+890 create Player_2 AiPowersWeaponToggle 0 3650,1150,0
 890 create Player_2 AiPowersWeaponToggle 1 3100,1750,0
 890 create Player_2 AiPowersSiegeToggle 0 3390,1450,0
-891 create Player_1 AiPowersCombatTarget 0 3135,1450,0
+891 create Player_1 AiPowersCombatTarget 0 3685,1150,0
 891 create Player_1 AiPowersCombatTarget 1 3200,1750,0
-891 create Player_1 AiPowersCombatTarget 2 3265,1450,0
+891 create Player_1 AiPowersCombatTarget 2 3815,1150,0
 891 create Player_1 AiPowersCombatTarget 3 3430,1490,0
 891 create Player_1 AiPowersSiegeTarget 0 3430,1450,0
 892 attack Player_2 AiPowersWeaponToggle 0 Player_1:AiPowersCombatTarget:0
@@ -101,9 +101,9 @@
 1196 destroy Player_2 AiPowersMountCaster 1
 1196 destroy Player_2 AiPowersMountCaster 0
 998 create Player_2 AiPowersPoweredWeaponToggle 0 3650,1750,0
-998 create Player_2 AiPowersFormationToggle 0 3000,1250,0
+998 create Player_2 AiPowersFormationToggle 0 3400,1000,0
 999 create Player_1 AiPowersFormationTarget 0 3680,1750,0
-999 create Player_1 AiPowersFormationTarget 1 3500,1250,0
+999 create Player_1 AiPowersFormationTarget 1 3800,1000,0
 1006 attack Player_2 AiPowersPoweredWeaponToggle 0 Player_1:AiPowersFormationTarget:0
 1006 attack Player_2 AiPowersFormationToggle 0 Player_1:AiPowersFormationTarget:1
 1075 formation-state Player_2 AiPowersFormationToggle 0
