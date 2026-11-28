@@ -158,7 +158,7 @@ public:
 
 	Squad *getGoalSquad();
 
-	StateReturnType setTemporaryState( StateID newStateID, Int frameLimitCoount );			///< change the temporary state of the machine, and number of frames limit.
+	StateReturnType setTemporaryState( StateID newStateID, Int frameLimitCoount, Bool lockAcrossClear = FALSE );
 	StateID getTemporaryState() const {return m_temporaryState?m_temporaryState->getID():INVALID_STATE_ID;}
 
 public:	// overrides.
@@ -181,7 +181,8 @@ private:
 	/** A temporary state to run for a while (usually AI_MOVE_OUT_OF_THE_WAY).
 	Doesn't clear or reset the state machine, so it goes back to doing what it was doing.  jba. */
 	State									*m_temporaryState;
-	UnsignedInt						m_temporaryStateFramEnd; ///< Last frame to run m_temporaryState.
+	UnsignedInt						m_temporaryStateFramEnd;
+	Bool									m_temporaryStateLocked;
 };
 
 

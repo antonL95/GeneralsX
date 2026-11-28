@@ -156,6 +156,9 @@ void BezierProjectileBehavior::projectileFireAtObjectOrPosition(const Object* vi
 
 Bool BezierProjectileBehavior::calcFlightPath(Bool recalcNumSegments)
 {
+	if (m_bounceIndex == 0 && !isSelfFlight() && !isPassengerFlight())
+		return DumbProjectileBehavior::calcFlightPath(recalcNumSegments);
+
 	const auto* data = getBezierProjectileBehaviorModuleData();
 	const Real firstIndent = m_bounceIndex == 0 ? data->m_firstPercentIndent : data->m_bounceFirstPercentIndent;
 	const Real secondIndent = m_bounceIndex == 0 ? data->m_secondPercentIndent : data->m_bounceSecondPercentIndent;
@@ -365,7 +368,7 @@ void BezierProjectileBehavior::finishCrushStyleLanding()
 		if (data->m_finalStuckTime == 0)
 			ai->aiIdle(CMD_FROM_AI);
 		else
-			ai->setRetailSpawnBusyTime(data->m_finalStuckTime);
+			ai->setRetailThrownStuckTime(data->m_finalStuckTime);
 	}
 }
 

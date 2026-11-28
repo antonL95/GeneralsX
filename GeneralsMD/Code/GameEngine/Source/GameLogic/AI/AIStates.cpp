@@ -690,6 +690,7 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 
 	m_temporaryState = nullptr;
 	m_temporaryStateFramEnd = 0;
+	m_temporaryStateLocked = FALSE;
 
 	// order matters: first state is the default state.
 	defineState( AI_IDLE,																	newInstance(AIIdleState)( this, AIIdleState::LOOK_FOR_TARGETS), AI_IDLE, AI_IDLE );
@@ -767,12 +768,10 @@ void AIStateMachine::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIStateMachine::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
- // extend base class
 	StateMachine::xfer(xfer);
 
 	Int i;
@@ -826,6 +825,13 @@ void AIStateMachine::xfer( Xfer *xfer )
 	}
 
 	xfer->xferUnsignedInt(&m_temporaryStateFramEnd);
+	if (RetailFileLayers::enabled())
+	{
+		RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, version >= 2, {
+			{ "temp-state-locked", [this](Xfer* block) { block->xferBool(&m_temporaryStateLocked); },
+				[this] { m_temporaryStateLocked = FALSE; } }
+		});
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -911,6 +917,7 @@ StateReturnType AIStateMachine::updateStateMachine()
 			}
 			temporaryState->onExit(EXIT_NORMAL);
 			m_temporaryState = nullptr;
+			m_temporaryStateLocked = FALSE;
 			if (RetailFileLayers::enabled() && temporaryState->getID() == AI_MOVE_OUT_OF_THE_WAY &&
 				getCurrentStateID() == AI_MOVE_TO)
 			{
@@ -953,7 +960,7 @@ StateReturnType AIStateMachine::updateStateMachine()
 /**
  * Change the temporary state of the machine, and number of frames limit.th
  */
-StateReturnType AIStateMachine::setTemporaryState( StateID newStateID, Int frameLimitCoount )
+StateReturnType AIStateMachine::setTemporaryState( StateID newStateID, Int frameLimitCoount, Bool lockAcrossClear )
 
 {
 	// extract the state associated with the given ID
@@ -982,6 +989,7 @@ StateReturnType AIStateMachine::setTemporaryState( StateID newStateID, Int frame
 		m_temporaryState->onExit(EXIT_RESET);
 		m_temporaryState = nullptr;
 	}
+	m_temporaryStateLocked = FALSE;
 	if (newState) {
 		m_temporaryState = newState;
 		StateReturnType ret = m_temporaryState->onEnter();
@@ -991,12 +999,12 @@ StateReturnType AIStateMachine::setTemporaryState( StateID newStateID, Int frame
 			return ret;
 		}
 		enum {FRAME_COUNT_MAX = 60*LOGICFRAMES_PER_SECOND};
-		// If you need to up this check, ok, but 1 minute seems overly long for a temporary state override.  jba.
 		DEBUG_ASSERTCRASH(frameLimitCoount<=FRAME_COUNT_MAX, ("Unusually long time to set temporary state."));
 		if (frameLimitCoount>FRAME_COUNT_MAX) {
 			frameLimitCoount = FRAME_COUNT_MAX;
 		}
 		m_temporaryStateFramEnd = TheGameLogic->getFrame()+frameLimitCoount;
+		m_temporaryStateLocked = lockAcrossClear;
 		return ret;
 	}
 	return STATE_FAILURE;
@@ -1060,11 +1068,11 @@ void AIStateMachine::clear()
 
 #if !RETAIL_COMPATIBLE_CRC
 	if (m_temporaryState &&
-		(!RetailFileLayers::enabled() || m_temporaryState->getID() != AI_BUSY ||
-			m_temporaryStateFramEnd <= TheGameLogic->getFrame()))
+		(!m_temporaryStateLocked || m_temporaryStateFramEnd < TheGameLogic->getFrame()))
 	{
 		m_temporaryState->onExit(EXIT_RESET);
 		m_temporaryState = nullptr;
+		m_temporaryStateLocked = FALSE;
 	}
 #endif
 

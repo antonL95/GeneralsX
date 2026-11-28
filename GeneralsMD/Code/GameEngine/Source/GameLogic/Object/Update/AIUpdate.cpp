@@ -4901,6 +4901,12 @@ void AIUpdateInterface::setRetailSpawnBusyTime(UnsignedInt frames)
 	wakeUpNow();
 }
 
+void AIUpdateInterface::setRetailThrownStuckTime(UnsignedInt frames)
+{
+	getStateMachine()->setTemporaryState(AI_BUSY, static_cast<Int>(std::min<UnsignedInt>(frames, 60 * LOGICFRAMES_PER_SECOND)), TRUE);
+	wakeUpNow();
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 /**
