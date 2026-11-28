@@ -1,9 +1,9 @@
 190 science Player_1 - 0 SCIENCE_BalrogAlly
 191 create Player_1 SummonBusyCaster 0 3200,1300,0
 200 default-cast Player_1 SummonBusyCaster 0 Command_SpellBookBalrogAlly 3300 800
-205 summon-busy-egg Player_1 MordorBalrogEgg 0 ordered
-500 destroy Player_1 MordorBalrog 0
+205 summon-busy-egg Player_1 SummonBusyEgg 0 ordered
+500 destroy Player_1 SummonBusyBalrog 0
 501 destroy Player_1 SummonBusyCaster 0
-620 create Player_1 SummonBusyFixedEgg 0 3300,1160,0
+620 create Player_1 SummonBusyFixedEgg 0 3300,800,0
 623 summon-busy-egg Player_1 SummonBusyFixedEgg 0 control
-800 destroy Player_1 MordorBalrog 0
+800 destroy Player_1 SummonBusyBalrog 0
