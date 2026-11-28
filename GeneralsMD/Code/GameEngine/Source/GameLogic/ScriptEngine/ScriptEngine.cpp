@@ -467,8 +467,10 @@ m_minFade(0.0f),
 m_numAttackInfo(0),
 m_shownMPLocalDefeatWindow(FALSE),
 m_objectsShouldReceiveDifficultyBonus(TRUE),
-m_ChooseVictimAlwaysUsesNormal(false)
+m_ChooseVictimAlwaysUsesNormal(false),
+m_hasSampledCameraPosition(FALSE)
 {
+	m_sampledCameraPosition.zero();
 	st_CanAppCont = true;
 	st_LastCurrentFrame = st_CurrentFrame = 0;
 	// By default, difficulty should be normal.
@@ -5291,6 +5293,8 @@ void ScriptEngine::reset()
 	m_numFlags = 1;
 	m_endGameTimer = -1;
 	m_closeWindowTimer = -1;
+	m_hasSampledCameraPosition = FALSE;
+	m_sampledCameraPosition.zero();
 	m_letterBoxActive = FALSE;
 
 	m_callingTeam = nullptr;
@@ -5460,6 +5464,8 @@ void ScriptEngine::newMap()
 	}
 	m_endGameTimer = -1;
 	m_closeWindowTimer = -1;
+	m_hasSampledCameraPosition = FALSE;
+	m_sampledCameraPosition.zero();
 #ifdef SPECIAL_SCRIPT_PROFILING
 #ifdef DEBUG_LOGGING
 	m_numFrames=0;
@@ -9127,7 +9133,7 @@ void ScriptEngine::xfer( Xfer *xfer )
 #else
 	const XferVersion stockVersion = 6;
 #endif
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : stockVersion;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : stockVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -9604,6 +9610,17 @@ void ScriptEngine::xfer( Xfer *xfer )
 	{
 		for (auto& references : m_retailUnitReferences)
 			references.clear();
+	}
+
+	if (version >= 8)
+	{
+		xfer->xferBool(&m_hasSampledCameraPosition);
+		xfer->xferCoord3D(&m_sampledCameraPosition);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_hasSampledCameraPosition = FALSE;
+		m_sampledCameraPosition.zero();
 	}
 
 	if( xfer->getXferMode() == XFER_LOAD ) {

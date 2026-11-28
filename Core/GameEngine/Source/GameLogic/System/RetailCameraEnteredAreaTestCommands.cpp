@@ -30,7 +30,11 @@ void checkCameraEnteredArea(const RetailTestCommands::Context &ctx)
 	script->setOrCondition(clause);
 
 	const Coord3D previous = TheTacticalView->getPosition();
+	const Bool hadSampled = TheScriptEngine->hasSampledCameraPosition();
+	const Coord3D previousSampled = TheScriptEngine->getSampledCameraPosition();
 	TheTacticalView->setPosition({125.0f, 125.0f, 100.0f});
+	const Bool unsampled = TheScriptEngine->evaluateConditions(script);
+	TheScriptEngine->setSampledCameraPosition(TheTacticalView->getPosition());
 	const Bool inside = TheScriptEngine->evaluateConditions(script);
 	const GameMode mode = TheGameLogic->getGameMode();
 	TheGameLogic->setGameMode(GAME_LAN);
@@ -39,14 +43,19 @@ void checkCameraEnteredArea(const RetailTestCommands::Context &ctx)
 	const Bool replay = TheScriptEngine->evaluateConditions(script);
 	TheGameLogic->setGameMode(mode);
 	TheTacticalView->setPosition({160.0f, 125.0f, 100.0f});
+	TheScriptEngine->setSampledCameraPosition(TheTacticalView->getPosition());
 	const Bool outside = TheScriptEngine->evaluateConditions(script);
 	TheTacticalView->setPosition(previous);
+	if (hadSampled)
+		TheScriptEngine->setSampledCameraPosition(previousSampled);
+	else
+		TheScriptEngine->clearSampledCameraPosition();
 
 	deleteInstance(script);
 	PolygonTrigger::removePolygonTrigger(area);
 	deleteInstance(area);
-	std::fprintf(stderr, "TEST camera-entered-area frame=%u inside=%d outside=%d multiplayer=%d replay=%d\n",
-		ctx.frame, inside, outside, multiplayer, replay);
+	std::fprintf(stderr, "TEST camera-entered-area frame=%u inside=%d outside=%d multiplayer=%d replay=%d unsampled=%d\n",
+		ctx.frame, inside, outside, multiplayer, replay, unsampled);
 }
 }
 #endif

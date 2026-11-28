@@ -339,6 +339,11 @@ public:
 	AsciiString getCurrentTrackName() const { return m_currentTrackName; }
 	void setCurrentTrackName(AsciiString a) { m_currentTrackName = a; }
 
+	void setSampledCameraPosition(const Coord3D& pos) { m_sampledCameraPosition = pos; m_hasSampledCameraPosition = TRUE; }
+	void clearSampledCameraPosition() { m_hasSampledCameraPosition = FALSE; m_sampledCameraPosition.zero(); }
+	Bool hasSampledCameraPosition() const { return m_hasSampledCameraPosition; }
+	const Coord3D& getSampledCameraPosition() const { return m_sampledCameraPosition; }
+
 	GameDifficulty getGlobalDifficulty() const { return m_gameDifficulty; }
 	void setGlobalDifficulty( GameDifficulty difficulty );
 
@@ -507,6 +512,8 @@ protected:
 	Bool							m_ChooseVictimAlwaysUsesNormal;
 
 	Bool							m_shownMPLocalDefeatWindow;
+	Coord3D						m_sampledCameraPosition;
+	Bool							m_hasSampledCameraPosition;
 
 #ifdef SPECIAL_SCRIPT_PROFILING
 #ifdef DEBUG_LOGGING

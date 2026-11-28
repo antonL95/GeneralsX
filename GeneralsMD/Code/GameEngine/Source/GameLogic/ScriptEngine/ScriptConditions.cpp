@@ -3326,10 +3326,12 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 		}
 		case Condition::CAMERA_ENTERED_AREA:
 		{
-			if (!TheTacticalView || TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInReplayGame())
+			if (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInReplayGame())
+				return FALSE;
+			if (!TheScriptEngine->hasSampledCameraPosition())
 				return FALSE;
 			const PolygonTrigger *area = TheScriptEngine->getQualifiedTriggerAreaByName(pCondition->getParameter(0)->getString());
-			return area && area->pointInTrigger(TheTacticalView->getPosition());
+			return area && area->pointInTrigger(TheScriptEngine->getSampledCameraPosition());
 		}
 		case Condition::IS_GAME_MODE_ACTIVE:
 			return RetailFileLayers::enabled() && TheGameInfo &&

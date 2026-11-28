@@ -1465,6 +1465,13 @@ void GameEngine::update()
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
 		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
 		{
+			if (TheScriptEngine && TheGameLogic)
+			{
+				if (TheTacticalView && !TheGameLogic->isInMultiplayerGame() && !TheGameLogic->isInReplayGame())
+					TheScriptEngine->setSampledCameraPosition(TheTacticalView->getPosition());
+				else
+					TheScriptEngine->clearSampledCameraPosition();
+			}
 			if (RetailSkirmishProbe::enabled())
 				RetailSkirmishProbe::checkpoint(TheGameLogic->getFrame());
 			RetailTestCommands::saveCheckpoint(TheGameLogic->getFrame());
