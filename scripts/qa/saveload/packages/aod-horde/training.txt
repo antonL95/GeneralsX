@@ -1,0 +1,17 @@
+200 create PlyrCreeps RohanOathbreakerHordeSmall 0 1150,2980,0
+215 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 stand1
+225 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 stand2
+235 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 stand3
+236 builderscriptmove PlyrCreeps RohanOathbreakerHordeSmall 0 - 1430 2980
+244 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 move1
+252 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 move2
+265 create Player_1 MordorMumakil 0 1270,2980,180
+265 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 move3
+280 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 bump1
+295 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 bump2
+310 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 bump3
+330 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 bump4
+380 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 settle
+645 aod-horde-probe PlyrCreeps RohanOathbreakerHordeSmall 0 decay
+650 destroy PlyrCreeps RohanOathbreakerHordeSmall 0
+650 destroy Player_1 MordorMumakil 0
