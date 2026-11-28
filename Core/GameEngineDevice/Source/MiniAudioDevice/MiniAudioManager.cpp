@@ -209,6 +209,11 @@ public:
 			m_attack = first.bytes;
 		if (m_remaining > 0 && !event.getDecayFilename().isEmpty() && !load(event.getDecayFilename(), m_decay))
 			return FALSE;
+		if (m_record)
+		{
+			segments.push_back({m_portion, 0, currentClip().size() / m_frameBytes});
+			m_segmentRecorded = TRUE;
+		}
 		return TRUE;
 	}
 
@@ -271,6 +276,7 @@ private:
 			m_index = next + (next >= m_index);
 		}
 		m_clipOffset = 0;
+		m_segmentRecorded = FALSE;
 	}
 
 	static ma_result read(ma_data_source* source, void* output, ma_uint64 requested, ma_uint64* count)
@@ -282,8 +288,11 @@ private:
 		{
 			const auto& clip = loop.currentClip();
 			const ma_uint64 length = clip.size() / loop.m_frameBytes;
-			if (loop.m_record && loop.m_clipOffset == 0)
+			if (loop.m_record && !loop.m_segmentRecorded)
+			{
 				loop.segments.push_back({loop.m_portion, loop.m_outputOffset, length});
+				loop.m_segmentRecorded = TRUE;
+			}
 			const auto frames = std::min(requested - *count, length - loop.m_clipOffset);
 			std::memcpy(static_cast<uint8_t*>(output) + *count * loop.m_frameBytes,
 				clip.data() + loop.m_clipOffset * loop.m_frameBytes, frames * loop.m_frameBytes);
@@ -321,6 +330,7 @@ private:
 	std::vector<uint8_t> m_decay;
 	ma_uint64 m_clipOffset = 0;
 	ma_uint64 m_outputOffset = 0;
+	Bool m_segmentRecorded = FALSE;
 	std::atomic<Bool> m_playingDecay{FALSE};
 };
 
@@ -724,15 +734,19 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 			(event->isPositionalAudio() ? PAT_3DSample : ambientStream ? PAT_Stream : PAT_Sample);
 		audio->m_fadeIn = event->getShouldFade();
 		m_playingSounds.push_back(audio);
-		if (m_traceEnabled && !audio->m_loopSource) {
-			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%u channels=%u samplebytes=%u\n",
-				static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
-				pcm.bytes.size(), pcm.rate, pcm.channels, ma_get_bytes_per_sample(pcm.format));
-			const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
-			const char *portion = info->m_soundType != AT_SoundEffect ? nullptr :
-				(event->getNextPlayPortion() == PP_Attack ? "attack" :
-				(event->getNextPlayPortion() == PP_Decay ? "decay" : "sound"));
-			traceEvent(req->m_isContinuation ? "segment" : "start", owner, event->getPlayingHandle(), event->getEventName(), portion);
+		if (m_traceEnabled) {
+			if (audio->m_loopSource) {
+				traceLoopSegments(*event, *audio->m_loopSource);
+			} else {
+				std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%u channels=%u samplebytes=%u\n",
+					static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
+					pcm.bytes.size(), pcm.rate, pcm.channels, ma_get_bytes_per_sample(pcm.format));
+				const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
+				const char *portion = info->m_soundType != AT_SoundEffect ? nullptr :
+					(event->getNextPlayPortion() == PP_Attack ? "attack" :
+					(event->getNextPlayPortion() == PP_Decay ? "decay" : "sound"));
+				traceEvent(req->m_isContinuation ? "segment" : "start", owner, event->getPlayingHandle(), event->getEventName(), portion);
+			}
 		}
 		return;
 	}
