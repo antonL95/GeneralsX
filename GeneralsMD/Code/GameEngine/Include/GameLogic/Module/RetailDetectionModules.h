@@ -87,6 +87,7 @@ public:
 	InvisibilityUpdate(Thing* thing, const ModuleData* data);
 	static InvisibilityUpdate* find(const Object* object, NameKeyType tag = NAMEKEY_INVALID);
 	void toggle(UnsignedInt duration);
+	Bool isActive() const { return m_active; }
 	Bool isAvailable() const;
 	Bool isEnabled() const;
 	Real timerProgress(UnsignedInt duration) const;
@@ -119,8 +120,12 @@ class ToggleHiddenSpecialAbilityUpdate final : public SpecialAbilityUpdate
 public:
 	ToggleHiddenSpecialAbilityUpdate(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
 	static Real timerProgress(const Object* object, const SpecialPowerTemplate* power);
+	static void onHiddenEnded(Object* object);
 
 protected:
 	Bool acceptsIntent(const Object* target, const Coord3D* position) const override;
 	void triggerAbilityEffect() override;
+
+private:
+	Bool m_countdownPaused = FALSE;
 };

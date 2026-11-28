@@ -11,6 +11,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 
 #include "Common/Upgrade.h"
 #include "GameLogic/TerrainLogic.h"
@@ -265,6 +266,8 @@ void InvisibilityUpdate::deactivate()
 	getObject()->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_HIDDEN));
 	getObject()->clearModelConditionState(MODELCONDITION_HIDDEN);
 	getObject()->clearWeaponSetFlag(WEAPONSET_HIDDEN);
+	if (!getInvisibilityUpdateModuleData()->m_startsActive)
+		ToggleHiddenSpecialAbilityUpdate::onHiddenEnded(getObject());
 }
 
 void InvisibilityUpdate::toggle(UnsignedInt duration)
@@ -404,14 +407,43 @@ Bool ToggleHiddenSpecialAbilityUpdate::acceptsIntent(const Object*, const Coord3
 
 void ToggleHiddenSpecialAbilityUpdate::triggerAbilityEffect()
 {
-	if (auto* invisibility = InvisibilityUpdate::find(getObject()))
+	auto* invisibility = InvisibilityUpdate::find(getObject());
+	const Bool activating = invisibility && !invisibility->isActive();
+	if (invisibility)
 		invisibility->toggle(getToggleHiddenSpecialAbilityUpdateModuleData()->m_effectDuration);
+	if (activating && !m_countdownPaused)
+	{
+		if (auto* spm = getMySPM())
+		{
+			spm->pauseCountdown(TRUE);
+			m_countdownPaused = TRUE;
+		}
+	}
 	SpecialAbilityUpdate::triggerAbilityEffect();
+}
+
+void ToggleHiddenSpecialAbilityUpdate::onHiddenEnded(Object* object)
+{
+	if (!object)
+		return;
+	const auto key = NAMEKEY("ToggleHiddenSpecialAbilityUpdate");
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		auto* toggle = static_cast<ToggleHiddenSpecialAbilityUpdate*>(*module);
+		if (!toggle->m_countdownPaused)
+			continue;
+		toggle->m_countdownPaused = FALSE;
+		if (auto* spm = toggle->getMySPM())
+			spm->pauseCountdown(FALSE);
+	}
 }
 
 void ToggleHiddenSpecialAbilityUpdate::crc(Xfer* xfer)
 {
 	SpecialAbilityUpdate::crc(xfer);
+	xfer->xferBool(&m_countdownPaused);
 }
 
 void ToggleHiddenSpecialAbilityUpdate::xfer(Xfer* xfer)
@@ -419,6 +451,7 @@ void ToggleHiddenSpecialAbilityUpdate::xfer(Xfer* xfer)
 	XferVersion version = 1;
 	xfer->xferVersion(&version, 1);
 	SpecialAbilityUpdate::xfer(xfer);
+	xfer->xferBool(&m_countdownPaused);
 }
 
 void ToggleHiddenSpecialAbilityUpdate::loadPostProcess()
