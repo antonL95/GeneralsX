@@ -98,9 +98,7 @@ void FireWeaponPower::doSpecialPower( UnsignedInt commandOptions )
 	Object *self = getObject();
 	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 
-	if( self->isDisabled() || !meetsRequiredRank() )
-		return;
-	if( !isRetailCastAllowed( commandOptions ) )
+	if (!isScriptCast(commandOptions) && (self->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)))
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
@@ -128,9 +126,7 @@ void FireWeaponPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	Object *self = getObject();
 	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 
-	if( self->isDisabled() || !meetsRequiredRank() )
-		return;
-	if( !isRetailCastAllowed( commandOptions ) )
+	if (!isScriptCast(commandOptions) && (self->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)))
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
@@ -158,9 +154,7 @@ void FireWeaponPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOp
 	Object *self = getObject();
 	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 
-	if( self->isDisabled() || !meetsRequiredRank() )
-		return;
-	if( !isRetailCastAllowed( commandOptions ) )
+	if (!isScriptCast(commandOptions) && (self->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)))
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality

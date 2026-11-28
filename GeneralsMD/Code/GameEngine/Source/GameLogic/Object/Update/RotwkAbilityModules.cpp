@@ -2225,8 +2225,9 @@ void RepairSpecialPower::doSpecialPowerAtObject(Object* target, UnsignedInt opti
 {
 	resetLastCastAccepted();
 	Object* caster = getObject();
-	if (!isReady() || caster->isDisabled() || !isRetailCastAllowed(options) || !isValidPowerTarget(target) ||
-		!CommandButton::isRetailPowerObjectTargetAllowed(caster, getSpecialPowerTemplate(), target))
+	if (!isValidPowerTarget(target) ||
+		(!isScriptCast(options) && (!isReady() || caster->isDisabled() || !isRetailCastAllowed(options) ||
+			!CommandButton::isRetailPowerObjectTargetAllowed(caster, getSpecialPowerTemplate(), target))))
 		return;
 
 	const CommandSourceType source = (options & COMMAND_OPTION_INTERNAL_AUTO) ? CMD_FROM_AI :
@@ -2709,13 +2710,13 @@ void PlayerHealSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 void PlayerHealSpecialPower::doSpecialPowerAtObject(Object* obj, UnsignedInt commandOptions)
 {
 	resetLastCastAccepted();
-	if (obj && CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj))
+	if (obj && (isScriptCast(commandOptions) || CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj)))
 		doSpecialPowerAtLocation(obj->getPosition(), INVALID_ANGLE, commandOptions);
 }
 
 void PlayerHealSpecialPower::doSpecialPowerAtLocation(const Coord3D* loc, Real angle, UnsignedInt commandOptions)
 {
-	if (!loc || m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
+	if (!loc || !canExecuteSpecialPower(commandOptions))
 		return;
 	const Coord3D center = *loc;
 	m_pendingCenter = center;

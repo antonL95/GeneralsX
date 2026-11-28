@@ -6890,11 +6890,11 @@ SpecialPowerModuleInterface *Object::getSpecialPowerModule( const SpecialPowerTe
 void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	const Bool fromScript = (commandOptions & COMMAND_FIRED_BY_SCRIPT) != 0;
+	if (!fromScript && isDisabled())
 		return;
 
-	// sanity
-	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
+	if (!forced && !fromScript && TheSpecialPowerStore->canUseSpecialPower(this, specialPowerTemplate) == FALSE)
 		return;
 
 	// get the module and execute
@@ -6910,11 +6910,11 @@ void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, U
 void Object::doSpecialPowerAtObject( const SpecialPowerTemplate *specialPowerTemplate, Object *obj, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	const Bool fromScript = (commandOptions & COMMAND_FIRED_BY_SCRIPT) != 0;
+	if (!fromScript && isDisabled())
 		return;
 
-	// sanity
-	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
+	if (!forced && !fromScript && TheSpecialPowerStore->canUseSpecialPower(this, specialPowerTemplate) == FALSE)
 		return;
 
 	// get the module and execute
@@ -6930,11 +6930,11 @@ void Object::doSpecialPowerAtLocation( const SpecialPowerTemplate *specialPowerT
 																			 const Coord3D *loc, Real angle, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	const Bool fromScript = (commandOptions & COMMAND_FIRED_BY_SCRIPT) != 0;
+	if (!fromScript && isDisabled())
 		return;
 
-	// sanity
-	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
+	if (!forced && !fromScript && TheSpecialPowerStore->canUseSpecialPower(this, specialPowerTemplate) == FALSE)
 		return;
 
 	// get the module and execute
@@ -6950,11 +6950,11 @@ void Object::doSpecialPowerAtLocation( const SpecialPowerTemplate *specialPowerT
 void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPowerTemplate, const Waypoint *way, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	const Bool fromScript = (commandOptions & COMMAND_FIRED_BY_SCRIPT) != 0;
+	if (!fromScript && isDisabled())
 		return;
 
-	// sanity
-	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
+	if (!forced && !fromScript && TheSpecialPowerStore->canUseSpecialPower(this, specialPowerTemplate) == FALSE)
 		return;
 
 	// get the module and execute
@@ -6969,7 +6969,7 @@ void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPo
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButton( const CommandButton *commandButton, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabled() && cmdSource != CMD_FROM_SCRIPT)
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
@@ -6991,7 +6991,7 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 			case GUI_COMMAND_SPECIAL_POWER:
 				if( commandButton->getSpecialPowerTemplate() )
 				{
-					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | COMMAND_FIRED_BY_SCRIPT);
+					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | (cmdSource == CMD_FROM_SCRIPT ? COMMAND_FIRED_BY_SCRIPT : 0));
 					doSpecialPower( commandButton->getSpecialPowerTemplate(), commandOptions, cmdSource == CMD_FROM_SCRIPT );
 					return;
 				}
@@ -7131,7 +7131,7 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object *obj, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabled() && cmdSource != CMD_FROM_SCRIPT)
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
@@ -7167,7 +7167,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 
 				if( commandButton->getSpecialPowerTemplate() )
 				{
-					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | COMMAND_FIRED_BY_SCRIPT);
+					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | (cmdSource == CMD_FROM_SCRIPT ? COMMAND_FIRED_BY_SCRIPT : 0));
 					doSpecialPowerAtObject( commandButton->getSpecialPowerTemplate(), obj, commandOptions, cmdSource == CMD_FROM_SCRIPT );
 				}
 				return;
@@ -7264,7 +7264,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtPosition( const CommandButton *commandButton, const Coord3D *pos, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabled() && cmdSource != CMD_FROM_SCRIPT)
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
@@ -7279,7 +7279,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 			{
 				if( commandButton->getSpecialPowerTemplate() )
 				{
-					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | COMMAND_FIRED_BY_SCRIPT);
+					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | (cmdSource == CMD_FROM_SCRIPT ? COMMAND_FIRED_BY_SCRIPT : 0));
 					doSpecialPowerAtLocation( commandButton->getSpecialPowerTemplate(), pos, INVALID_ANGLE, commandOptions, cmdSource == CMD_FROM_SCRIPT );
 					return;
 				}
@@ -7365,7 +7365,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, const Waypoint *way, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabled() && cmdSource != CMD_FROM_SCRIPT)
 		return;
 
 	if( commandButton )
@@ -7382,7 +7382,7 @@ void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, 
 			{
 				if( commandButton->getSpecialPowerTemplate() )
 				{
-					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | COMMAND_FIRED_BY_SCRIPT);
+					CommandOption commandOptions = (CommandOption)(commandButton->getOptions() | (cmdSource == CMD_FROM_SCRIPT ? COMMAND_FIRED_BY_SCRIPT : 0));
 					doSpecialPowerUsingWaypoints( commandButton->getSpecialPowerTemplate(), way, commandOptions, cmdSource == CMD_FROM_SCRIPT );
 					return;
 				}

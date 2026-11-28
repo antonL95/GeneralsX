@@ -36,7 +36,7 @@ HordeDispatchSpecialPower::~HordeDispatchSpecialPower() = default;
 void HordeDispatchSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
+	if (!horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || !canExecuteSpecialPower(commandOptions))
 		return;
 
 	SpecialPowerModule::doSpecialPower(commandOptions);
@@ -51,7 +51,7 @@ void HordeDispatchSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 void HordeDispatchSpecialPower::doSpecialPowerAtObject(Object* target, UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!target || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
+	if (!target || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || !canExecuteSpecialPower(commandOptions))
 		return;
 
 	SpecialPowerModule::doSpecialPowerAtObject(target, commandOptions);
@@ -66,7 +66,7 @@ void HordeDispatchSpecialPower::doSpecialPowerAtObject(Object* target, UnsignedI
 void HordeDispatchSpecialPower::doSpecialPowerAtLocation(const Coord3D* position, Real angle, UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!position || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
+	if (!position || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || !canExecuteSpecialPower(commandOptions))
 		return;
 
 	SpecialPowerModule::doSpecialPowerAtLocation(position, angle, commandOptions);

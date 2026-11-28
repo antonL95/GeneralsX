@@ -239,6 +239,8 @@ public:
 protected:
 	virtual void applyPowerEffect(const Coord3D*) {}
 
+	static Bool isScriptCast(UnsignedInt commandOptions);
+	Bool canExecuteSpecialPower(UnsignedInt commandOptions) const;
 	Bool meetsRequiredRank() const;
 	Bool initiateIntentToDoSpecialPower( const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions );
 	void triggerSpecialPower( const Coord3D *location );

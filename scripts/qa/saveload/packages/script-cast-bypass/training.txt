@@ -1,0 +1,24 @@
+200 create PlyrCreeps ScriptBypassCaster 0 3120,950,0
+200 create PlyrCreeps ScriptBypassTarget 0 3150,950,0
+201 reveal PlyrCreeps ScriptBypassCaster 0
+205 script-cast-player PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+206 script-cast-ai-btn PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+207 script-cast-map PlyrCreeps ScriptBypassCaster 0 ScriptBypassPower
+210 script-cast-count PlyrCreeps ScriptBypassMarker 0
+220 script-cast-disable PlyrCreeps ScriptBypassCaster 0 1
+222 script-cast-player PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+223 script-cast-ai-btn PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+225 script-cast-map PlyrCreeps ScriptBypassCaster 0 ScriptBypassPower
+228 script-cast-count PlyrCreeps ScriptBypassMarker 0
+248 script-cast-player PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+250 script-cast-obj PlyrCreeps ScriptBypassCaster 0 ScriptBypassPower 3150 950
+252 script-cast-script-btn PlyrCreeps ScriptBypassCaster 0 ScriptBypassButton 3150 950
+255 script-cast-count PlyrCreeps ScriptBypassMarker 0
+260 script-cast-disable PlyrCreeps ScriptBypassCaster 0 0
+395 unreveal PlyrCreeps ScriptBypassCaster 0
+395 destroy PlyrCreeps ScriptBypassMarker 3
+395 destroy PlyrCreeps ScriptBypassMarker 2
+395 destroy PlyrCreeps ScriptBypassMarker 1
+395 destroy PlyrCreeps ScriptBypassMarker 0
+395 destroy PlyrCreeps ScriptBypassTarget 0
+395 destroy PlyrCreeps ScriptBypassCaster 0

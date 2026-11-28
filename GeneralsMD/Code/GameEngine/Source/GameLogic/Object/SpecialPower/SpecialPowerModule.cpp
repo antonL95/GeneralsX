@@ -895,9 +895,20 @@ void SpecialPowerModule::updateRequirementsPause()
 	}
 }
 
+Bool SpecialPowerModule::isScriptCast(UnsignedInt commandOptions)
+{
+	return (commandOptions & COMMAND_FIRED_BY_SCRIPT) != 0;
+}
+
+Bool SpecialPowerModule::canExecuteSpecialPower(UnsignedInt commandOptions) const
+{
+	if (isScriptCast(commandOptions))
+		return TRUE;
+	return m_pausedCount == 0 && !getObject()->isDisabled() && meetsRequiredRank() && isRetailCastAllowed(commandOptions);
+}
 Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
 {
-	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog)
+	if (isScriptCast(commandOptions) || !RetailFileLayers::enabled() || !TheRetailCommandCatalog)
 		return TRUE;
 	if (!meetsRequirementsFilter())
 		return FALSE;
@@ -915,7 +926,7 @@ Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
 void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 {
 	m_lastCastAccepted = FALSE;
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
+	if (!canExecuteSpecialPower(commandOptions)) {
 		return;
 	}
 
@@ -935,10 +946,10 @@ void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
 	m_lastCastAccepted = FALSE;
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
+	if (!canExecuteSpecialPower(commandOptions)) {
 		return;
 	}
-	if (!CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj))
+	if (!isScriptCast(commandOptions) && !CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj))
 		return;
 
 	const Bool initiated = initiateIntentToDoSpecialPower( obj, nullptr, nullptr, commandOptions );
@@ -957,7 +968,7 @@ void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt comman
 void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
 	m_lastCastAccepted = FALSE;
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
+	if (!canExecuteSpecialPower(commandOptions)) {
 		return;
 	}
 
@@ -980,7 +991,7 @@ void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angl
 void SpecialPowerModule::doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions )
 {
 	m_lastCastAccepted = FALSE;
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
+	if (!canExecuteSpecialPower(commandOptions)) {
 		return;
 	}
 

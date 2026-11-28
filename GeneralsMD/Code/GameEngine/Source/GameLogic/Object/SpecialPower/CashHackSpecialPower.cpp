@@ -99,7 +99,7 @@ CashHackSpecialPower::~CashHackSpecialPower()
 // ------------------------------------------------------------------------------------------------
 void CashHackSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	// only allowed at objects
@@ -128,7 +128,7 @@ Int CashHackSpecialPower::findAmountToSteal() const
 // ------------------------------------------------------------------------------------------------
 void CashHackSpecialPower::doSpecialPowerAtObject( Object *victim, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (!isScriptCast(commandOptions) && (getObject()->isDisabled() || !meetsRequiredRank()))
 		return;
 
 	// sanity

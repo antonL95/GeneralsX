@@ -92,7 +92,7 @@ DefectorSpecialPower::~DefectorSpecialPower()
 
 void DefectorSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	// only allowed at objects
@@ -101,7 +101,7 @@ void DefectorSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real an
 // ------------------------------------------------------------------------------------------------
 void DefectorSpecialPower::doSpecialPowerAtObject( Object *objectToMakeDefector, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (!isScriptCast(commandOptions) && (getObject()->isDisabled() || !meetsRequiredRank()))
 		return;
 
 	// sanity check

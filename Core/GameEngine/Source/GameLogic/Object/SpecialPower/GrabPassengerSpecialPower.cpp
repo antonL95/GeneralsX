@@ -120,7 +120,7 @@ void GrabPassengerSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 void GrabPassengerSpecialPower::doSpecialPowerAtLocation(const Coord3D* position, Real, UnsignedInt commandOptions)
 {
 	m_lastCastAccepted = FALSE;
-	if (!position || m_pausedCount > 0 || getObject()->isDisabled() || !isRetailCastAllowed(commandOptions))
+	if (!position || !canExecuteSpecialPower(commandOptions))
 		return;
 
 	const auto* data = static_cast<const GrabPassengerSpecialPowerModuleData*>(getModuleData());
@@ -186,7 +186,7 @@ Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt comma
 {
 	m_lastCastAccepted = FALSE;
 	Object* caster = getObject();
-	if (m_pausedCount > 0 || caster->isDisabled() || !isRetailCastAllowed(commandOptions))
+	if (!canExecuteSpecialPower(commandOptions))
 		return FALSE;
 	const Object* target = findGrabTarget(requested, (commandOptions & OPTION_ONE) != 0);
 	if (!target)
@@ -222,9 +222,9 @@ Bool GrabPassengerSpecialPower::requestTreeGrab(const Coord3D& position, Unsigne
 	m_lastCastAccepted = FALSE;
 	Object* caster = getObject();
 	Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
-	if (m_pausedCount > 0 || caster->isDisabled() || !meetsRequiredRank() || getPercentReady() < 1.0f ||
-		!isRetailCastAllowed(commandOptions) || !canGrab(proxy) ||
-		!TheSpecialPowerStore->canUseSpecialPower(caster, getSpecialPowerTemplate()))
+	if (!canExecuteSpecialPower(commandOptions) ||
+		(!isScriptCast(commandOptions) && (getPercentReady() < 1.0f || !TheSpecialPowerStore->canUseSpecialPower(caster, getSpecialPowerTemplate()))) ||
+		!canGrab(proxy))
 		return FALSE;
 	const ObjectID oldTarget = m_target;
 	const Coord3D oldPosition = m_treePosition;

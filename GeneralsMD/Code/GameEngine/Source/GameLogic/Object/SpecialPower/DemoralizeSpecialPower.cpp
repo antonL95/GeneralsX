@@ -100,7 +100,7 @@ DemoralizeSpecialPower::~DemoralizeSpecialPower()
 // ------------------------------------------------------------------------------------------------
 void DemoralizeSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (!isScriptCast(commandOptions) && (getObject()->isDisabled() || !meetsRequiredRank()))
 		return;
 
 	// sanity
@@ -181,7 +181,7 @@ void DemoralizeSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real 
 // ------------------------------------------------------------------------------------------------
 void DemoralizeSpecialPower::doSpecialPowerAtObject( const Object *obj, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	if( obj )

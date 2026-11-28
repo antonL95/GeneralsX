@@ -171,7 +171,7 @@ OCLSpecialPower::~OCLSpecialPower()
 //-------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
+	if (!isScriptCast(commandOptions) && (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)))
 		return;
 
 	// sanity
@@ -282,7 +282,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	// convert to a location
@@ -294,7 +294,7 @@ void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOp
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
+	if (!isScriptCast(commandOptions) && (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)))
 		return;
 
 	const Bool ready = isReady();

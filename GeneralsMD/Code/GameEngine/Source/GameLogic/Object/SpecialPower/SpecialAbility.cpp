@@ -59,7 +59,7 @@ SpecialAbility::~SpecialAbility()
 // ------------------------------------------------------------------------------------------------
 void SpecialAbility::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	// sanity
@@ -74,7 +74,7 @@ void SpecialAbility::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, U
 // ------------------------------------------------------------------------------------------------
 void SpecialAbility::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	if (!obj)
@@ -89,7 +89,7 @@ void SpecialAbility::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOpt
 // ------------------------------------------------------------------------------------------------
 void SpecialAbility::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!isScriptCast(commandOptions) && getObject()->isDisabled())
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
