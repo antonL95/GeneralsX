@@ -722,8 +722,7 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 		}
 
-		const Real innerRange = melee->innerRange > 0.0f ? melee->innerRange : formation->m_meleeBehavior.innerRange;
-		const Real contactDistance = std::max(8.0f, std::max(formation->m_meleeAttackLeashDistance, innerRange));
+		const Real contactDistance = std::max(8.0f, formation->m_meleeAttackLeashDistance);
 		const Real targetRadius = target ? target->getGeometryInfo().getBoundingCircleRadius() : 0.0f;
 		const Real range = std::max(approachRange, contactDistance) + targetRadius;
 		approach(destination, rankedAdvance ? rankReached :
