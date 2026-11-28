@@ -680,12 +680,27 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	auto &geometry = cacheable ? *stored : temporary;
 	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry, renderer, *materialId))
 		return false;
-	const auto vertices = poseMesh(mesh, geometry);
-	if (vertices.empty())
-		return false;
-
 	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
 	const auto fog = fogBindings(device8);
+	RenderStateStruct previous;
+	if (useSorting)
+	{
+		if (!shaderBlend && opacity <= 0.0f)
+			return true;
+		if (geometry.vertices.size() >= 65536u || geometry.indices.size() >= 65536u)
+			return false;
+		DX8Wrapper::Get_Render_State(previous);
+		SortingRendererClass::Ensure_Dynamic_Sorting_Capacity(
+			static_cast<unsigned>(geometry.vertices.size()), static_cast<unsigned>(geometry.indices.size()));
+	}
+	const auto vertices = poseMesh(mesh, geometry);
+	if (vertices.empty())
+	{
+		if (useSorting)
+			DX8Wrapper::Set_Render_State(previous);
+		return false;
+	}
+
 	std::array<Register, 6> directional{};
 	std::array<Register, 3> point{{{}, {}, {1.0f, 0.0f, 0.0f, 0.0f}}};
 	unsigned numDirectional = 0;
@@ -732,16 +747,6 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 
 	if (useSorting)
 	{
-		if (!shaderBlend && opacity <= 0.0f)
-			return true;
-		if (vertices.size() >= 65536u || geometry.indices.size() >= 65536u)
-			return false;
-
-		RenderStateStruct previous;
-		DX8Wrapper::Get_Render_State(previous);
-		SortingRendererClass::Ensure_Dynamic_Sorting_Capacity(
-			static_cast<unsigned>(vertices.size()), static_cast<unsigned>(geometry.indices.size()));
-
 		DynamicVBAccessClass vb(BUFFER_TYPE_DYNAMIC_SORTING, dynamic_fvf_type, static_cast<unsigned short>(vertices.size()));
 		{
 			DynamicVBAccessClass::WriteLockClass lock(&vb);

@@ -76,13 +76,14 @@ struct TempIndexStruct
 	ShortVectorIStruct tri;
 	unsigned short idx;
 	float z;
+	float group;
 };
 
-bool operator <(const TempIndexStruct &l, const TempIndexStruct &r) { return l.z < r.z; }
-bool operator <=(const TempIndexStruct &l, const TempIndexStruct &r) { return l.z <= r.z; }
-bool operator >(const TempIndexStruct &l, const TempIndexStruct &r) { return l.z > r.z; }
-bool operator >=(const TempIndexStruct &l, const TempIndexStruct &r) { return l.z >= r.z; }
-bool operator ==(const TempIndexStruct &l, const TempIndexStruct &r) { return l.z == r.z; }
+bool operator <(const TempIndexStruct &l, const TempIndexStruct &r) { return l.group < r.group || (l.group == r.group && l.z < r.z); }
+bool operator <=(const TempIndexStruct &l, const TempIndexStruct &r) { return !(r < l); }
+bool operator >(const TempIndexStruct &l, const TempIndexStruct &r) { return r < l; }
+bool operator >=(const TempIndexStruct &l, const TempIndexStruct &r) { return !(l < r); }
+bool operator ==(const TempIndexStruct &l, const TempIndexStruct &r) { return l.group == r.group && l.z == r.z; }
 // ----------------------------------------------------------------------------
 static
 void InsertionSort(TempIndexStruct *begin, TempIndexStruct *end)
@@ -525,6 +526,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 					tis_ptr->tri.k = idx3 + vertex_array_offset;
 					tis_ptr->idx = node_id;
 					tis_ptr->z = (v1->z + v2->z + v3->z)/3.0f;
+					tis_ptr->group = tis_ptr->z;
 					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			} else {
@@ -548,8 +550,19 @@ void SortingRendererClass::Flush_Sorting_Pool()
 					tis_ptr->z = (mtx[0][2]*(v1->x + v2->x + v3->x) +
 												mtx[1][2]*(v1->y + v2->y + v3->y) +
 												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[3][2];
+					tis_ptr->group = tis_ptr->z;
 					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
+			}
+
+			if (state->has_effect && state->polygon_count) {
+				TempIndexStruct* node_tis = tis + polygon_array_offset;
+				float group = 0.0f;
+				for (int i=0;i<state->polygon_count;++i)
+					group += node_tis[i].z;
+				group /= state->polygon_count;
+				for (int i=0;i<state->polygon_count;++i)
+					node_tis[i].group = group;
 			}
 
 			state->min_vertex_index=vertex_array_offset;
