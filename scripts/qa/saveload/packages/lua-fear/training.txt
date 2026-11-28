@@ -1,5 +1,5 @@
-221 hordespawn Player_1 LuaFearHorde 0 - 1600 2560 0
-221 create PlyrCreeps LuaFearSource 0 1670,2560,0
+221 hordespawn Player_1 LuaFearHorde 0 - 2660 2480 0
+221 create PlyrCreeps LuaFearSource 0 2730,2480,0
 222 create PlyrCreeps LuaFearSource 0 2990,2860,0
 223 create Player_1 LuaFearCower 0 2940,2800,0
 224 create Player_1 LuaFearPanic 0 2940,2860,0
