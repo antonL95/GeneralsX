@@ -334,6 +334,8 @@ protected:
 	UnsignedInt animationFramesRemaining() const { return m_animFrames; }
 	ObjectID getAbilityTargetID() const { return m_targetID; }
 	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
+	Bool hasRequiredUnitCost() const;
+	Bool consumeUnitCost();
 
   // Lorenzen added this additional flag to support the NapalmBombDrop
   // It causes this update to force a recharge of the SPM between drops

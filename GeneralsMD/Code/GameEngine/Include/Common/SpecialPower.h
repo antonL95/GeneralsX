@@ -143,6 +143,8 @@ public:
 	UnsignedInt getViewObjectDuration() const { return getFO()->m_viewObjectDuration; }
 	Real getViewObjectRange() const { return getFO()->m_viewObjectRange; }
 	Real getRadiusCursorRadius() const { return getFO()->m_radiusCursorRadius; }
+	Int getUnitCost() const { return getFO()->m_unitCost; }
+	Int getUnitCostDeathType() const { return getFO()->m_unitCostDeathType; }
 	Bool isShortcutPower() const { return getFO()->m_shortcutPower; }
 	AcademyClassificationType getAcademyClassificationType() const { return m_academyClassificationType; }
 

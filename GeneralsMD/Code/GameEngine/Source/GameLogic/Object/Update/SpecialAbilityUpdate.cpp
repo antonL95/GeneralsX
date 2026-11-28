@@ -29,6 +29,7 @@
 
 #include "PreRTS.h" // This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
 #include <limits>
 
 #include "WWMath/wwmath.h"
@@ -73,6 +74,7 @@
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 
 
@@ -385,6 +387,12 @@ UpdateSleepTime SpecialAbilityUpdate::update()
 
     if( isPreparationComplete() )
     {
+      if( !consumeUnitCost() )
+      {
+        endPreparation();
+        onExit( FALSE );
+        return calcSleepTime();
+      }
       //STEP 4 -- TRIGGER (with preparation)
       triggerAbilityEffect();
       if( isPersistentAbility() )
@@ -458,6 +466,16 @@ UpdateSleepTime SpecialAbilityUpdate::update()
 
     if( m_packingState == STATE_UNPACKED )
     {
+      if( data->m_preparationFrames > 0 && !hasRequiredUnitCost() )
+      {
+        onExit( FALSE );
+        return calcSleepTime();
+      }
+      if( data->m_preparationFrames == 0 && !consumeUnitCost() )
+      {
+        onExit( FALSE );
+        return calcSleepTime();
+      }
       //STEP 3 -- PREPARE
       startPreparation();
 
@@ -2467,6 +2485,52 @@ void SpecialAbilityUpdate::applyRotwkTrigger()
 	const SpecialPowerModule *spm = static_cast<const SpecialPowerModule*>( getObject()->getSpecialPowerModule( data->m_specialPowerTemplate ) );
 	if( spm && spm->getPowerModuleData()->m_setModelCondition >= 0 )
 		startTimedCondition( spm->getPowerModuleData()->m_setModelCondition, secondsToFrames( spm->getPowerModuleData()->m_setModelConditionTime ) );
+}
+
+Bool SpecialAbilityUpdate::hasRequiredUnitCost() const
+{
+	const SpecialPowerTemplate* spTemplate = getTemplate();
+	const Int unitCost = spTemplate ? spTemplate->getUnitCost() : 0;
+	if (unitCost <= 0)
+		return TRUE;
+	const HordeContain* horde = HordeContain::get(getObject());
+	return horde && horde->getContainCount() >= static_cast<UnsignedInt>(unitCost);
+}
+
+Bool SpecialAbilityUpdate::consumeUnitCost()
+{
+	const SpecialPowerTemplate* spTemplate = getTemplate();
+	const Int unitCost = spTemplate ? spTemplate->getUnitCost() : 0;
+	if (unitCost <= 0)
+		return TRUE;
+	HordeContain* horde = dynamic_cast<HordeContain*>(getObject()->getContain());
+	if (!horde || horde->getContainCount() < static_cast<UnsignedInt>(unitCost))
+		return FALSE;
+	std::vector<Object*> victims;
+	if (const ContainedItemsList* items = horde->getContainedItemsList())
+	{
+		for (Object* member : *items)
+		{
+			if (member && !member->isEffectivelyDead() && !member->isDestroyed() && !horde->isBannerCarrier(member))
+				victims.push_back(member);
+		}
+	}
+	std::sort(victims.begin(), victims.end(), [](const Object* a, const Object* b) {
+		return a->getID() < b->getID();
+	});
+	const Int rawDeath = spTemplate->getUnitCostDeathType();
+	const DeathType deathType = (rawDeath >= DEATH_NORMAL && rawDeath < DEATH_NUM_TYPES)
+		? static_cast<DeathType>(rawDeath)
+		: DEATH_NORMAL;
+	const size_t sacrificeCount = std::min(victims.size(), static_cast<size_t>(unitCost));
+	for (size_t i = 0; i < sacrificeCount; ++i)
+	{
+		Object* victim = victims[i];
+		horde->removeFromContain(victim);
+		victim->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+		victim->kill(DAMAGE_UNRESISTABLE, deathType);
+	}
+	return TRUE;
 }
 
 UnsignedInt SpecialAbilityUpdate::secondsToFrames( Real seconds )
