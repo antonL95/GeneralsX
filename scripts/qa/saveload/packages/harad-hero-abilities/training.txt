@@ -49,8 +49,8 @@
 770 hero-ability-probe Player_1 GondorFighter 0 dominate_converted
 783 destroy Player_1 GondorFighter 0
 783 destroy PlyrCreeps GondorFighter 0
-828 create PlyrCreeps GondorFighter 0 2370,2560,0
-830 hero-ability-press Player_1 HaradBurodapan 0 Command_GiveNothingBack 2370 2560
+828 create PlyrCreeps GondorFighter 0 2330,2580,0
+830 hero-ability-press Player_1 HaradBurodapan 0 Command_GiveNothingBack 2330 2580
 885 hero-ability-world - - 0 givenothing_fx|BurodapanGiveNothingBackFX
 910 hero-ability-probe Player_1 HaradBurodapan 0 givenothing_caster|SpecialAbilityGiveNothingBack
 910 hero-ability-probe PlyrCreeps GondorFighter 0 givenothing_enemy

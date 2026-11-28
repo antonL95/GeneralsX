@@ -40,6 +40,8 @@ check() {
     require_line 770 '^TEST hero-ability-probe frame=770 tag=dominate_caster .* ready=0' buro-dominate-recharge &&
     require_line 770 '^TEST hero-ability-probe frame=770 tag=dominate_converted .* alive=1 .* team=Player_1' buro-dominate-converted &&
     require_line 830 '^TEST hero-ability-press frame=830 .* button=Command_GiveNothingBack .* accepted=1' buro-givenothing-press &&
+    require_line 910 '^TEST hero-ability-probe frame=910 tag=givenothing_caster .* ready=0' buro-givenothing-recharge &&
+    require_line 885 '^TEST hero-ability-world frame=885 tag=givenothing_fx template=BurodapanGiveNothingBackFX .* total=[1-9]' buro-givenothing-fx &&
     require_line 990 '^TEST hero-ability-press frame=990 .* button=Command_SpecialAbilityWateryGraves .* accepted=1' buro-watery-press &&
     require_line 1060 '^TEST hero-ability-probe frame=1060 tag=watery_caster .* ready=0' buro-watery-recharge &&
     require_line 1060 '^TEST hero-ability-probe frame=1060 tag=watery_after .* mods=BurodapanWateryGravesStructureWeapon' buro-watery-mod &&
