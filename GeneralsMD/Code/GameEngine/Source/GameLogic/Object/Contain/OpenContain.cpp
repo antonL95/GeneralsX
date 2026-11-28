@@ -47,8 +47,10 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/ControlBar.h"
 
+#include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "Common/ModuleFactory.h"
@@ -62,7 +64,10 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/Pathfinder/PathfindCell.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
+#include "WWMath/wwmath.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1362,12 +1367,248 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 			physics->setAllowToFall(canFall);
 		}
 	}
-	else
+	else if (!RetailFileLayers::enabled() || !exitShipPassengerToShore(exitObj, FALSE))
 	{
-		///< @todo This really should be automatically wrapped up in an activation sequence	for objects in general
-		// tell the AI about it
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
+}
+
+Bool OpenContain::exitShipPassengerToShore(Object* exitObj, Bool quickExit)
+{
+	Object* me = getObject();
+	if (!RetailFileLayers::enabled() || !me || !exitObj || !me->isKindOf(KINDOF_SHIP) || !TheTerrainLogic ||
+		!TheTerrainLogic->isUnderwater(me->getPosition()->x, me->getPosition()->y))
+	{
+		return FALSE;
+	}
+
+	Coord3D landPos;
+	if (!findShipLandingPoint(exitObj, &landPos))
+		return FALSE;
+
+	const Coord3D shipPos = *me->getPosition();
+	const Real dx = landPos.x - shipPos.x;
+	const Real dy = landPos.y - shipPos.y;
+	const Real angle = (dx != 0.0f || dy != 0.0f) ? WWMath::Atan2(dy, dx) : me->getOrientation();
+	exitObj->setPosition(&landPos);
+	exitObj->setOrientation(angle);
+	exitObj->setLayer(LAYER_GROUND);
+
+	AIUpdateInterface* ai = exitObj->getAI();
+	const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+	Coord3D exitDest = landPos;
+	const Real distSq = dx * dx + dy * dy;
+	const Real dist = distSq > 0.0f ? WWMath::SqrtfOrigin(distSq) : 0.0f;
+	if (dist > 0.001f)
+	{
+		const Real ux = dx / dist;
+		const Real uy = dy / dist;
+		const Bool isHorde = HordeContain::get(exitObj) != nullptr;
+		const Real extraInland = (isHorde ? 3.0f : 2.0f) * PATHFIND_CELL_SIZE_F;
+		const Real shipClearance = 5.0f * PATHFIND_CELL_SIZE_F;
+		const Real fromShipMin = dist < shipClearance ? (shipClearance - dist) : 0.0f;
+		Real dryStopStep = fromShipMin > extraInland ? fromShipMin : extraInland;
+		Bool reachedDry = !TheTerrainLogic->isUnderwater(landPos.x, landPos.y);
+		const Real maxSearchStep = 8.0f * PATHFIND_CELL_SIZE_F;
+		for (Real step = PATHFIND_CELL_SIZE_F; step <= maxSearchStep; step += PATHFIND_CELL_SIZE_F)
+		{
+			Coord3D inland;
+			inland.x = landPos.x + ux * step;
+			inland.y = landPos.y + uy * step;
+			inland.z = TheTerrainLogic->getLayerHeight(inland.x, inland.y, LAYER_GROUND);
+			const Bool valid = !loco || TheAI->pathfinder()->validMovementTerrain(LAYER_GROUND, loco, &inland);
+			const Bool dry = valid && !TheTerrainLogic->isUnderwater(inland.x, inland.y);
+			if (dry)
+			{
+				if (!reachedDry)
+				{
+					reachedDry = TRUE;
+					const Real remain = fromShipMin > step ? (fromShipMin - step) : 0.0f;
+					dryStopStep = step + (remain > extraInland ? remain : extraInland);
+				}
+				exitDest = inland;
+				if (step >= dryStopStep)
+					break;
+			}
+			else if (reachedDry)
+			{
+				break;
+			}
+			else if (valid && step <= dryStopStep)
+			{
+				exitDest = inland;
+			}
+		}
+
+		if (isHorde)
+		{
+			const Real shiftStep = 2.0f * PATHFIND_CELL_SIZE_F;
+			const Real innerRadius = 3.0f * PATHFIND_CELL_SIZE_F;
+			const Real outerRadius = 5.0f * PATHFIND_CELL_SIZE_F;
+			Coord3D bestCenter = exitDest;
+			Int bestScore = -1;
+			Real bestDistSq = 0.0f;
+			for (Int sy = -2; sy <= 2; ++sy)
+			{
+				for (Int sx = -2; sx <= 2; ++sx)
+				{
+					Coord3D center;
+					center.x = exitDest.x + static_cast<Real>(sx) * shiftStep;
+					center.y = exitDest.y + static_cast<Real>(sy) * shiftStep;
+					center.z = TheTerrainLogic->getLayerHeight(center.x, center.y, LAYER_GROUND);
+					if (TheTerrainLogic->isUnderwater(center.x, center.y))
+						continue;
+					if (loco && !TheAI->pathfinder()->validMovementTerrain(LAYER_GROUND, loco, &center))
+						continue;
+					Int score = 0;
+					for (Int ring = 0; ring < 2; ++ring)
+					{
+						const Real radius = ring == 0 ? innerRadius : outerRadius;
+						for (Int py = -1; py <= 1; ++py)
+						{
+							for (Int px = -1; px <= 1; ++px)
+							{
+								if (px == 0 && py == 0)
+									continue;
+								Coord3D sample;
+								sample.x = center.x + static_cast<Real>(px) * radius;
+								sample.y = center.y + static_cast<Real>(py) * radius;
+								sample.z = TheTerrainLogic->getLayerHeight(sample.x, sample.y, LAYER_GROUND);
+								if (!TheTerrainLogic->isUnderwater(sample.x, sample.y) &&
+									(!loco || TheAI->pathfinder()->validMovementTerrain(LAYER_GROUND, loco, &sample)))
+								{
+									++score;
+								}
+							}
+						}
+					}
+					const Real shiftDistSq = static_cast<Real>(sx * sx + sy * sy);
+					if (score > bestScore || (score == bestScore && shiftDistSq < bestDistSq))
+					{
+						bestScore = score;
+						bestDistSq = shiftDistSq;
+						bestCenter = center;
+					}
+				}
+			}
+			exitDest = bestCenter;
+		}
+	}
+
+	if (ai && !exitObj->testStatus(OBJECT_STATUS_HORDE_MEMBER))
+	{
+		std::vector<Coord3D> exitPath;
+		exitPath.push_back(exitDest);
+		if (quickExit)
+			ai->doQuickExit(&exitPath);
+		else
+			ai->aiFollowPath(&exitPath, me, CMD_FROM_AI);
+		TheAI->pathfinder()->updateGoal(exitObj, &exitDest, LAYER_GROUND);
+	}
+	TheAI->pathfinder()->addObjectToPathfindMap(exitObj);
+	return TRUE;
+}
+
+Bool OpenContain::findShipLandingPoint(const Object* rider, Coord3D* landPos) const
+{
+	if (!RetailFileLayers::enabled() || !landPos)
+		return FALSE;
+	const Object* me = getObject();
+	if (!me || !me->isKindOf(KINDOF_SHIP) || !TheTerrainLogic || !TheAI || !TheAI->pathfinder())
+		return FALSE;
+
+	const Coord3D pos = *me->getPosition();
+	if (!TheTerrainLogic->isUnderwater(pos.x, pos.y))
+	{
+		*landPos = pos;
+		return TRUE;
+	}
+
+	const GeometryInfo& geom = me->getGeometryInfo();
+	const Bool isBox = geom.getGeomType() == GEOMETRY_BOX;
+	const Real searchMargin = 2.0f * PATHFIND_CELL_SIZE_F;
+	const Real halfX = (isBox ? geom.getMajorRadius() : geom.getBoundingCircleRadius()) + searchMargin;
+	const Real halfY = (isBox ? geom.getMinorRadius() : geom.getBoundingCircleRadius()) + searchMargin;
+	const Coord3D& dir = *me->getUnitDirectionVector2D();
+	const Real absDirX = dir.x < 0.0f ? -dir.x : dir.x;
+	const Real absDirY = dir.y < 0.0f ? -dir.y : dir.y;
+	const Real boundX = absDirX * halfX + absDirY * halfY;
+	const Real boundY = absDirY * halfX + absDirX * halfY;
+
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const ICoord2D* extent = pathfinder->getExtent();
+	const Int maxExtentX = extent ? extent->x : 0;
+	const Int maxExtentY = extent ? extent->y : 0;
+	const Int minCellX = std::max<Int>(0, static_cast<Int>(REAL_TO_INT_FLOOR((pos.x - boundX) / PATHFIND_CELL_SIZE_F)));
+	const Int maxCellX = std::min<Int>(maxExtentX, static_cast<Int>(REAL_TO_INT_FLOOR((pos.x + boundX) / PATHFIND_CELL_SIZE_F)));
+	const Int minCellY = std::max<Int>(0, static_cast<Int>(REAL_TO_INT_FLOOR((pos.y - boundY) / PATHFIND_CELL_SIZE_F)));
+	const Int maxCellY = std::min<Int>(maxExtentY, static_cast<Int>(REAL_TO_INT_FLOOR((pos.y + boundY) / PATHFIND_CELL_SIZE_F)));
+
+	const AIUpdateInterface* riderAI = rider ? rider->getAI() : nullptr;
+	const Locomotor* riderLoco = riderAI ? riderAI->getCurLocomotor() : nullptr;
+
+	Bool foundDry = FALSE;
+	Real bestDryDistSq = 0.0f;
+	Coord3D bestDryPos;
+	Bool foundClear = FALSE;
+	Real bestClearZ = 0.0f;
+	Real bestClearDistSq = 0.0f;
+	Coord3D bestClearPos;
+
+	for (Int cy = minCellY; cy <= maxCellY; ++cy)
+	{
+		for (Int cx = minCellX; cx <= maxCellX; ++cx)
+		{
+			const PathfindCell* cell = pathfinder->getCell(LAYER_GROUND, cx, cy);
+			if (!cell || cell->getType() != PathfindCell::CELL_CLEAR)
+				continue;
+
+			Coord3D candidate;
+			candidate.x = (static_cast<Real>(cx) + 0.5f) * PATHFIND_CELL_SIZE_F;
+			candidate.y = (static_cast<Real>(cy) + 0.5f) * PATHFIND_CELL_SIZE_F;
+			const Real dx = candidate.x - pos.x;
+			const Real dy = candidate.y - pos.y;
+			const Real localX = dx * dir.x + dy * dir.y;
+			const Real localY = -dx * dir.y + dy * dir.x;
+			if ((localX < 0.0f ? -localX : localX) > halfX || (localY < 0.0f ? -localY : localY) > halfY)
+				continue;
+
+			candidate.z = TheTerrainLogic->getLayerHeight(candidate.x, candidate.y, LAYER_GROUND);
+			if (riderLoco && !pathfinder->validMovementTerrain(LAYER_GROUND, riderLoco, &candidate))
+				continue;
+
+			const Real distSq = dx * dx + dy * dy;
+			if (!TheTerrainLogic->isUnderwater(candidate.x, candidate.y))
+			{
+				if (!foundDry || distSq < bestDryDistSq)
+				{
+					foundDry = TRUE;
+					bestDryDistSq = distSq;
+					bestDryPos = candidate;
+				}
+			}
+			else if (!foundClear || candidate.z > bestClearZ ||
+				(candidate.z == bestClearZ && distSq < bestClearDistSq))
+			{
+				foundClear = TRUE;
+				bestClearZ = candidate.z;
+				bestClearDistSq = distSq;
+				bestClearPos = candidate;
+			}
+		}
+	}
+
+	if (foundDry)
+	{
+		*landPos = bestDryPos;
+		return TRUE;
+	}
+	if (foundClear)
+	{
+		*landPos = bestClearPos;
+		return TRUE;
+	}
+	return FALSE;
 }
 // ------------------------------------------------------------------------------------------------
 /**
@@ -1456,10 +1697,8 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 			TheAI->pathfinder()->updateGoal(exitObj, &endPosition, TheTerrainLogic->getLayerForDestination(&endPosition));
 		}
 	}
-	else
+	else if (!RetailFileLayers::enabled() || !exitShipPassengerToShore(exitObj, TRUE))
 	{
-		///< @todo This really should be automatically wrapped up in an activation sequence	for objects in general
-		// tell the AI about it
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
 }

@@ -229,6 +229,36 @@ void HordeTransportContain::onRemoving(Object* rider)
 	releaseHordeMembers(rider);
 }
 
+void HordeTransportContain::exitObjectViaDoor(Object* exitObj, ExitDoorType exitDoor)
+{
+	TransportContain::exitObjectViaDoor(exitObj, exitDoor);
+	if (!RetailFileLayers::enabled() || !exitObj)
+		return;
+	const HordeContain* horde = HordeContain::get(exitObj);
+	if (!horde)
+		return;
+	const Coord3D anchorPos = *exitObj->getPosition();
+	const Real angle = exitObj->getOrientation();
+	placeHordeAtPosition(exitObj, anchorPos, angle);
+	Pathfinder* pathfinder = TheAI ? TheAI->pathfinder() : nullptr;
+	for (Object* member : *horde->getContainedItemsList())
+	{
+		if (!member || member->isEffectivelyDead())
+			continue;
+		member->setLayer(exitObj->getLayer());
+		Coord3D memberPos = *member->getPosition();
+		const AIUpdateInterface* memberAI = member->getAI();
+		const Locomotor* memberLoco = memberAI ? memberAI->getCurLocomotor() : nullptr;
+		const Bool invalidPos = (TheTerrainLogic && TheTerrainLogic->isUnderwater(memberPos.x, memberPos.y))
+			|| (pathfinder && memberLoco && !pathfinder->validMovementTerrain(member->getLayer(), memberLoco, &memberPos));
+		if (invalidPos)
+			memberPos = anchorPos;
+		else if (TheTerrainLogic)
+			memberPos.z = TheTerrainLogic->getLayerHeight(memberPos.x, memberPos.y, member->getLayer());
+		member->setPosition(&memberPos);
+	}
+}
+
 #if RTS_GENERALS
 Bool HordeTransportContain::isPassengerAllowedToFire() const
 {

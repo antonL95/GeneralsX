@@ -1855,6 +1855,14 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	if ((m_retailGroupRouteLeader != INVALID_ID || aiOther->m_retailGroupRouteLeader != INVALID_ID) &&
 		ignoreRetailGroupAnchorContact(other))
 		return FALSE;
+	if (RetailFileLayers::enabled() && self->isKindOf(KINDOF_SHIP) != other->isKindOf(KINDOF_SHIP) && TheTerrainLogic)
+	{
+		const Object* ship = self->isKindOf(KINDOF_SHIP) ? self : other;
+		const Object* landUnit = self->isKindOf(KINDOF_SHIP) ? other : self;
+		if (TheTerrainLogic->isUnderwater(ship->getPosition()->x, ship->getPosition()->y) &&
+			!TheTerrainLogic->isUnderwater(landUnit->getPosition()->x, landUnit->getPosition()->y))
+			return FALSE;
+	}
 
 	Bool selfMoving = isMoving();
 	Bool otherMoving = ( aiOther && aiOther->isMoving() );
@@ -3819,6 +3827,12 @@ void AIUpdateInterface::privateMoveAwayFromUnit( Object *unit, CommandSourceType
 		return;
 	// the dead don't listen very well
 	if (isAiInDeadState() || (getObject()->isMobile() == FALSE) || !isAllowedToMoveAwayFromUnit())
+	{
+		return;
+	}
+	if (RetailFileLayers::enabled() && unit && unit->isKindOf(KINDOF_SHIP) && !getObject()->isKindOf(KINDOF_SHIP) &&
+		TheTerrainLogic && TheTerrainLogic->isUnderwater(unit->getPosition()->x, unit->getPosition()->y) &&
+		!TheTerrainLogic->isUnderwater(getObject()->getPosition()->x, getObject()->getPosition()->y))
 	{
 		return;
 	}

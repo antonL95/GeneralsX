@@ -279,6 +279,8 @@ protected:
 	const ContainedItemsList& getContainList() const { return m_containList; }
 
 	void scatterToNearbyPosition(Object* obj);
+	Bool findShipLandingPoint(const Object* rider, Coord3D* landPos) const;
+	Bool exitShipPassengerToShore(Object* exitObj, Bool quickExit);
 	void removeFromContainViaIterator( ContainedItemsList::iterator it, Bool exposeStealthUnits = FALSE );  ///< remove item from contain list
 	void removeFromPassengerViaIterator( ContainedItemsList::iterator it );///< remove item from passenger list
 

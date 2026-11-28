@@ -51,6 +51,7 @@
 #include "GameLogic/Module/TransportContain.h"
 #include "Common/ModuleFactory.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
 
@@ -864,6 +865,13 @@ Bool TransportContain::isSpecificRiderFreeToExit(Object* specificObject)
 	const Locomotor *hisLocomotor = specificObject->getAIUpdateInterface()->getCurLocomotor();
 	if( hisLocomotor == nullptr )
    	return FALSE;
+
+	if (RetailFileLayers::enabled() && me->isKindOf(KINDOF_SHIP) && TheTerrainLogic &&
+		TheTerrainLogic->isUnderwater(myPosition->x, myPosition->y))
+	{
+		Coord3D landPos;
+		return findShipLandingPoint(specificObject, &landPos);
+	}
 
   // He can't get to this spot naturally, so I can't force him there.  (amphib transport)
   if (!TheAI->pathfinder()->validMovementTerrain(me->getLayer(), hisLocomotor, myPosition))

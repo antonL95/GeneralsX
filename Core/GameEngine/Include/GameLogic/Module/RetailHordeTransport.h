@@ -36,6 +36,7 @@ public:
 	Bool isPassengerAllowedToFire(ObjectID id = INVALID_ID) const override;
 #endif
 	void onRemoving(Object* rider) override;
+	void exitObjectViaDoor(Object* exitObj, ExitDoorType exitDoor) override;
 
 private:
 	void positionContainedHordes();
