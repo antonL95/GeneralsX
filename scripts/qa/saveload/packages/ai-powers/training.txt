@@ -101,9 +101,9 @@
 1196 destroy Player_2 AiPowersMountCaster 1
 1196 destroy Player_2 AiPowersMountCaster 0
 998 create Player_2 AiPowersPoweredWeaponToggle 0 3650,1750,0
-998 create Player_2 AiPowersFormationToggle 0 3400,1000,0
+998 create Player_2 AiPowersFormationToggle 0 3500,1950,0
 999 create Player_1 AiPowersFormationTarget 0 3680,1750,0
-999 create Player_1 AiPowersFormationTarget 1 3800,1000,0
+999 create Player_1 AiPowersFormationTarget 1 3850,1950,0
 1006 attack Player_2 AiPowersPoweredWeaponToggle 0 Player_1:AiPowersFormationTarget:0
 1006 attack Player_2 AiPowersFormationToggle 0 Player_1:AiPowersFormationTarget:1
 1075 formation-state Player_2 AiPowersFormationToggle 0
