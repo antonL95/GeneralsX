@@ -61,6 +61,7 @@ Display::Display()
 	m_cinematicTextFrames = 0;
 
 	m_currentlyPlayingMovie.clear();
+	m_movieCancellable = TRUE;
 	m_letterBoxFadeStartTime = 0;
 	m_isBatching = FALSE;
 }
@@ -200,7 +201,7 @@ void Display::setHeight( UnsignedInt height )
 // Display::playMovie
 //============================================================================
 
-void Display::playMovie( AsciiString movieName)
+void Display::playMovie( AsciiString movieName, Bool allowCancel )
 {
 	if (TheGlobalData->m_headless)
 		return;
@@ -217,6 +218,7 @@ void Display::playMovie( AsciiString movieName)
 	}
 
 	m_currentlyPlayingMovie = movieName;
+	m_movieCancellable = allowCancel;
 
 	m_videoBuffer = createVideoBuffer();
 	if (	m_videoBuffer == nullptr ||
@@ -249,6 +251,7 @@ void Display::stopMovie()
 		//TheScriptEngine->notifyOfCompletedVideo(m_currentlyPlayingMovie); // Removing this sync-error cause MDC
 		m_currentlyPlayingMovie = AsciiString::TheEmptyString;
 	}
+	m_movieCancellable = TRUE;
 }
 
 //============================================================================

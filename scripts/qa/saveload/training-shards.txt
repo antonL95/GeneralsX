@@ -145,3 +145,4 @@
 3 pkg-armor-flank
 3 pkg-garrison-range
 3 pkg-contained-weaponset
+3 map-play-movie-in-game

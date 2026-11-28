@@ -351,7 +351,8 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 				}
 				else if (TheDisplay->isMoviePlaying())
 				{
-					TheDisplay->stopMovie();
+					if (TheDisplay->isMovieCancellable())
+						TheDisplay->stopMovie();
 					returnCode = WIN_INPUT_USED;
 				}
 			}

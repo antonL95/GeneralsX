@@ -654,6 +654,7 @@ public:
 		DESELECT,
 		DIM_WORLD_LIGHTS,
 		RESTORE_WORLD_LIGHTS,
+		PLAY_MOVIE_IN_GAME,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

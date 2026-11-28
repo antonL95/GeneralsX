@@ -8071,6 +8071,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::MOVIE_PLAY_RADAR:
 			doMoviePlayRadar(pAction->getParameter(0)->getString());
 			return;
+		case ScriptAction::PLAY_MOVIE_IN_GAME:
+			closeWindows(FALSE);
+			if (TheGameLogic)
+				TheGameLogic->closeWindows();
+			if (TheDisplay)
+				TheDisplay->playMovie(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt() != 0);
+			return;
 		case ScriptAction::SOUND_PLAY_NAMED:
 			doSoundPlayFromNamed(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;

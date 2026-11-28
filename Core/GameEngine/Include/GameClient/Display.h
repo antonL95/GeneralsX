@@ -181,9 +181,10 @@ public:
 													Int endX, Int endY ) = 0;
 
 	/// FullScreen video playback
-	virtual void playMovie( AsciiString movieName );
+	virtual void playMovie( AsciiString movieName, Bool allowCancel = TRUE );
 	virtual void stopMovie();
 	virtual Bool isMoviePlaying();
+	Bool isMovieCancellable() const { return m_movieCancellable; }
 
 	/// Register debug display callback
 	virtual void setDebugDisplayCallback( DebugDisplayCallback *callback, void *userData = nullptr  );
@@ -235,6 +236,7 @@ protected:
 	VideoBuffer						*m_videoBuffer;						///< Video playback buffer
 	VideoStreamInterface	*m_videoStream;						///< Video stream;
 	AsciiString						 m_currentlyPlayingMovie;	///< The currently playing video. Used to notify TheScriptEngine of completed videos.
+	Bool							 m_movieCancellable;
 
 	// Debug display data
 	DebugDisplayInterface *m_debugDisplay;					///< Actual debug display
