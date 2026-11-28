@@ -11,3 +11,13 @@
 136 pkg18-award-xp Player_1 GondorPippin 0 100000
 137 select Player_1 GondorPippin 0
 141 hud - - 0
+150 create Player_1 GondorGandalf 0 2500,1460,0
+151 reveal Player_1 GondorGandalf 1
+152 objupgrade Player_1 GondorGandalf 1 Upgrade_ObjectLevel10
+153 power Player_1 GondorGandalf 1 SpecialAbilityToggleMounted
+154 ability Player_1 GondorGandalf 1
+450 select Player_1 GondorGandalf 1
+453 power Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor
+454 ability Player_1 GondorGandalf 1
+455 create PlyrCreeps MordorCaveTroll 0 2580,1465,0
+485 auto-ability-state Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor

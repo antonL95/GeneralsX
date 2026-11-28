@@ -16,3 +16,11 @@ def check(log):
         raise RuntimeError("Gandalf's HUD must omit Shield Bubble")
     if not re.search(r"^TEST hud 141 slot=3 Command_BladeofWesternessePassive type=\d+ disabled ", log, re.M):
         raise RuntimeError("Pippin's passive Blade of Westernesse must be visible and disabled for input")
+    if not re.search(rf"^TEST auto state frame=485 power={power} ready=0 next=\d+ dead=0 disabled=0 bubble=1$", log, re.M):
+        raise RuntimeError("Mounted Gandalf did not raise the shield")
+    if not re.search(r"^TEST draw frame 485 id \d+ GondorGandalf module ModuleTag_ShieldBubble model gugandalfcrstl ", log, re.M):
+        raise RuntimeError("The raised shield did not draw its authored crystal model")
+
+
+engine_timeout = 900
+render_env = {"GENERALSX_TEST_DRAWTRACE": "GondorGandalf", "PLAYTEST_PIN_DYNAMIC_LOD": "1"}
