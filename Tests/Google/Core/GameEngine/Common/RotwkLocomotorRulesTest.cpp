@@ -104,3 +104,9 @@ TEST(RotwkLocomotorRulesTest, UnauthoredBackingUpSpeedDefaultsToThreeQuarters)
 	RotwkLocomotorRules::Authored authored;
 	EXPECT_FLOAT_EQ(authored.backingUpSpeedFraction, 0.75f);
 }
+
+TEST(RotwkLocomotorRulesTest, UnauthoredAccelDecelTriggerDefaultsToHalf)
+{
+	RotwkLocomotorRules::Authored authored;
+	EXPECT_FLOAT_EQ(authored.accelDecelTrigger, 0.5f);
+}

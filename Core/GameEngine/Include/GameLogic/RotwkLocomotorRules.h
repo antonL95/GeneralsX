@@ -22,7 +22,7 @@ struct Authored
 	float backingUpDistanceMax = 0.0f;
 	float backingUpAngle = std::numeric_limits<float>::max();
 	float walkDistance = 0.0f;
-	float accelDecelTrigger = -1.0f;
+	float accelDecelTrigger = 0.5f;
 	float turnThreshold = FULL_TURN / 24.0f;
 	float turnThresholdHighSpeed = FULL_TURN / 2.0f;
 	float maxOverlappedHeight = std::numeric_limits<float>::max();

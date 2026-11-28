@@ -1451,8 +1451,7 @@ void Locomotor::advanceRetailScalarSpeed(Object* object, Real goalSpeed)
 
 void Locomotor::clearRetailGait(Object* object)
 {
-	if (!RetailFileLayers::enabled() ||
-		(m_template->m_rotwk.walkDistance <= 0.0f && m_template->m_rotwk.accelDecelTrigger < 0.0f))
+	if (!RetailFileLayers::enabled())
 		return;
 	m_retailWasRunning = FALSE;
 	object->clearModelConditionState(MODELCONDITION_WALKING);
@@ -1460,29 +1459,20 @@ void Locomotor::clearRetailGait(Object* object)
 	object->clearModelConditionState(MODELCONDITION_DECELERATE);
 }
 
-void Locomotor::updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter, Real scalarBefore)
+void Locomotor::updateRetailGait(Object* object, Real distance, Bool braking, Real scalarBefore)
 {
 	const auto& data = m_template->m_rotwk;
-	if (!RetailFileLayers::enabled() || (data.walkDistance <= 0.0f && data.accelDecelTrigger < 0.0f))
+	if (!RetailFileLayers::enabled())
 		return;
 
 	const auto damage = object->getBodyModule()->getDamageState();
-	const Bool authoredTrigger = data.accelDecelTrigger >= 0.0f;
-	if (authoredTrigger)
-	{
-		speedBefore = scalarBefore;
-		speedAfter = m_retailScalarSpeed;
-	}
-	const Real threshold = getMaxSpeedForCondition(damage, object) * (authoredTrigger ? data.accelDecelTrigger : 0.5f);
-	const Bool hasSteeredSpeed = speedAfter >= 0.0f;
-	const Bool decelerating = m_retailWasRunning && braking &&
-		(!authoredTrigger || (hasSteeredSpeed ? speedAfter : speedBefore) < threshold);
+	const Real threshold = getMaxSpeedForCondition(damage, object) * std::max(0.0f, data.accelDecelTrigger);
+	const Bool decelerating = m_retailWasRunning && braking && m_retailScalarSpeed < threshold;
 	const Bool walking = !m_retailWasRunning && data.walkDistance > 0.0f && distance < data.walkDistance && !braking;
 	const Real minimumAccelerationFraction = 0.4f;
-	const Bool accelerating = !walking && !braking && speedBefore < threshold &&
-		(authoredTrigger && hasSteeredSpeed ? speedAfter - speedBefore > minimumAccelerationFraction * getMaxAcceleration(damage) :
-			!m_retailWasRunning);
-	if (!walking && !braking && speedBefore >= threshold)
+	const Bool accelerating = !walking && !braking && scalarBefore < threshold &&
+		m_retailScalarSpeed - scalarBefore > minimumAccelerationFraction * getMaxAcceleration(damage);
+	if (!walking && !braking && scalarBefore >= threshold)
 		m_retailWasRunning = TRUE;
 
 	if (walking)
@@ -1623,7 +1613,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			return;
 		}
 		advanceRetailScalarSpeed(obj, 0.0f);
-		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), TRUE, -1.0f, scalarBefore);
+		updateRetailGait(obj, onPathDistToGoal, TRUE, scalarBefore);
 		physics->scrubVelocity2D(desiredSpeed); // stop if we are about to run into the blocking object.
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (m_template->m_wanderWidthFactor == 0.0f)
@@ -1741,7 +1731,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 
 	if (!usedRetailGroundSteering && m_template->m_appearance != LOCO_HORDE && m_template->m_appearance != LOCO_WHEELS_FOUR &&
 		m_template->m_appearance != LOCO_MOTORCYCLE)
-		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING), -1.0f, scalarBefore);
+		updateRetailGait(obj, onPathDistToGoal, getFlag(IS_BRAKING), scalarBefore);
 	handleBehaviorZ(obj, physics, goalPos);
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
 
@@ -2120,8 +2110,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	//
 	const Real scalarBefore = m_retailScalarSpeed;
 	advanceRetailScalarSpeed(obj, goalSpeed);
-	updateRetailGait(obj, onPathDistToGoal, actualSpeed, getFlag(IS_BRAKING) || goalSpeed + MIN_GAIT_SPEED <
-		(m_template->m_rotwk.accelDecelTrigger >= 0.0f ? scalarBefore : actualSpeed), -1.0f, scalarBefore);
+	updateRetailGait(obj, onPathDistToGoal, getFlag(IS_BRAKING) || goalSpeed + MIN_GAIT_SPEED < scalarBefore, scalarBefore);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (moveBackwards) {
 		speedDelta = -goalSpeed+actualSpeed;
@@ -2360,8 +2349,7 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 	Coord3D direction{Cos(travelHeading), Sin(travelHeading), 0.0f};
 	direction.scale(physics->getMass() * nextSpeed);
 	physics->applyMotiveForce(&direction);
-	updateRetailGait(obj, onPathDistToGoal, speed, desiredSpeed + MIN_GAIT_SPEED <
-		(m_template->m_rotwk.accelDecelTrigger >= 0.0f ? scalarBefore : speed), nextSpeed, scalarBefore);
+	updateRetailGait(obj, onPathDistToGoal, desiredSpeed + MIN_GAIT_SPEED < scalarBefore, scalarBefore);
 }
 
 void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos,
@@ -2408,7 +2396,7 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 		obj->clearModelConditionState(MODELCONDITION_MOVING);
 		const Real scalarBefore = m_retailScalarSpeed;
 		advanceRetailScalarSpeed(obj, 0.0f);
-		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f, scalarBefore);
+		updateRetailGait(obj, onPathDistToGoal, FALSE, scalarBefore);
 		return;
 	}
 
@@ -2451,8 +2439,7 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 	}
 	const Real scalarBefore = m_retailScalarSpeed;
 	advanceRetailScalarSpeed(obj, targetSpeed);
-	updateRetailGait(obj, onPathDistToGoal, curSpeed, targetSpeed + MIN_GAIT_SPEED <
-		(rules.accelDecelTrigger >= 0.0f ? scalarBefore : curSpeed), nextSpeed, scalarBefore);
+	updateRetailGait(obj, onPathDistToGoal, targetSpeed + MIN_GAIT_SPEED < scalarBefore, scalarBefore);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3559,12 +3546,10 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 		force.z = 0.0f;
 		physics->applyMotiveForce(&force);
 	}
-	if (goalSpeed <= MIN_GAIT_SPEED &&
-		(m_template->m_rotwk.accelDecelTrigger >= 0.0f ? m_retailScalarSpeed : actualSpeed) <= MIN_GAIT_SPEED)
+	if (goalSpeed <= MIN_GAIT_SPEED && m_retailScalarSpeed <= MIN_GAIT_SPEED)
 		clearRetailGait(obj);
 	else
-		updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + MIN_GAIT_SPEED <
-			(m_template->m_rotwk.accelDecelTrigger >= 0.0f ? scalarBefore : actualSpeed), actualSpeed, scalarBefore);
+		updateRetailGait(obj, onPathDistToGoal, backing || goalSpeed + MIN_GAIT_SPEED < scalarBefore, scalarBefore);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3647,26 +3632,25 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 			break;
 	}
 
-	if (m_retailScalarSpeed > 0.0f)
-		requiresConstantCalling = TRUE;
 	if (RetailFileLayers::enabled())
 	{
-		const Bool authoredTrigger = m_template->m_rotwk.accelDecelTrigger >= 0.0f;
-		const Real speed = m_retailWasRunning ? (authoredTrigger ? m_retailScalarSpeed : physics->getVelocityMagnitude()) : 0.0f;
-		if (speed > MIN_GAIT_SPEED)
+		if (m_retailWasRunning && m_retailScalarSpeed > MIN_GAIT_SPEED &&
+			(m_template->m_appearance == LOCO_WHEELS_FOUR ||
+				m_template->m_appearance == LOCO_MOTORCYCLE ||
+				m_template->m_appearance == LOCO_HORDE))
 		{
-			updateRetailGait(obj, 0.0f, speed, TRUE, -1.0f, scalarBefore);
-			obj->setModelConditionState(MODELCONDITION_MOVING);
+			updateRetailGait(obj, 0.0f, TRUE, scalarBefore);
 			requiresConstantCalling = TRUE;
 		}
 		else
 		{
-			const AIUpdateInterface* ai = obj->getAI();
-			if (m_retailWasRunning && (!ai || !ai->isMoving() || obj->getLogicModelConditions().test(MODELCONDITION_DECELERATE)))
-				obj->clearModelConditionState(MODELCONDITION_MOVING);
+			if (m_template->m_appearance != LOCO_THRUST && m_template->m_appearance != LOCO_WINGS)
+				m_retailScalarSpeed = 0.0f;
 			clearRetailGait(obj);
 		}
 	}
+	if (m_retailScalarSpeed > 0.0f)
+		requiresConstantCalling = TRUE;
 
 	// but we do need to do this even if not moving, for hovering/Thrusting things.
 	if (handleBehaviorZ(obj, physics, m_maintainPos))
