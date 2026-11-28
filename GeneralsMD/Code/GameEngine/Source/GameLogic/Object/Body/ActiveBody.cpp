@@ -1097,19 +1097,10 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 	{
 		BodyDamageType oldState = m_curDamageState;
 
-		// do the damage simplistic damage ADDITION
 		internalChangeHealth( amount );
-		if (RetailFileLayers::enabled() && !getActiveBodyModuleData()->m_damageCreationLists.empty())
-		{
-			for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
-			{
-				m_sideDamage[side] = std::max(0.0f, m_sideDamage[side] - (m_currentHealth - m_prevHealth) * 0.1875f);
-				if (m_sideDamage[side] < m_maxHealth * 0.1875f)
-					m_destroyedSides &= ~(1u << side);
-			}
-			if (m_curDamageState != oldState)
-				updateDestroyedSide(oldState);
-		}
+		if (RetailFileLayers::enabled() && !getActiveBodyModuleData()->m_damageCreationLists.empty() &&
+			m_curDamageState != oldState)
+			updateDestroyedSide(oldState);
 
 		// record the actual damage done from this, and when it happened
 		damageInfo->out.m_actualDamageDealt = amount;
@@ -1501,10 +1492,30 @@ void ActiveBody::internalChangeHealth( Real delta )
 	// change the health by the delta, it can be positive or negative
 	m_currentHealth += delta;
 
-	// high end cap
 	Real maxHealth = m_maxHealth;
-	if( m_currentHealth > maxHealth )
+	if (m_currentHealth > maxHealth)
+	{
 		m_currentHealth = maxHealth;
+		for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+			m_sideDamage[side] = 0.0f;
+	}
+	else if (m_currentHealth == maxHealth && delta > 0.0f)
+	{
+		for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+			m_sideDamage[side] = 0.0f;
+	}
+	else if (m_prevHealth == 0.0f && delta > 0.0f)
+	{
+		const Real revivedSideDamage = std::max(0.0f, m_maxHealth * 0.1875f - 1.0f);
+		for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+			m_sideDamage[side] = revivedSideDamage;
+	}
+	else if (delta > 0.0f)
+	{
+		const Real reduce = delta * 0.1875f;
+		for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+			m_sideDamage[side] = std::max(0.0f, m_sideDamage[side] - reduce);
+	}
 
 	// low end cap
 	const Real lowEndCap = 0.0f;  // low end cap for health, don't go below this
