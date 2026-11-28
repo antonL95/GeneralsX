@@ -1,5 +1,6 @@
-210 create Player_1 MenFortress 0 1200,1200,0
+210 create Player_1 MenFortress 0 1200,700,0
 210 create Player_1 Pkg26StandaloneTower 0 1400,1200,0
+211 pkg26-castle-unpack Player_1 MenFortress 0 - 1200 700
 212 create Player_1 MenWallPosternGate 0 1100,1400,0
 212 create Player_1 Pkg26Fighter 0 1060,1400,0
 212 create Player_1 Pkg26Trebuchet 0 1060,1430,0
@@ -23,8 +24,8 @@
 219 pkg26-place-footprint Player_1 Pkg26SupportWall 0
 219 pkg26-place-footprint Player_1 TDHEreborSecretGate 0
 219 pkg26-place-footprint Player_1 Pkg26PlainWall 0
-220 pkg26-castle-member Player_1 MenFortressCitadel 0
-220 pkg26-castle-member Player_1 MenFortressExpansionPadSide 0
+220 pkg26-castle-part Player_1 MenFortress 0 MenFortressCitadel 1200 700
+220 pkg26-castle-part Player_1 MenFortress 0 MenFortressExpansionPadSide 1200 700
 220 pkg26-castle-member Player_1 Pkg26StandaloneTower 0
 220 pkg26-portal-state Player_1 MenWallPosternGate 0 Player_1:Pkg26Fighter:0
 220 pkg26-portal-state Player_1 MenWallPosternGate 0 Player_1:Pkg26Trebuchet:0
@@ -40,7 +41,7 @@
 230 pkg26-rebuild-state Player_1 Pkg26RubbleWall 0
 230 pkg26-rebuild-state Player_1 Pkg26RubbleControl 0
 230 pkg26-wall-upgrade-state Player_1 TDHEreborSecretGate 0
-250 pkg26-castle-transfer Player_1 MenFortressCitadel 0 PlyrCreeps
+250 pkg26-castle-transfer Player_1 MenFortress 0 PlyrCreeps 1200 700
 252 pkg26-castle-member PlyrCreeps MenFortressCitadel 0
 252 pkg26-castle-member PlyrCreeps MenFortressExpansionPadSide 0
 252 pkg26-castle-member Player_1 Pkg26StandaloneTower 0

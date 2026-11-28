@@ -2,6 +2,7 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
+#include <cmath>
 #include <cstdio>
 #include <string_view>
 
@@ -21,6 +22,42 @@
 
 namespace
 {
+void printCastleMember(UnsignedInt frame, const Object& member)
+{
+	const CastleMemberBehavior* cm = CastleMemberBehavior::find(&member);
+	const Player* owner = member.getControllingPlayer();
+	std::fprintf(stderr, "TEST pkg26 castle-member frame=%u object=%s owner=%s hasModule=%d linked=%d isKeep=%d owned=%d storedPrice=%u\n",
+		frame, member.getTemplate()->getName().str(),
+		owner ? owner->getPlayerName().str() : "-",
+		cm != nullptr ? 1 : 0,
+		cm && cm->getCastleID() != INVALID_ID ? 1 : 0,
+		cm && cm->isKeep() ? 1 : 0,
+		cm && cm->isOwnedByCastle() ? 1 : 0,
+		cm ? cm->getStoredUpgradePrice() : 0u);
+}
+
+Object* findCastleAt(const Coord3D& location)
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Coord3D* position = object->getPosition();
+		if (CastleBehavior::find(object) && std::fabs(position->x - location.x) < 1.0f && std::fabs(position->y - location.y) < 1.0f)
+			return object;
+	}
+	return nullptr;
+}
+
+const Object* findCastlePart(const Object& castle, std::string_view templateName)
+{
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const CastleMemberBehavior* cm = CastleMemberBehavior::find(object);
+		if (cm && cm->getCastleID() == castle.getID() && object->getTemplate()->getName().str() == templateName)
+			return object;
+	}
+	return nullptr;
+}
+
 void handlePackage26(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject(FALSE);
@@ -108,24 +145,34 @@ void handlePackage26(const RetailTestCommands::Context& ctx)
 
 	if (action == "pkg26-castle-member")
 	{
-		const CastleMemberBehavior* cm = CastleMemberBehavior::find(source);
-		const Player* owner = source->getControllingPlayer();
-		std::fprintf(stderr, "TEST pkg26 castle-member frame=%u object=%s owner=%s hasModule=%d linked=%d isKeep=%d owned=%d storedPrice=%u\n",
-			ctx.frame, source->getTemplate()->getName().str(),
-			owner ? owner->getPlayerName().str() : "-",
-			cm != nullptr ? 1 : 0,
-			cm && cm->getCastleID() != INVALID_ID ? 1 : 0,
-			cm && cm->isKeep() ? 1 : 0,
-			cm && cm->isOwnedByCastle() ? 1 : 0,
-			cm ? cm->getStoredUpgradePrice() : 0u);
+		printCastleMember(ctx.frame, *source);
+		return;
+	}
+
+	if (action == "pkg26-castle-unpack")
+	{
+		if (CastleBehavior* castle = CastleBehavior::find(ctx.hasPosition ? findCastleAt(ctx.groundLocation()) : nullptr))
+			castle->unpackFree();
+		return;
+	}
+
+	if (action == "pkg26-castle-part")
+	{
+		const Object* castle = ctx.hasPosition ? findCastleAt(ctx.groundLocation()) : nullptr;
+		if (const Object* part = castle ? findCastlePart(*castle, arg) : nullptr)
+			printCastleMember(ctx.frame, *part);
+		else
+			std::fprintf(stderr, "TEST pkg26 castle-part frame=%u missing=%s\n", ctx.frame, ctx.argument);
 		return;
 	}
 
 	if (action == "pkg26-castle-transfer")
 	{
+		const CastleBehavior* castle = CastleBehavior::find(ctx.hasPosition ? findCastleAt(ctx.groundLocation()) : source);
+		Object* keep = castle ? castle->getKeep() : nullptr;
 		Player* nextOwner = ctx.findPlayer(ctx.argument);
-		if (nextOwner && nextOwner->getDefaultTeam())
-			source->setTeam(nextOwner->getDefaultTeam());
+		if (keep && nextOwner && nextOwner->getDefaultTeam())
+			keep->setTeam(nextOwner->getDefaultTeam());
 		return;
 	}
 
