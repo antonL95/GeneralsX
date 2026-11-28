@@ -18,6 +18,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/WeaponSetType.h"
 
 SpecialEnemySenseUpdate::~SpecialEnemySenseUpdate() = default;
 
@@ -257,10 +258,13 @@ const RetailInvisibilityNugget& InvisibilityUpdate::getNugget() const
 
 void InvisibilityUpdate::deactivate()
 {
+	if (!m_active)
+		return;
 	m_active = FALSE;
 	m_end = 0;
 	getObject()->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_HIDDEN));
 	getObject()->clearModelConditionState(MODELCONDITION_HIDDEN);
+	getObject()->clearWeaponSetFlag(WEAPONSET_HIDDEN);
 }
 
 void InvisibilityUpdate::toggle(UnsignedInt duration)
@@ -275,6 +279,7 @@ void InvisibilityUpdate::toggle(UnsignedInt duration)
 		m_end = duration ? frame + duration : 0;
 		getObject()->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_HIDDEN));
 		getObject()->setModelConditionState(MODELCONDITION_HIDDEN);
+		getObject()->setWeaponSetFlag(WEAPONSET_HIDDEN);
 	}
 	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
 }

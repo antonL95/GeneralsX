@@ -1,0 +1,20 @@
+200 create Player_1 AngmarNaglur 0 1760,1650,0
+200 create PlyrCreeps ToggleHiddenTarget 0 1770,1650,0
+202 toggle-hidden-attack Player_1 AngmarNaglur 0 PlyrCreeps:ToggleHiddenTarget:0
+235 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+235 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+237 power Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+243 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+243 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+245 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+245 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+600 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+600 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+1120 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+1120 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+1155 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+1155 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+1230 toggle-hidden-probe Player_1 AngmarNaglur 0 SpecialAbilityWormtongueEscape
+1230 toggle-hidden-probe PlyrCreeps ToggleHiddenTarget 0
+1250 destroy Player_1 AngmarNaglur 0
+1250 destroy PlyrCreeps ToggleHiddenTarget 0
