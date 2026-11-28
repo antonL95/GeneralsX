@@ -9,9 +9,9 @@
 270 destroy Player_1 GuardRetaliateRangedAlly 0
 270 destroy PlyrCreeps GuardRetaliateRangedBait 0
 
-185 create Player_1 GuardRetaliateMeleeAlly 0 2300,3180,0
-185 create PlyrCreeps GuardRetaliateMeleeBait 0 2520,3180,180
-204 create Player_1 GuardRetaliateMelee 0 2300,3150,0
+185 create Player_1 GuardRetaliateMeleeAlly 0 1900,3180,0
+185 create PlyrCreeps GuardRetaliateMeleeBait 0 2120,3180,180
+204 create Player_1 GuardRetaliateMelee 0 1900,3150,0
 244 guard-retaliate-probe Player_1 GuardRetaliateMelee 0
 245 guard-retaliate-probe Player_1 GuardRetaliateMelee 0
 410 guard-retaliate-probe Player_1 GuardRetaliateMelee 0
