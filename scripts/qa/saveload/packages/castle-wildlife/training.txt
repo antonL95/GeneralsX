@@ -1,0 +1,17 @@
+149 create PlyrCivilian CastleWildlifeAnimal 0 3490,740,0
+150 create Player_1 CastleWildlifeCamp 0 3350,600,0
+151 castle-wildlife-unpack Player_1 CastleWildlifeCamp 0
+155 create Player_1 CastleWildlifeWalker 0 3590,840,0
+157 castle-wildlife-status Player_1 CastleWildlifeWalker 0 Player_1:CastleWildlifeCamp:0
+157 castle-wildlife-status PlyrCivilian CastleWildlifeAnimal 0 Player_1:CastleWildlifeCamp:0
+158 move Player_1 CastleWildlifeWalker 0 - 3470 720
+243 castle-wildlife-status Player_1 CastleWildlifeWalker 0 Player_1:CastleWildlifeCamp:0
+243 castle-wildlife-status PlyrCivilian CastleWildlifeAnimal 0 Player_1:CastleWildlifeCamp:0
+244 castle-wildlife-status Player_1 CastleWildlifeWalker 0 Player_1:CastleWildlifeCamp:0
+244 castle-wildlife-status PlyrCivilian CastleWildlifeAnimal 0 Player_1:CastleWildlifeCamp:0
+250 move Player_1 CastleWildlifeWalker 0 - 3590 840
+380 castle-wildlife-status Player_1 CastleWildlifeWalker 0 Player_1:CastleWildlifeCamp:0
+380 castle-wildlife-status PlyrCivilian CastleWildlifeAnimal 0 Player_1:CastleWildlifeCamp:0
+385 destroy Player_1 CastleWildlifeWalker 0
+385 destroy PlyrCivilian CastleWildlifeAnimal 0
+385 destroy Player_1 CastleWildlifeCamp 0
