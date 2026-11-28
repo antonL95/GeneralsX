@@ -3227,7 +3227,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 	{
 		const PolygonTrigger* trigger = m_triggerInfo[i].pTrigger;
 		if (trigger && (!refresh || trigger->isCastleArea()) &&
-			!trigger->pointInTrigger(iPos))
+			(trigger->isRetired() || !trigger->pointInTrigger(iPos)))
 		{
 			const Bool exited = m_triggerInfo[i].isInside;
 			m_triggerInfo[i].isInside = false;
@@ -3236,12 +3236,13 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 			if (m_team)
 				m_team->setEnteredExited();
 			TheGameLogic->updateObjectsChangedTriggerAreas();
-			if (exited && !refresh)
-				if (auto* lua = LuaScriptEngine::active())
-					lua->dispatch(*this, "OnUnitExited", std::string_view(trigger->getTriggerName().str()));
-#ifdef RTS_DEBUG
-			//TheScriptEngine->AppendDebugMessage("Object exited.", false);
-#endif
+			if (exited)
+			{
+				if (!refresh)
+					if (auto* lua = LuaScriptEngine::active())
+						lua->dispatch(*this, "OnUnitExited", std::string_view(trigger->getTriggerName().str()));
+				trigger->notifyObjectExited(this);
+			}
 		}
 	}
 
@@ -3280,9 +3281,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 				if (!refresh)
 					if (auto* lua = LuaScriptEngine::active())
 						lua->dispatch(*this, "OnUnitEntered", std::string_view(pTrig->getTriggerName().str()));
-#ifdef RTS_DEBUG
-				//TheScriptEngine->AppendDebugMessage("Object entered.", false);
-#endif
+				pTrig->notifyObjectEntered(this);
 			}
 			else
 			{

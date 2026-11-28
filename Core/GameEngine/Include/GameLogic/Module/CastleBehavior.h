@@ -3,6 +3,8 @@
 class Matrix3D;
 class UpgradeTemplate;
 
+#include <set>
+
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/UpdateModule.h"
@@ -109,6 +111,11 @@ private:
 	const CastleTemplates::Camp* findUnpackedCamp() const;
 	void registerPerimeters(const CastleTemplates::Camp& camp, const Matrix3D& transform);
 	void restoreMissingPerimeters();
+	void attachPerimeterCallbacks();
+	void clearInsideCastleObjects();
+	void onObjectEntered(Object* object);
+	void onObjectExited(Object* object);
+	static void onTriggerAreaTransition(Object* object, void* userData, Bool entered);
 
 	Bool m_buildComplete = FALSE;
 	Bool m_pendingUnpack = FALSE;
@@ -118,4 +125,5 @@ private:
 	UnsignedInt m_unpackFrame = 0;
 	ObjectID m_keep = INVALID_ID;
 	std::vector<ObjectID> m_members;
+	std::set<ObjectID> m_objectsInsideCastle;
 };

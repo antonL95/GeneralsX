@@ -14,7 +14,7 @@ public:
 	Int m_maxWanderDistance = 0;
 	Int m_maxWanderRadius = 0;
 	Int m_updateTimer = 0;
-	Bool m_afraidOfCastles = FALSE;
+	Bool m_afraidOfCastles = TRUE;
 };
 
 class AnimalAIUpdate final : public AIUpdateInterface
@@ -25,6 +25,7 @@ class AnimalAIUpdate final : public AIUpdateInterface
 public:
 	AnimalAIUpdate(Thing* thing, const ModuleData* data);
 	UpdateSleepTime update() override;
+	Bool isAfraidOfCastles() const { return getAnimalAIUpdateModuleData()->m_afraidOfCastles; }
 	void fleeFrom(const Object& threat);
 
 private:

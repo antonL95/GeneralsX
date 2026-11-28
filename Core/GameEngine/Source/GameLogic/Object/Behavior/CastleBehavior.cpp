@@ -34,9 +34,11 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Module/AnimalAIUpdate.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/CastleUpgrade.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "WWMath/wwmath.h"
 
 namespace
 {
@@ -150,6 +152,7 @@ CastleBehavior::~CastleBehavior() = default;
 
 void CastleBehavior::onDelete()
 {
+	clearInsideCastleObjects();
 	if (m_unpacked)
 		PolygonTrigger::retireCastleAreas(getObject()->getID());
 }
@@ -428,6 +431,7 @@ void CastleBehavior::killEverything()
 void CastleBehavior::repack()
 {
 	Object* packed = getObject();
+	clearInsideCastleObjects();
 	PolygonTrigger::retireCastleAreas(packed->getID());
 	const Object* keep = TheGameLogic->findObjectByID(m_keep);
 	if (keep && keep->getName().isNotEmpty())
@@ -533,6 +537,100 @@ const CastleTemplates::Camp* CastleBehavior::findUnpackedCamp() const
 	return bestCamp;
 }
 
+void CastleBehavior::onTriggerAreaTransition(Object* object, void* userData, Bool entered)
+{
+	auto* self = static_cast<CastleBehavior*>(userData);
+	if (!self)
+		return;
+	if (entered)
+		self->onObjectEntered(object);
+	else
+		self->onObjectExited(object);
+}
+
+void CastleBehavior::onObjectEntered(Object* object)
+{
+	if (!object || object->isDestroyed())
+		return;
+	if (!object->isKindOf(KINDOF_IGNORED_IN_GUI))
+	{
+		object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_INSIDE_CASTLE));
+		m_objectsInsideCastle.insert(object->getID());
+		return;
+	}
+	const Object* castle = getObject();
+	auto* animal = dynamic_cast<AnimalAIUpdate*>(object->getAI());
+	if (!castle || !animal || !animal->isAfraidOfCastles())
+		return;
+	Coord3D direction = *object->getPosition();
+	direction.sub(*castle->getPosition());
+	const Real length = WWMath::Sqrt(
+		direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+	if (length > 0.0f)
+	{
+		direction.x /= length;
+		direction.y /= length;
+		direction.z /= length;
+	}
+	Coord3D destination = *object->getPosition();
+	destination.x += direction.x * 150.0f;
+	destination.y += direction.y * 150.0f;
+	destination.z += direction.z * 150.0f;
+	animal->aiMoveToPositionEvenIfSleeping(&destination, CMD_FROM_AI);
+}
+
+void CastleBehavior::onObjectExited(Object* object)
+{
+	if (!object)
+		return;
+	const auto it = m_objectsInsideCastle.find(object->getID());
+	if (it == m_objectsInsideCastle.end())
+		return;
+	object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_INSIDE_CASTLE));
+	m_objectsInsideCastle.erase(it);
+}
+
+void CastleBehavior::clearInsideCastleObjects()
+{
+	for (ObjectID id : m_objectsInsideCastle)
+	{
+		if (Object* object = TheGameLogic->findObjectByID(id))
+			object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_INSIDE_CASTLE));
+	}
+	m_objectsInsideCastle.clear();
+}
+
+void CastleBehavior::attachPerimeterCallbacks()
+{
+	const ObjectID owner = getObject()->getID();
+	std::vector<const PolygonTrigger*> activeAreas;
+	for (auto* polygon = PolygonTrigger::getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+	{
+		if (polygon->isCastleArea() && !polygon->isRetired() && polygon->getCastleAreaOwner() == owner)
+		{
+			polygon->setTransitionCallback(&CastleBehavior::onTriggerAreaTransition, this);
+			activeAreas.push_back(polygon);
+		}
+	}
+	m_objectsInsideCastle.clear();
+	if (activeAreas.empty())
+		return;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->isDestroyed() || object->isKindOf(KINDOF_PROJECTILE) || object->isKindOf(KINDOF_INERT) ||
+			object->isKindOf(KINDOF_IGNORED_IN_GUI) || !object->testStatus(OBJECT_STATUS_INSIDE_CASTLE))
+			continue;
+		for (const PolygonTrigger* area : activeAreas)
+		{
+			if (object->isInside(area))
+			{
+				m_objectsInsideCastle.insert(object->getID());
+				break;
+			}
+		}
+	}
+}
+
 void CastleBehavior::registerPerimeters(const CastleTemplates::Camp& camp, const Matrix3D& transform)
 {
 	const Object* packed = getObject();
@@ -548,6 +646,7 @@ void CastleBehavior::registerPerimeters(const CastleTemplates::Camp& camp, const
 		name.format("%s%d", prefix.str(), static_cast<Int>(i));
 		area->setTriggerName(name);
 		area->setCastleAreaOwner(packed->getID());
+		area->setTransitionCallback(&CastleBehavior::onTriggerAreaTransition, this);
 		for (const auto& [x, y] : points)
 		{
 			Vector3 world;
@@ -804,6 +903,7 @@ void CastleBehavior::loadPostProcess()
 		if (Drawable* drawable = getObject()->getDrawable())
 			drawable->setDrawableHidden(TRUE);
 		restoreMissingPerimeters();
+		attachPerimeterCallbacks();
 	}
 }
 

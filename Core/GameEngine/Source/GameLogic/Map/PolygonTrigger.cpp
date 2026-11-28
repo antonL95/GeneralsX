@@ -332,6 +332,30 @@ PolygonTrigger* PolygonTrigger::findByName(const AsciiString& name, Bool include
 	return nullptr;
 }
 
+void PolygonTrigger::setTransitionCallback(TransitionCallback callback, void* userData)
+{
+	m_transitionCallback = callback;
+	m_transitionUserData = userData;
+}
+
+void PolygonTrigger::clearTransitionCallback()
+{
+	m_transitionCallback = nullptr;
+	m_transitionUserData = nullptr;
+}
+
+void PolygonTrigger::notifyObjectEntered(Object* object) const
+{
+	if (m_transitionCallback)
+		m_transitionCallback(object, m_transitionUserData, TRUE);
+}
+
+void PolygonTrigger::notifyObjectExited(Object* object) const
+{
+	if (m_transitionCallback)
+		m_transitionCallback(object, m_transitionUserData, FALSE);
+}
+
 void PolygonTrigger::retireCastleAreas(ObjectID owner)
 {
 	Bool changed = FALSE;
@@ -339,6 +363,7 @@ void PolygonTrigger::retireCastleAreas(ObjectID owner)
 	{
 		if (polygon->m_castleAreaOwner == owner)
 		{
+			polygon->clearTransitionCallback();
 			polygon->m_castleAreaOwner = INVALID_ID;
 			AsciiString retired;
 			retired.format("%s (retired %d)", polygon->getTriggerName().str(), polygon->getID());

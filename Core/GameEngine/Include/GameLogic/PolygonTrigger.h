@@ -46,6 +46,7 @@
 class DataChunkInput;
 class DataChunkOutput;
 struct DataChunkInfo;
+class Object;
 class PolygonTrigger;
 class Xfer;
 
@@ -73,6 +74,8 @@ class PolygonTrigger : public MemoryPoolObject,
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(PolygonTrigger, "PolygonTrigger")
 
 public:
+	using TransitionCallback = void (*)(Object* object, void* userData, Bool entered);
+
 	struct StandingWaterSettings
 	{
 		UnsignedInt sourceId;
@@ -119,6 +122,8 @@ protected:
 	std::unique_ptr<RiverWaterSettings> m_riverWater;
 	std::optional<UnsignedInt> m_bfmeTriggerAreaId;
 	std::optional<ObjectID> m_castleAreaOwner;
+	TransitionCallback m_transitionCallback = nullptr;
+	void* m_transitionUserData = nullptr;
 	std::vector<Coord2D> m_importedRiverBanks;
 	Region2D m_importedRiverBounds{};
 	Int m_authoredRiverHeight = 0;
@@ -154,8 +159,13 @@ public:
 public:
 	static void addPolygonTrigger(PolygonTrigger *pTrigger);
 	void setCastleAreaOwner(ObjectID owner) { m_castleAreaOwner = owner; }
+	ObjectID getCastleAreaOwner() const { return m_castleAreaOwner.value_or(INVALID_ID); }
 	Bool isCastleArea() const { return m_castleAreaOwner.has_value(); }
 	Bool isRetired() const { return m_castleAreaOwner == INVALID_ID; }
+	void setTransitionCallback(TransitionCallback callback, void* userData);
+	void clearTransitionCallback();
+	void notifyObjectEntered(Object* object) const;
+	void notifyObjectExited(Object* object) const;
 	static void assignImportedIDs(const std::vector<PolygonTrigger *> &polygons,
 		const std::vector<PolygonTrigger *> &rivers);
 	static void installImportedPolygons(const std::vector<PolygonTrigger *> &polygons);
