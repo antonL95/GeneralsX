@@ -103,10 +103,10 @@
 998 create Player_2 AiPowersPoweredWeaponToggle 0 3650,1750,0
 998 create Player_2 AiPowersFormationToggle 0 3000,1250,0
 999 create Player_1 AiPowersFormationTarget 0 3680,1750,0
-999 create Player_1 AiPowersFormationTarget 1 3160,1250,0
+999 create Player_1 AiPowersFormationTarget 1 3500,1250,0
 1006 attack Player_2 AiPowersPoweredWeaponToggle 0 Player_1:AiPowersFormationTarget:0
 1006 attack Player_2 AiPowersFormationToggle 0 Player_1:AiPowersFormationTarget:1
-1035 formation-state Player_2 AiPowersFormationToggle 0
+1075 formation-state Player_2 AiPowersFormationToggle 0
 1075 ability Player_2 AiPowersPoweredWeaponToggle 0
 1076 destroy Player_2 AiPowersPoweredWeaponToggle 0
 1076 destroy Player_2 AiPowersFormationToggle 0

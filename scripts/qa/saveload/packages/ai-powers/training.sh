@@ -105,9 +105,9 @@ check() {
     expect_mounted 965 2 0 || return 1
     expect_mounted 1195 1 0 || return 1
     expect_weapon 1075 AiPowersPoweredWeaponToggle 1 AiPowersToggleMeleeWeapon || return 1
-    if covers 1035 && ! grep -Eq '^TEST formation-state 1035 AiPowersFormationToggle 0 .* active=1$' "$log"; then
-        printf 'Expected the AI horde to enter its alternate formation at frame 1035\n' >&2
-        grep -F 'TEST formation-state 1035 AiPowersFormationToggle ' "$log" >&2 || true
+    if covers 1075 && ! grep -Eq '^TEST formation-state 1075 AiPowersFormationToggle 0 .* active=1$' "$log"; then
+        printf 'Expected the AI horde to enter its alternate formation at frame 1075\n' >&2
+        grep -F 'TEST formation-state 1075 AiPowersFormationToggle ' "$log" >&2 || true
         return 1
     fi
     if covers 1440 && ! awk '
