@@ -1,0 +1,12 @@
+44 power-reveal - - 0
+60 create Player_2 StrategicBiasArcher 0 2800,1500,0
+60 create PlyrCreeps StrategicBiasNear 0 2860,1500,0
+60 create Player_1 StrategicBiasFar 0 2930,1500,0
+60 create Player_1 StrategicBiasArcher 0 2800,2000,0
+60 create PlyrCreeps StrategicBiasNear 1 2860,2000,0
+60 create Player_2 StrategicBiasFar 0 2930,2000,0
+61 stance Player_2 StrategicBiasArcher 0 Aggressive
+61 stance Player_1 StrategicBiasArcher 0 Aggressive
+62 attackmove Player_1 StrategicBiasArcher 0 at 3000 2000
+150 ai-target Player_2 StrategicBiasArcher 0
+150 ai-target Player_1 StrategicBiasArcher 0

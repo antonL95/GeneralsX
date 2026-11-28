@@ -97,6 +97,7 @@ struct RetailArmyMember
 
 constexpr Int RETAIL_ATTACK_WAVE_MIN_UNITS = 3;
 constexpr Real RETAIL_DEFENDED_TARGET_DISTANCE = 350.0f;
+constexpr Real RETAIL_STRATEGIC_ENEMY_TARGET_BIAS = 100.0f;
 
 enum RetailTacticalKind
 {
@@ -2220,16 +2221,23 @@ Bool AISkirmishPlayer::updateRetailFlagCapture(const std::vector<Object*>& owned
 	return TRUE;
 }
 
-Player* AISkirmishPlayer::retailStrategicEnemy() const
+Player* AISkirmishPlayer::retailStrategicEnemy(const Player& player)
 {
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player* candidate = ThePlayerList->getNthPlayer(i);
-		if (candidate && candidate != m_player && candidate->isPlayableSide() && candidate->isPlayerActive() &&
-			m_player->getRelationship(candidate->getDefaultTeam()) == ENEMIES)
+		if (candidate && candidate != &player && candidate->isPlayableSide() && candidate->isPlayerActive() &&
+			player.getRelationship(candidate->getDefaultTeam()) == ENEMIES)
 			return candidate;
 	}
 	return nullptr;
+}
+
+Real AISkirmishPlayer::getRetailStrategicEnemyBias(Player* attackerOwner, const Player* targetOwner)
+{
+	if (!attackerOwner || !targetOwner || !attackerOwner->isSkirmishAIPlayer())
+		return 0.0f;
+	return retailStrategicEnemy(*attackerOwner) == targetOwner ? RETAIL_STRATEGIC_ENEMY_TARGET_BIAS : 0.0f;
 }
 
 Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
@@ -2320,7 +2328,7 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 		center = center + *unit->getPosition();
 	center.scale(1.0f / static_cast<Real>(roster.size()));
 
-	Player* enemy = retailStrategicEnemy();
+	Player* enemy = retailStrategicEnemy(*m_player);
 	if (!enemy)
 		return endRaid();
 	if (phase == 0 && raid.rushPolicy == 0)

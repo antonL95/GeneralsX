@@ -58,6 +58,7 @@ public:	 // AISkirmish specific methods.
 	static Bool rollRetailSpecialPowerActivation(const Player& player);
 	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
 	static Real getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target);
+	static Real getRetailStrategicEnemyBias(Player* attackerOwner, const Player* targetOwner);
 	virtual Bool computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord3D *pos, Int playerNdx, Real weaponRadius) override; ///< Calculates best pos for weapon given radius.
 
 public:	// AIPlayer interface methods.
@@ -170,7 +171,7 @@ protected:
 		UnsignedInt idleSince = 0;
 	};
 	RetailFarmRaid m_retailFarmRaid;
-	Player* retailStrategicEnemy() const;
+	static Player* retailStrategicEnemy(const Player& player);
 	Bool updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
 		UnsignedInt frame, Bool canStart, Bool trace);
 	UnsignedInt m_retailRoamNextFrame = 0;
