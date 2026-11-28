@@ -29,6 +29,10 @@ Bool affectsGeometry(const GeometryUpgradeModuleData& upgrade, const AsciiString
 Bool isActive(const ThingTemplate::GeometryDetails& details, const std::vector<const GeometryUpgradeModuleData*>& upgrades,
 	[[maybe_unused]] const Object* object = nullptr)
 {
+#if !RTS_GENERALS
+	if (object && object->testStatus(OBJECT_STATUS_BOOKENDING))
+		return details.name.compareNoCase("Bookend") == 0;
+#endif
 	Bool active = details.active;
 #if !RTS_GENERALS
 	if (object)
@@ -209,7 +213,7 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 		std::any_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
 			[&](const auto& geometry) { return hasUpgrade(geometry.details); }));
 #if !RTS_GENERALS
-	const Bool adjusted = upgraded || object.hasLuaGeometryOverrides();
+	const Bool adjusted = upgraded || object.hasLuaGeometryOverrides() || object.testStatus(OBJECT_STATUS_BOOKENDING);
 #else
 	const Bool adjusted = upgraded;
 #endif

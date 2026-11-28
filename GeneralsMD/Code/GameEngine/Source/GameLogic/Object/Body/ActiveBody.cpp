@@ -60,6 +60,7 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -285,9 +286,24 @@ void ActiveBody::onDelete()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static Bool hasBookendGeometry(const Object& object)
+{
+	const auto& data = object.getTemplate()->getRotWKObjectData();
+	if (data.primaryGeometry.name.compareNoCase("Bookend") == 0)
+		return TRUE;
+	for (const auto& part : data.additionalGeometries)
+	{
+		if (part.details.name.compareNoCase("Bookend") == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 void ActiveBody::setCorrectDamageState()
 {
+	const BodyDamageType oldState = m_curDamageState;
 	m_curDamageState = calcDamageState(m_currentHealth, m_maxHealth, getActiveBodyModuleData());
+	Object* obj = getObject();
 	if (LuaScriptEngine::active())
 	{
 		ModelConditionFlags clear;
@@ -296,32 +312,83 @@ void ActiveBody::setCorrectDamageState()
 		clear.set(MODELCONDITION_REALLY_DAMAGED);
 		set.set(MODELCONDITION_DAMAGED, m_curDamageState == BODY_DAMAGED);
 		set.set(MODELCONDITION_REALLY_DAMAGED, m_curDamageState == BODY_REALLYDAMAGED);
-		getObject()->clearAndSetModelConditionFlags(clear, set);
+		obj->clearAndSetModelConditionFlags(clear, set);
 	}
 
-	/// @todo srj -- bleah, this is an icky way to do it. oh well.
-	if (m_curDamageState == BODY_RUBBLE && getObject()->isKindOf(KINDOF_STRUCTURE))
+	if (obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
 	{
-		Real rubbleHeight = getObject()->getTemplate()->getStructureRubbleHeight();
+		if (m_curDamageState < BODY_RUBBLE)
+		{
+			if (oldState == BODY_RUBBLE)
+				obj->setGeometryInfo(obj->getTemplate()->getTemplateGeometryInfo());
+		}
+		else
+		{
+			obj->setGeometryInfoZ(TheGlobalData->m_defaultStructureRubbleHeight);
+		}
 
-		if (rubbleHeight <= 0.0f)
-			rubbleHeight = TheGlobalData->m_defaultStructureRubbleHeight;
-
-		/** @todo I had to change this to a Z only version to keep it from disappearing from the
-			PartitionManager for a frame.  That didn't used to happen.
-		*/
-		getObject()->setGeometryInfoZ(rubbleHeight);
-
-		// Have to tell pathfind as well, as rubble pathfinds differently.
-		TheAI->pathfinder()->removeObjectFromPathfindMap(getObject());
-		TheAI->pathfinder()->addObjectToPathfindMap(getObject());
-
-
-		// here we make sure nobody collides with us, ever again...			//Lorenzen
-		//THis allows projectiles shot from infantry that are inside rubble to get out of said rubble safely
-		getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_COLLISIONS ) );
-
-
+		if (m_curDamageState > oldState && m_curDamageState == BODY_RUBBLE)
+		{
+			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+			obj->setStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_NO_COLLISIONS, OBJECT_STATUS_CAN_NOT_WALK_ON));
+			if (hasBookendGeometry(*obj))
+			{
+				obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BOOKENDING));
+				GeometryUpgrade::refreshLuaBounds(*obj);
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
+			}
+		}
+		else if (m_curDamageState < oldState && m_curDamageState == BODY_PRISTINE)
+		{
+			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+			obj->clearStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_CAN_NOT_WALK_ON, OBJECT_STATUS_BOOKENDING));
+			if (oldState == BODY_RUBBLE)
+			{
+				if (hasBookendGeometry(*obj))
+					GeometryUpgrade::refreshLuaBounds(*obj);
+				obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+			}
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
+		}
+		else if (m_curDamageState < oldState && oldState == BODY_RUBBLE)
+		{
+			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+			obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CAN_NOT_WALK_ON));
+			obj->clearStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_BOOKENDING, OBJECT_STATUS_NO_COLLISIONS));
+			if (hasBookendGeometry(*obj))
+				GeometryUpgrade::refreshLuaBounds(*obj);
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
+		}
+	}
+	else if (obj->isKindOf(KINDOF_STRUCTURE))
+	{
+		if (m_curDamageState < BODY_RUBBLE && oldState == BODY_RUBBLE)
+		{
+			if (obj->testStatus(OBJECT_STATUS_BOOKENDING))
+			{
+				TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+				obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BOOKENDING));
+				GeometryUpgrade::refreshLuaBounds(*obj);
+			}
+			obj->setGeometryInfoZ(obj->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition());
+			obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
+		}
+		else if (m_curDamageState == BODY_RUBBLE)
+		{
+			Real rubbleHeight = obj->getTemplate()->getStructureRubbleHeight();
+			if (rubbleHeight <= 0.0f)
+				rubbleHeight = TheGlobalData->m_defaultStructureRubbleHeight;
+			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+			if (m_curDamageState > oldState && hasBookendGeometry(*obj))
+			{
+				obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BOOKENDING));
+				GeometryUpgrade::refreshLuaBounds(*obj);
+			}
+			obj->setGeometryInfoZ(rubbleHeight);
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
+			obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+		}
 	}
 }
 
@@ -1990,8 +2057,13 @@ void ActiveBody::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void ActiveBody::loadPostProcess()
 {
-
-	// extend base class
 	BodyModule::loadPostProcess();
-
+	Object* obj = getObject();
+	if (!obj || !obj->testStatus(OBJECT_STATUS_BOOKENDING) || !hasBookendGeometry(*obj))
+		return;
+	if (TheAI && TheAI->pathfinder())
+		TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
+	GeometryUpgrade::refreshLuaBounds(*obj);
+	if (TheAI && TheAI->pathfinder())
+		TheAI->pathfinder()->addObjectToPathfindMap(obj);
 }

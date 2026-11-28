@@ -273,7 +273,8 @@ static Bool isRetailWalkableWall(const Object* object)
 {
 	return object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) && !object->isDestroyed() &&
 		(!object->isEffectivelyDead() || isInactiveAuthoredWall(object)) &&
-		!object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+		!object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+		!object->testStatus(OBJECT_STATUS_CAN_NOT_WALK_ON);
 }
 
 void Pathfinder::refreshRetailWallLayer()
@@ -816,15 +817,17 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	{
 		if (insert)
 			addWallPiece(obj);
-		else if (obj->isDestroyed() || obj->isEffectivelyDead())
+		else if (obj->isDestroyed() || obj->isEffectivelyDead() || obj->testStatus(OBJECT_STATUS_CAN_NOT_WALK_ON))
 			removeWallPiece(obj);
 	}
 	if (insert && retail && obj->isEffectivelyDead() && !isInactiveAuthoredWall(obj) &&
+		!obj->testStatus(OBJECT_STATUS_BOOKENDING) &&
 		(obj->isKindOf(KINDOF_WALL_SEGMENT) || obj->isKindOf(KINDOF_WALL_GATE) ||
 		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL) ||
 		 obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 		return;
-	const auto* authored = retail && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) ? RetailWallMesh::forObject(*obj) : nullptr;
+	const auto* authored = retail && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) &&
+		!obj->testStatus(OBJECT_STATUS_BOOKENDING) ? RetailWallMesh::forObject(*obj) : nullptr;
 	if (authored && !authored->wall.empty())
 	{
 		Region2D bounds;
