@@ -11,4 +11,7 @@ if objectives_tribute_active:
         "set variable this->m_slot[1]->m_IP = 1",
         "continue",
     ))
+    victory = gdb.Breakpoint("VictoryConditions::update")
+    victory.silent = True
+    victory.commands = "\n".join(("return", "continue"))
 end

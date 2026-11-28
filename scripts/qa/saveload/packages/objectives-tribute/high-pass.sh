@@ -28,4 +28,5 @@ check() {
         expect "TEST hud-tribute 21 0 840"
     fi
     if covers 22; then expect "TEST hud-objective 22 2 0 0 1"; fi
+    printf 'PASS objectives and tribute HUD state (%s)\n' "$phase"
 }
