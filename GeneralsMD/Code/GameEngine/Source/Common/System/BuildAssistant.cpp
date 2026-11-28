@@ -1521,6 +1521,9 @@ Bool BuildAssistant::isRemovableForConstruction( Object *obj )
 		return FALSE;
 	}
 
+	if (obj->isKindOf(KINDOF_TAINT))
+		return FALSE;
+
 	// all shrubbery can be removed
 	if( obj->isKindOf( KINDOF_SHRUBBERY ) )
 		return TRUE;

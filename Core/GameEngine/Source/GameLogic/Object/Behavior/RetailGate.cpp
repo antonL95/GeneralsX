@@ -155,7 +155,9 @@ void GateOpenAndCloseBehavior::request(Bool open)
 	const Real fraction = std::min(200u, data->m_pathingPercent) * 0.01f;
 	const Real delay = open ? fraction : std::max(0.0f, 1.0f - fraction);
 	m_pathFrame = frame + static_cast<UnsignedInt>(data->m_resetTime * delay);
-	m_soundFrame = frame + (open ? data->m_openSoundTime : data->m_closeSoundTime);
+	const UnsignedInt openSoundTime = data->m_openSoundTime == ~0u ? data->m_resetTime : data->m_openSoundTime;
+	const UnsignedInt closeSoundTime = data->m_closeSoundTime == ~0u ? data->m_resetTime : data->m_closeSoundTime;
+	m_soundFrame = frame + (open ? openSoundTime : closeSoundTime);
 	applyModelState();
 	playSound(open ? data->m_openingSound : data->m_closingSound);
 	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);

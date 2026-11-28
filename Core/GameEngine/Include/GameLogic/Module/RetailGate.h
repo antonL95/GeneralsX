@@ -13,8 +13,8 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
 	UnsignedInt m_resetTime = 0;
-	UnsignedInt m_openSoundTime = 0;
-	UnsignedInt m_closeSoundTime = 0;
+	UnsignedInt m_openSoundTime = ~0u;
+	UnsignedInt m_closeSoundTime = ~0u;
 	UnsignedInt m_pathingPercent = 50;
 	Bool m_openByDefault = FALSE;
 	Bool m_repelUnits = FALSE;
