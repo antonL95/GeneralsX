@@ -1,4 +1,5 @@
 180 create Player_1 ArmyOfTheDeadFixtureElessar 0 3130,780,0
+180 stance Player_1 ArmyOfTheDeadFixtureElessar 0 HoldGround
 181 reveal Player_1 ArmyOfTheDeadFixtureElessar 0
 190 power Player_1 ArmyOfTheDeadFixtureElessar 0 SpecialAbilityPersonalFlood
 190 aim Player_1 ArmyOfTheDeadFixtureElessar 0 120,0
