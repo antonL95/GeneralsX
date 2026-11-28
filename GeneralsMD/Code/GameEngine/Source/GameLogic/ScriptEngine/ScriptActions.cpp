@@ -7739,9 +7739,27 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			doQuickVictory();
 			return;
 		case ScriptAction::VICTORY_SCREEN:
+		{
+			closeWindows(FALSE);
+			if (TheGameLogic)
+				TheGameLogic->closeWindows();
+			doDisableInput();
+			const Player *localPlayer = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+			if (!m_suppressNewWindows && TheAudio)
+			{
+				AudioEventRTS screenAudio("Gui_VictoryScreen");
+				TheAudio->addAudioEvent(&screenAudio);
+				const Bool isEvil = localPlayer && localPlayer->getPlayerTemplate() && localPlayer->getPlayerTemplate()->isEvil();
+				AudioEventRTS cheerAudio(isEvil ? "Gui_VictoryCheerEvil" : "Gui_VictoryCheerGood");
+				TheAudio->addAudioEvent(&cheerAudio);
+			}
 			if (!m_suppressNewWindows && TheGameText && TheVictoryConditions && !TheVictoryConditions->amIObserver())
-				RetailNotification::showScriptVictory(TheGameText->fetch("GUI:Victory"));
+			{
+				const Bool defeated = TheVictoryConditions->isLocalDefeat() || TheVictoryConditions->isLocalAlliedDefeat();
+				RetailNotification::showScriptVictory(TheGameText->fetch(defeated ? "GUI:Defeat" : "GUI:Victory"));
+			}
 			return;
+		}
 
 		case ScriptAction::VICTORY:
 			doVictory();

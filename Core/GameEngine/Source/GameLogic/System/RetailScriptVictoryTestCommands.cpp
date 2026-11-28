@@ -6,8 +6,13 @@
 
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
+#include "Common/Player.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/InGameUI.h"
+#include "GameClient/Mouse.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 
@@ -15,6 +20,20 @@ namespace
 {
 void showVictory(const RetailTestCommands::Context &ctx)
 {
+	const Bool hadInput = TheInGameUI && TheInGameUI->getInputEnabled();
+	Object *selected = nullptr;
+	if (ctx.player)
+	{
+		ctx.player->iterateObjects([](Object *obj, void *userData) {
+			auto **out = static_cast<Object **>(userData);
+			if (!*out && obj && obj->getDrawable() && obj->isSelectable())
+				*out = obj;
+		}, &selected);
+	}
+	if (selected)
+		ctx.selectObject(selected);
+	const Int beforeSelect = TheInGameUI ? TheInGameUI->getSelectCount() : 0;
+
 	const Int type = ScriptEngine::findRotwkActionByRetailIndex(511);
 	if (type >= 0)
 	{
@@ -25,8 +44,16 @@ void showVictory(const RetailTestCommands::Context &ctx)
 	GameWindow *notification = TheWindowManager->winGetWindowFromId(nullptr, NAMEKEY("ControlBar.wnd:Notification"));
 	const Bool shown = !TheGlobalData->m_headless && notification &&
 		!notification->winIsHidden() && !notification->winGetParent();
-	std::fprintf(stderr, "TEST script-victory frame=%u handled=%d shown=%d ending=%d\n",
-		ctx.frame, type >= 0, shown, TheScriptEngine->isGameEnding());
+	const Bool disabled = TheInGameUI && !TheInGameUI->getInputEnabled();
+	const Bool deselected = beforeSelect > 0 && TheInGameUI && TheInGameUI->getSelectCount() == 0;
+	if (hadInput && TheInGameUI)
+	{
+		TheInGameUI->setInputEnabled(TRUE);
+		if (TheMouse)
+			TheMouse->setVisibility(TRUE);
+	}
+	std::fprintf(stderr, "TEST script-victory frame=%u handled=%d shown=%d ending=%d disabled=%d deselected=%d\n",
+		ctx.frame, type >= 0, shown, TheScriptEngine->isGameEnding(), disabled, deselected);
 }
 }
 #endif
