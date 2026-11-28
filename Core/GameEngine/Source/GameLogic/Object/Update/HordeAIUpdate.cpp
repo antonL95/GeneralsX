@@ -735,6 +735,27 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeContain* enemy = HordeContain::get(target);
 	const auto attackType = m_forceAttack ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET;
 	Bool groundAttackInProgress = FALSE;
+	Bool amoebaMelee = FALSE;
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && m_engaging && target && !attackGround && !hold &&
+		melee->name.compareNoCase("Amoeba") == 0)
+	{
+		for (const Object* member : members)
+		{
+			if (const Weapon* weapon = member->getCurrentWeapon();
+				weapon && !member->isEffectivelyDead() && contain->rankCanAttack(member) &&
+				weapon->isContactWeapon())
+			{
+				amoebaMelee = TRUE;
+				break;
+			}
+		}
+	}
+	if (amoebaMelee)
+		const_cast<HordeContain*>(contain)->updateAmoebaMelee(target, *melee);
+	else if (RetailFileLayers::enabled())
+		const_cast<HordeContain*>(contain)->stopAmoebaMelee();
+#endif
 #if RTS_ZEROHOUR
 	const Bool comboPursuit = comboEnabled && useComboForTarget(target);
 	const Real anchorRadius = horde->getGeometryInfo().getBoundingCircleRadius();
@@ -769,13 +790,23 @@ UpdateSleepTime HordeAIUpdate::update()
 			if (target)
 			{
 				const Object* current = ai->getGoalObject();
-				if (ai->isAttacking() && current && !current->isEffectivelyDead() &&
-					(enemy ? current->getContainedBy() == target : current == target))
-					continue;
+				const Bool attackingLiveVictim = ai->isAttacking() && current && !current->isEffectivelyDead() &&
+					(enemy ? current->getContainedBy() == target : current == target);
+				if (attackingLiveVictim)
+				{
+					if (!amoebaMelee)
+						continue;
+					const Weapon* weapon = member->getCurrentWeapon();
+					const Real outer = current->isKindOf(KINDOF_STRUCTURE) ? melee->outerRangeBuildings : melee->outerRange;
+					if ((weapon && weapon->isWithinAttackRange(member, current)) ||
+						outer <= 0.0f || distanceSquared(*horde->getPosition(), *member->getPosition()) <= outer * outer)
+						continue;
+					ai->aiIdle(CMD_FROM_SCRIPT);
+				}
 				const Bool attackingAnchor = enemy && current == target && ai->isAttacking();
 				if (attackingAnchor)
 					ai->aiIdle(CMD_FROM_SCRIPT);
-				if ((refresh || !wasEngaging || attackingAnchor || recovered) && member->isAbleToAttack())
+				if ((refresh || !wasEngaging || attackingAnchor || recovered || (amoebaMelee && ai->isIdle())) && member->isAbleToAttack())
 				{
 					CanAttackResult result;
 					Object* victim = target;
@@ -788,6 +819,28 @@ UpdateSleepTime HordeAIUpdate::update()
 					if (!mayApproach && !formation->m_isPorcupineFormation && victim)
 						mayApproach = ai->isWithinHoldGroundCloseRange(victim);
 #endif
+					if (amoebaMelee && victim)
+					{
+						const Weapon* weapon = member->getCurrentWeapon();
+						const Real outer = victim->isKindOf(KINDOF_STRUCTURE) ? melee->outerRangeBuildings : melee->outerRange;
+						const Bool memberOutside = outer > 0.0f &&
+							distanceSquared(*horde->getPosition(), *member->getPosition()) > outer * outer;
+						const Bool inContactReach = weapon && weapon->isWithinAttackRange(member, victim);
+						const Real closeRange = (weapon ? weapon->getAttackRange(member) : 0.0f) +
+							member->getGeometryInfo().getBoundingCircleRadius() +
+							victim->getGeometryInfo().getBoundingCircleRadius() + 10.0f;
+						const Bool victimOutside = outer > 0.0f &&
+							distanceSquared(*horde->getPosition(), *victim->getPosition()) > outer * outer;
+						const Bool closeEnough = !memberOutside && !victimOutside &&
+							distanceSquared(*member->getPosition(), *victim->getPosition()) <= closeRange * closeRange;
+						if (!inContactReach && (memberOutside || !closeEnough))
+						{
+							Coord3D stepPos;
+							if (const_cast<HordeContain*>(contain)->chooseAmoebaStep(member, target, *melee, stepPos))
+								ai->aiMoveToPositionEvenIfSleeping(&stepPos, CMD_FROM_SCRIPT);
+							continue;
+						}
+					}
 					if (result == ATTACKRESULT_POSSIBLE || (mayApproach && result == ATTACKRESULT_POSSIBLE_AFTER_MOVING))
 					{
 						if (m_forceAttack)

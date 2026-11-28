@@ -283,6 +283,17 @@ void HordeContainModuleData::parseMeleeBehavior(INI* ini, void*, void* store, co
 
 	MeleeBehavior behavior;
 	behavior.name = ini->getNextAsciiString();
+	if (behavior.name.compareNoCase("Amoeba") == 0)
+	{
+		behavior.facingBonus = 10.0f;
+		behavior.angleLimitCos = -0.17f;
+		behavior.innerRange = 60.0f;
+		behavior.outerRange = 90.0f;
+		behavior.outerRangeBuildings = 140.0f;
+		behavior.delayUntilIdle = 2 * LOGICFRAMES_PER_SECOND;
+		behavior.delayRandomActivateMin = 2 * LOGICFRAMES_PER_SECOND;
+		behavior.delayRandomActivateMax = 3 * LOGICFRAMES_PER_SECOND;
+	}
 	ini->initFromINI(&behavior, fields);
 	*static_cast<MeleeBehavior*>(store) = std::move(behavior);
 }
@@ -685,6 +696,7 @@ void HordeContain::onRemoving( Object *rider )
 		if (m_backingMoves.empty())
 			m_backingSource = INVALID_ID;
 	}
+	m_amoebaHistory.erase(rider->getID());
 	updateRankWeaponConditions(rider);
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
@@ -739,9 +751,51 @@ void HordeContain::crc( Xfer *xfer )
 
 void HordeContain::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
 		{"initial-payload-pending", [this](Xfer* x) { x->xferBool(&m_initialPayloadPending); },
-			[this] { m_initialPayloadPending = FALSE; }}
+			[this] { m_initialPayloadPending = FALSE; }},
+		{"amoeba-melee-target", [this](Xfer* x) { x->xferObjectID(&m_meleeTargetID); },
+			[this] { m_meleeTargetID = INVALID_ID; }},
+		{"amoeba-cell-history", [this, loading](Xfer* x) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_amoebaHistory.size());
+			x->xferUnsignedInt(&count);
+			if (loading)
+			{
+				m_amoebaHistory.clear();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					ObjectID id = INVALID_ID;
+					UnsignedInt cells = 0;
+					x->xferObjectID(&id);
+					x->xferUnsignedInt(&cells);
+					std::deque<ICoord2D> list;
+					for (UnsignedInt j = 0; j < cells; ++j)
+					{
+						ICoord2D cell{ 0, 0 };
+						x->xferInt(&cell.x);
+						x->xferInt(&cell.y);
+						list.push_back(cell);
+					}
+					m_amoebaHistory.emplace(id, std::move(list));
+				}
+			}
+			else
+			{
+				for (auto& [id, list] : m_amoebaHistory)
+				{
+					ObjectID memberID = id;
+					UnsignedInt cells = static_cast<UnsignedInt>(list.size());
+					x->xferObjectID(&memberID);
+					x->xferUnsignedInt(&cells);
+					for (ICoord2D& cell : list)
+					{
+						x->xferInt(&cell.x);
+						x->xferInt(&cell.y);
+					}
+				}
+			}
+		}, [this] { m_amoebaHistory.clear(); }}
 	});
 }
 
@@ -1930,6 +1984,194 @@ void HordeContain::reassignSlotsByPosition()
 	rebuildMemberSlots();
 	for (Object* member : getContainList())
 		updateRankWeaponConditions(member);
+}
+
+void HordeContain::updateAmoebaMelee(Object* target, const HordeContainModuleData::MeleeBehavior&)
+{
+	Object* horde = getObject();
+	if (!RetailFileLayers::enabled() || !horde || !target)
+		return;
+	const Object* facingTarget = target->getContainedBy() ? target->getContainedBy() : target;
+	const Coord3D* hordePos = horde->getPosition();
+	const Coord3D* targetPos = facingTarget->getPosition();
+	const Real desiredAngle = WWMath::Atan2(targetPos->y - hordePos->y, targetPos->x - hordePos->x);
+	const Real turn = stdAngleDiff(desiredAngle, horde->getOrientation());
+	if (target->getID() != m_meleeTargetID)
+	{
+		m_meleeTargetID = target->getID();
+		m_amoebaHistory.clear();
+		horde->setOrientation(horde->getOrientation() + turn);
+		if (fabs(turn) > 0.5235f)
+			reassignSlotsByPosition();
+	}
+	else
+	{
+		horde->setOrientation(horde->getOrientation() + turn);
+	}
+}
+
+void HordeContain::stopAmoebaMelee()
+{
+	if (!RetailFileLayers::enabled() || m_meleeTargetID == INVALID_ID)
+		return;
+	m_meleeTargetID = INVALID_ID;
+	m_amoebaHistory.clear();
+}
+
+Bool HordeContain::chooseAmoebaStep(Object* member, const Object* target,
+	const HordeContainModuleData::MeleeBehavior& melee, Coord3D& outPos)
+{
+	const Object* horde = getObject();
+	if (!RetailFileLayers::enabled() || !horde || !member || !target)
+		return FALSE;
+
+	const Coord3D& anchorPos = *horde->getPosition();
+	const Coord3D& memberPos = *member->getPosition();
+	const Int cellX = static_cast<Int>(WWMath::Floor(memberPos.x / 10.0f));
+	const Int cellY = static_cast<Int>(WWMath::Floor(memberPos.y / 10.0f));
+	const auto historyIt = m_amoebaHistory.find(member->getID());
+	const HordeContain* enemyHorde = HordeContain::get(target);
+
+	Real bestScore = 0.0f;
+	Bool found = FALSE;
+	Bool sawOutsideOuter = FALSE;
+	Coord3D bestPos = memberPos;
+	ICoord2D bestCell{ cellX, cellY };
+	Bool validCell[3][3] = {};
+
+	for (Int ix = -1; ix <= 1; ++ix)
+	{
+		for (Int iy = -1; iy <= 1; ++iy)
+		{
+			if (ix == 0 && iy == 0)
+				continue;
+			const ICoord2D candCell{ cellX + ix, cellY + iy };
+			if (historyIt != m_amoebaHistory.end())
+			{
+				Bool visited = FALSE;
+				for (const ICoord2D& prev : historyIt->second)
+				{
+					if (prev.x == candCell.x && prev.y == candCell.y)
+					{
+						visited = TRUE;
+						break;
+					}
+				}
+				if (visited)
+					continue;
+			}
+
+			Coord3D candPos{
+				memberPos.x + static_cast<Real>(ix * 10),
+				memberPos.y + static_cast<Real>(iy * 10),
+				memberPos.z
+			};
+			if (TheTerrainLogic)
+				candPos.z = TheTerrainLogic->getLayerHeight(candPos.x, candPos.y, member->getLayer());
+			validCell[ix + 1][iy + 1] = TRUE;
+
+			const Real stepAngle = WWMath::Atan2(candPos.y - memberPos.y, candPos.x - memberPos.x);
+			Real score = 10000.0f - fabs(stdAngleDiff(stepAngle, member->getOrientation())) * melee.facingBonus * 0.31836995f;
+
+			const Object* refTarget = enemyHorde ? enemyHorde->findNearestLivingMember(candPos) : target;
+			if (!refTarget)
+				refTarget = target;
+
+			const Coord3D& refPos = *refTarget->getPosition();
+			Real umx = memberPos.x - refPos.x;
+			Real umy = memberPos.y - refPos.y;
+			const Real umLenSq = umx * umx + umy * umy;
+			if (umLenSq > 0.0f)
+			{
+				const Real invUm = 1.0f / WWMath::SqrtfOrigin(umLenSq);
+				umx *= invUm;
+				umy *= invUm;
+				const Real tcx = memberPos.x - candPos.x;
+				const Real tcy = memberPos.y - candPos.y;
+				const Real px = tcy;
+				const Real py = -tcx;
+				const Real pLenSq = px * px + py * py;
+				if (pLenSq > 0.0f)
+				{
+					const Real radius = refTarget->getGeometryInfo().getBoundingCircleRadius();
+					const Real scale = radius / WWMath::SqrtfOrigin(pLenSq);
+					const Real v1x = tcx + px * scale;
+					const Real v1y = tcy + py * scale;
+					const Real v2x = tcx - px * scale;
+					const Real v2y = tcy - py * scale;
+					const Real v1LenSq = v1x * v1x + v1y * v1y;
+					const Real v2LenSq = v2x * v2x + v2y * v2y;
+					const Real dot1 = v1LenSq > 0.0f ? (v1x * umx + v1y * umy) / WWMath::SqrtfOrigin(v1LenSq) : 1.0f;
+					const Real dot2 = v2LenSq > 0.0f ? (v2x * umx + v2y * umy) / WWMath::SqrtfOrigin(v2LenSq) : 1.0f;
+					if (dot1 < melee.angleLimitCos && dot2 < melee.angleLimitCos)
+						continue;
+				}
+			}
+
+			const Real rdx = candPos.x - refPos.x;
+			const Real rdy = candPos.y - refPos.y;
+			score -= WWMath::SqrtfOrigin(rdx * rdx + rdy * rdy);
+
+			const Real adx = anchorPos.x - candPos.x;
+			const Real ady = anchorPos.y - candPos.y;
+			const Real anchorDistSq = adx * adx + ady * ady;
+			const Real outer = refTarget->isKindOf(KINDOF_STRUCTURE) ? melee.outerRangeBuildings : melee.outerRange;
+			if (outer > 0.0f && anchorDistSq > outer * outer)
+			{
+				sawOutsideOuter = TRUE;
+				continue;
+			}
+			if (melee.innerRange > 0.0f && anchorDistSq > melee.innerRange * melee.innerRange)
+				score -= WWMath::SqrtfOrigin(anchorDistSq);
+
+			if (score > bestScore)
+			{
+				bestScore = score;
+				bestPos = candPos;
+				bestCell = candCell;
+				found = TRUE;
+			}
+		}
+	}
+
+	if (bestScore < 1.0f && sawOutsideOuter)
+	{
+		for (Int ix = -1; ix <= 1; ++ix)
+		{
+			for (Int iy = -1; iy <= 1; ++iy)
+			{
+				if ((ix == 0 && iy == 0) || !validCell[ix + 1][iy + 1])
+					continue;
+				Coord3D candPos{
+					memberPos.x + static_cast<Real>(ix * 10),
+					memberPos.y + static_cast<Real>(iy * 10),
+					memberPos.z
+				};
+				if (TheTerrainLogic)
+					candPos.z = TheTerrainLogic->getLayerHeight(candPos.x, candPos.y, member->getLayer());
+				const Real adx = anchorPos.x - candPos.x;
+				const Real ady = anchorPos.y - candPos.y;
+				const Real score = 1000000.0f - (adx * adx + ady * ady);
+				if (score > bestScore)
+				{
+					bestScore = score;
+					bestPos = candPos;
+					bestCell = ICoord2D{ cellX + ix, cellY + iy };
+					found = TRUE;
+				}
+			}
+		}
+	}
+
+	if (!found || bestScore <= 0.0f)
+		return FALSE;
+
+	auto& list = m_amoebaHistory[member->getID()];
+	if (list.size() >= 4)
+		list.pop_front();
+	list.push_back(bestCell);
+	outPos = bestPos;
+	return TRUE;
 }
 
 const HordeContainModuleData* HordeContain::findAlternateFormation() const

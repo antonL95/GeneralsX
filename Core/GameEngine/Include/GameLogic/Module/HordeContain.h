@@ -167,6 +167,10 @@ public:
 	UnsignedInt getFormationReformTravelFrames() const;
 #endif
 	void reassignSlotsByPosition();
+	void updateAmoebaMelee(Object* target, const HordeContainModuleData::MeleeBehavior& melee);
+	void stopAmoebaMelee();
+	Bool chooseAmoebaStep(Object* member, const Object* target, const HordeContainModuleData::MeleeBehavior& melee,
+		Coord3D& outPos);
 	Bool canSetAlternateFormation(Bool alternate) const;
 	Bool isAlternateFormation() const;
 	void setAlternateFormation(Bool alternate);
@@ -240,6 +244,8 @@ private:
 	};
 	std::map<ObjectID, BackingMove> m_backingMoves;
 	ObjectID m_backingSource = INVALID_ID;
+	ObjectID m_meleeTargetID = INVALID_ID;
+	std::map<ObjectID, std::deque<ICoord2D>> m_amoebaHistory;
 };
 
 class BannerCarrierUpdateModuleData : public UpdateModuleData
