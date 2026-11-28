@@ -807,6 +807,11 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	// if none of the above is true, we can't attack. sorry!
 	//
 	Relationship r = source->getRelationship(victim);
+	if (RetailFileLayers::enabled() && victim->isKindOf(KINDOF_TREE) &&
+		TheAI && TheAI->getAiData()->m_allowForestFires)
+	{
+		r = ENEMIES;
+	}
 	if (RetailFileLayers::enabled() && commandSource == CMD_FROM_AI && !isForcedAttack(attackType))
 	{
 		if (victim->isKindOf(KINDOF_INERT))
