@@ -160,6 +160,7 @@ public:
 	static void _Deinit();
 	static void _Reset(bool frame_changed);
 	static unsigned short Get_Default_Vertex_Count();	///<current size of dynamic vertex buffer
+	static unsigned Get_Sorting_Offset();
 
 	// To lock the vertex buffer, create instance of this write class locally.
 	// The buffer is automatically unlocked when you exit the scope.

@@ -50,9 +50,11 @@
 #include <WWDebug/wwprofile.h>
 #include <algorithm>
 #include <list>
+#include <vector>
 
 
 bool SortingRendererClass::_EnableTriangleDraw=true;
+static SortedEffectDraw sortedEffectDraw = nullptr;
 static unsigned DEFAULT_SORTING_POLY_COUNT = 16384;	// (count * 3) must be less than 65536
 static unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768;	// count must be less than 65536
 
@@ -163,6 +165,9 @@ public:
 	unsigned short polygon_count;			// Polygon count to process (3 indices = one polygon)
 	unsigned short min_vertex_index;		// First index used in the vb
 	unsigned short vertex_count;			// Number of vertices used in vb
+	bool has_effect = false;
+	SortedRetailEffectData effect_data;
+	const VertexFormatXYZNDUV2* effect_vertices = nullptr;
 };
 
 typedef std::list<SortingNodeStruct*> SortingNodeStructList;
@@ -208,12 +213,46 @@ static TempIndexStruct* Get_Temp_Index_Array(unsigned count)
 //
 // ----------------------------------------------------------------------------
 
+void SortingRendererClass::Set_Effect_Draw(SortedEffectDraw draw)
+{
+	sortedEffectDraw = draw;
+}
+
+void SortingRendererClass::Ensure_Dynamic_Sorting_Capacity(unsigned vertexCount, unsigned indexCount)
+{
+	if (DynamicVBAccessClass::Get_Sorting_Offset() + vertexCount >= 65536u ||
+		DynamicIBAccessClass::Get_Sorting_Offset() + indexCount >= 65536u)
+		Flush();
+}
+
 void SortingRendererClass::Insert_Triangles(
 	const SphereClass& bounding_sphere,
 	unsigned short start_index,
 	unsigned short polygon_count,
 	unsigned short min_vertex_index,
 	unsigned short vertex_count)
+{
+	Insert_Triangles_Impl(bounding_sphere, start_index, polygon_count, min_vertex_index, vertex_count, nullptr);
+}
+
+void SortingRendererClass::Insert_Triangles_With_Effect(
+	const SphereClass& bounding_sphere,
+	unsigned short start_index,
+	unsigned short polygon_count,
+	unsigned short min_vertex_index,
+	unsigned short vertex_count,
+	const SortedRetailEffectData& effect)
+{
+	Insert_Triangles_Impl(bounding_sphere, start_index, polygon_count, min_vertex_index, vertex_count, &effect);
+}
+
+void SortingRendererClass::Insert_Triangles_Impl(
+	const SphereClass& bounding_sphere,
+	unsigned short start_index,
+	unsigned short polygon_count,
+	unsigned short min_vertex_index,
+	unsigned short vertex_count,
+	const SortedRetailEffectData* effect)
 {
 	if (!WW3D::Is_Sorting_Enabled()) {
 		DX8Wrapper::Draw_Triangles(start_index,polygon_count,min_vertex_index,vertex_count);
@@ -239,6 +278,10 @@ void SortingRendererClass::Insert_Triangles(
 	state->polygon_count=polygon_count;
 	state->min_vertex_index=min_vertex_index;
 	state->vertex_count=vertex_count;
+	state->has_effect = effect != nullptr;
+	state->effect_vertices = nullptr;
+	if (effect)
+		state->effect_data = *effect;
 
 	if (bounding_sphere.Is_Valid())
 	{
@@ -443,6 +486,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 			src_verts+=state->sorting_state.vba_offset;
 			src_verts+=state->sorting_state.index_base_offset;
 			src_verts+=state->min_vertex_index;
+			state->effect_vertices = src_verts;
 
 			// If you have a crash in here and "dest_verts" points to illegal memory area,
 			// it is because D3D is in illegal state, and the only known cure is rebooting.
@@ -546,38 +590,44 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 		DX8Wrapper::Apply_Render_State_Changes();
 
+		auto renderNodeRun = [&](unsigned startIndex, unsigned countToRender, unsigned runNodeId) {
+			SortingNodeStruct* state = overlapping_nodes[runNodeId];
+			if (state->has_effect && sortedEffectDraw && DX8Wrapper::_Is_Triangle_Draw_Enabled()) {
+				static std::vector<unsigned short> sortedIndices;
+				sortedIndices.resize(countToRender * 3);
+				for (unsigned a = 0; a < countToRender; ++a) {
+					const ShortVectorIStruct& tri = tis[chunkOffset + startIndex + a].tri;
+					sortedIndices[a * 3 + 0] = tri.i - state->min_vertex_index;
+					sortedIndices[a * 3 + 1] = tri.j - state->min_vertex_index;
+					sortedIndices[a * 3 + 2] = tri.k - state->min_vertex_index;
+				}
+				if (sortedEffectDraw(state->sorting_state, state->effect_data,
+						state->effect_vertices, state->vertex_count, sortedIndices.data(), countToRender))
+					return;
+			}
+			Apply_Render_State(state->sorting_state);
+			DX8Wrapper::Draw_Triangles(
+				startIndex * 3,
+				countToRender,
+				state->min_vertex_index,
+				state->vertex_count);
+		};
+
 		unsigned count_to_render=1;
 		unsigned start_index=0;
 		unsigned node_id=tis[chunkOffset].idx;
 		for (unsigned i=chunkOffset + 1;i<chunkEnd;++i) {
 			if (node_id!=tis[i].idx) {
-				SortingNodeStruct* state=overlapping_nodes[node_id];
-				Apply_Render_State(state->sorting_state);
-
-				DX8Wrapper::Draw_Triangles(
-					start_index*3,
-					count_to_render,
-					state->min_vertex_index,
-					state->vertex_count);
-
+				renderNodeRun(start_index, count_to_render, node_id);
 				count_to_render=0;
 				start_index=i - chunkOffset;
 				node_id=tis[i].idx;
 			}
-			count_to_render++;	//keep track of number of polygons of same kind
+			count_to_render++;
 		}
 
-		// Render any remaining polygons...
-		if (count_to_render) {
-			SortingNodeStruct* state=overlapping_nodes[node_id];
-			Apply_Render_State(state->sorting_state);
-
-			DX8Wrapper::Draw_Triangles(
-				start_index*3,
-				count_to_render,
-				state->min_vertex_index,
-				state->vertex_count);
-		}
+		if (count_to_render)
+			renderNodeRun(start_index, count_to_render, node_id);
 
 		chunkOffset += chunkCount;
 	}

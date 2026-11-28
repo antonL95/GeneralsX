@@ -22,6 +22,31 @@
 
 class SortingNodeStruct;
 class SphereClass;
+struct RenderStateStruct;
+struct VertexFormatXYZNDUV2;
+
+struct SortedRetailEffectData
+{
+	bool twoSided = false;
+	bool alphaTest = false;
+	bool alphaBlend = true;
+	bool depthWrite = false;
+	unsigned char alphaRef = 0x60;
+	unsigned char srcBlend = 0;
+	unsigned char dstBlend = 0;
+	float vertexOpacity = 1.0f;
+	float overrideOpacity = 1.0f;
+	float directional[6][4]{};
+	float point[3][4]{};
+	float ambientLight[4]{};
+	float fog[4][4]{};
+	bool hasPointLight = false;
+	char meshName[128]{};
+};
+
+using SortedEffectDraw = bool (*)(const RenderStateStruct& state, const SortedRetailEffectData& effect,
+	const VertexFormatXYZNDUV2* vertices, unsigned vertexCount,
+	const unsigned short* indices, unsigned polygonCount);
 
 class SortingRendererClass
 {
@@ -30,14 +55,32 @@ class SortingRendererClass
 	static void Flush_Sorting_Pool();
 	static void Insert_To_Sorted_List(SortingNodeStruct* state);
 	static void Insert_To_Sorting_Pool(SortingNodeStruct* state);
+	static void Insert_Triangles_Impl(
+		const SphereClass& bounding_sphere,
+		unsigned short start_index,
+		unsigned short polygon_count,
+		unsigned short min_vertex_index,
+		unsigned short vertex_count,
+		const SortedRetailEffectData* effect);
 
 public:
+	static void Set_Effect_Draw(SortedEffectDraw draw);
+	static void Ensure_Dynamic_Sorting_Capacity(unsigned vertexCount, unsigned indexCount);
+
 	static void Insert_Triangles(
 		const SphereClass& bounding_sphere,
 		unsigned short start_index,
 		unsigned short polygon_count,
 		unsigned short min_vertex_index,
 		unsigned short vertex_count);
+
+	static void Insert_Triangles_With_Effect(
+		const SphereClass& bounding_sphere,
+		unsigned short start_index,
+		unsigned short polygon_count,
+		unsigned short min_vertex_index,
+		unsigned short vertex_count,
+		const SortedRetailEffectData& effect);
 
 	static void Insert_Triangles(
 		unsigned short start_index,

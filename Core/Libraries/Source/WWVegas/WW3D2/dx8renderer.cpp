@@ -1979,8 +1979,8 @@ void DX8TextureCategoryClass::Render()
 		const bool sorted = !particle && !retailAdditiveFade && animationOpacity == 1.0f &&
 			mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled();
 		bool drawn = false;
-		if (meshEffectDraw && !m_gForceMultiply && !particle && !materialOverride && !sorted &&
-			(mesh->Peek_Model()->Has_Fx_Materials() || (!opacityOverride && pass == 0)))
+		if (meshEffectDraw && !m_gForceMultiply && !particle && !materialOverride &&
+			(mesh->Peek_Model()->Has_Fx_Materials() || (!retailAdditiveFade && pass == 0)))
 		{
 			Matrix4x4 queuedWorld;
 			DX8Wrapper::Get_Transform(D3DTS_WORLD, queuedWorld);

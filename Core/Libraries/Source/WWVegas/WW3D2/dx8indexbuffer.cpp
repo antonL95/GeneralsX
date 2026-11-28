@@ -405,6 +405,11 @@ DynamicIBAccessClass::~DynamicIBAccessClass()
 	}
 }
 
+unsigned DynamicIBAccessClass::Get_Sorting_Offset()
+{
+	return _DynamicSortingIndexArrayOffset;
+}
+
 void DynamicIBAccessClass::_Deinit()
 {
 	WWASSERT ((_DynamicDX8IndexBuffer == nullptr) || (_DynamicDX8IndexBuffer->Num_Refs() == 1));

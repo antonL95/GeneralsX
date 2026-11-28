@@ -476,9 +476,25 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 	return drawn && restored;
 }
 
+D3DBLEND toD3DBlend(BlendFactor factor)
+{
+	switch (factor)
+	{
+		case BlendFactor::Zero: return D3DBLEND_ZERO;
+		case BlendFactor::One: return D3DBLEND_ONE;
+		case BlendFactor::SrcColor: return D3DBLEND_SRCCOLOR;
+		case BlendFactor::InvSrcColor: return D3DBLEND_INVSRCCOLOR;
+		case BlendFactor::SrcAlpha: return D3DBLEND_SRCALPHA;
+		case BlendFactor::InvSrcAlpha: return D3DBLEND_INVSRCALPHA;
+		case BlendFactor::DestColor: return D3DBLEND_DESTCOLOR;
+	}
+	return D3DBLEND_SRCALPHA;
+}
+
 bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
 	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
-	bool alphaTest, bool alphaBlend, bool depthWrite, bool twoSided)
+	bool alphaTest, bool alphaBlend, bool depthWrite, bool twoSided,
+	BlendFactor srcBlend, BlendFactor dstBlend, uint8_t alphaRef, bool alphaTestLessEqual)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	if (vertices.empty() || indices.empty())
@@ -487,9 +503,13 @@ bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVert
 		const bool categoryState = m_data->useCategoryDepthAndCull;
 		const bool blend = alphaBlend || m_data->composite;
 		if (FAILED(device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest ? TRUE : FALSE)) ||
+			(alphaTest && (FAILED(device->SetRenderState(D3DRS_ALPHAREF, alphaRef)) ||
+				FAILED(device->SetRenderState(D3DRS_ALPHAFUNC, alphaTestLessEqual ? D3DCMP_LESSEQUAL : D3DCMP_GREATEREQUAL)))) ||
 			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, blend ? TRUE : FALSE)) ||
 			(blend && (FAILED(device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD)) ||
 				FAILED(device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE)))) ||
+			(alphaBlend && (FAILED(device->SetRenderState(D3DRS_SRCBLEND, toD3DBlend(srcBlend))) ||
+				FAILED(device->SetRenderState(D3DRS_DESTBLEND, toD3DBlend(dstBlend))))) ||
 			FAILED(device->SetRenderState(D3DRS_FOGENABLE, FALSE)) ||
 			((categoryState || alphaBlend) && FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, depthWrite ? TRUE : FALSE))) ||
 			((categoryState || twoSided) && FAILED(device->SetRenderState(D3DRS_CULLMODE, twoSided ? D3DCULL_NONE : D3DCULL_CW))))
@@ -530,7 +550,8 @@ bool NativePass::drawTerrain(void *, std::span<const TerrainVertex>, std::span<c
 	std::span<const uint32_t>, void *) { return false; }
 
 bool NativePass::drawNormalMapped(void *, std::span<const NormalMappedVertex>, std::span<const uint32_t>,
-	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool, bool, bool) { return false; }
+	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool, bool, bool,
+	BlendFactor, BlendFactor, uint8_t, bool) { return false; }
 
 #endif
 

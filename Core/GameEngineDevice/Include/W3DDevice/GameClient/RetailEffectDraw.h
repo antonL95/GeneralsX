@@ -47,6 +47,17 @@ struct VegetationVertex
 	uint32_t color;
 };
 
+enum class BlendFactor : uint8_t
+{
+	Zero,
+	One,
+	SrcColor,
+	InvSrcColor,
+	SrcAlpha,
+	InvSrcAlpha,
+	DestColor,
+};
+
 struct NormalMappedVertex
 {
 	float position[3];
@@ -87,7 +98,9 @@ public:
 		std::span<const TerrainVertex> third = {}, std::span<const uint32_t> thirdIndices = {}, void *thirdAtlas = nullptr);
 	bool drawNormalMapped(void *device, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
-		bool alphaTest, bool alphaBlend, bool depthWrite, bool twoSided);
+		bool alphaTest, bool alphaBlend, bool depthWrite, bool twoSided,
+		BlendFactor srcBlend = BlendFactor::SrcAlpha, BlendFactor dstBlend = BlendFactor::InvSrcAlpha,
+		uint8_t alphaRef = 0x60, bool alphaTestLessEqual = false);
 	bool drawVegetation(void *device, std::span<const VegetationVertex> vertices, std::span<const uint16_t> indices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture);
 

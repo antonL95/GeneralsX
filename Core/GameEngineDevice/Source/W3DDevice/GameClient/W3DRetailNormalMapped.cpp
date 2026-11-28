@@ -11,16 +11,24 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/assetmgr.h"
+#include "WW3D2/dx8fvf.h"
+#include "WW3D2/dx8indexbuffer.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/dx8renderer.h"
+#include "WW3D2/dx8vertexbuffer.h"
+#include "WW3D2/dx8wrapper.h"
 #include "WW3D2/htree.h"
 #include "WW3D2/lightenvironment.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
+#include "WW3D2/shader.h"
+#include "WW3D2/sortingrenderer.h"
 #include "WW3D2/vertmaterial.h"
 #include "WW3D2/w3dbfmechunks.h"
 #include "WW3D2/w3dfxmaterial.h"
 
+#include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <set>
@@ -80,8 +88,9 @@ public:
 	std::array<std::unique_ptr<NativePass>, 2> passes;
 	std::array<std::unique_ptr<NativePass>, 4> shadowed;
 	std::unique_ptr<NativePass> composite;
-	std::set<std::tuple<std::string, unsigned, unsigned, bool>> traced;
+	std::set<std::tuple<std::string, unsigned, unsigned, bool, bool>> traced;
 	std::vector<NormalMappedVertex> posed;
+	std::vector<uint32_t> sortedIndices;
 	std::vector<Vector3> positions;
 	std::vector<Vector3> normals;
 	std::vector<Matrix3D> inverseBindPose;
@@ -266,50 +275,37 @@ bool isSkyboxMesh(MeshClass &mesh)
 	return false;
 }
 
-bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
-	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world, DX8PolygonRendererClass &renderer)
+BlendFactor toBlendFactor(ShaderClass::SrcBlendFuncType src)
 {
-	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
-		ShaderClass::Is_Backface_Culling_Inverted() || isSkyboxMesh(mesh))
-		return false;
-	auto &model = *mesh.Peek_Model();
-	const auto *fx = model.Peek_Fx_Materials();
-	const bool normalMapped = fx && !fx->materials.empty();
-	const auto *lights = mesh.Get_Lighting_Environment();
-	auto *shroud = TheTerrainRenderObject->getShroud();
-	if (!lights ||
-		!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
-		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
-		return false;
-	const unsigned meshPass = renderer.Get_Pass();
-	const auto materialId = normalMapped ? selectMaterial(model, *fx, meshPass, vertexMaterial) : std::optional(0u);
-	if (!materialId || (normalMapped && (*materialId >= fx->materials.size() ||
-		fx->materials[*materialId].effect != "normalmapped.fx")))
-		return false;
-	if (!normalMapped && (model.Get_Pass_Count() != 1 ||
-		secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
-		vertexMaterial->Get_Opacity() != 1.0f || shader.Get_Depth_Compare() != ShaderClass::PASS_LEQUAL ||
-		shader.Get_Depth_Mask() != ShaderClass::DEPTH_WRITE_ENABLE ||
-		shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE ||
-		shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO))
-		return false;
-	static const W3dFx::Material noFx{};
-	const auto &material = normalMapped ? fx->materials[*materialId] : noFx;
-	const auto normalName = material.get<std::string>("NormalMap", {});
-	const auto diffuseColor = material.get<W3dFx::Float4>("DiffuseColor", {1.0f, 1.0f, 1.0f, 1.0f});
-	if (normalMapped && (normalName.empty() || stricmp(normalName.c_str(), "None") == 0))
-		return false;
-	const float opacity = mesh.Get_Animation_Opacity() * mesh.Get_Alpha_Override();
-	const bool alphaBlend = normalMapped && (opacity < 1.0f || diffuseColor[3] < 1.0f ||
-		material.get<bool>("AlphaBlendEnable", false));
+	switch (src)
+	{
+		case ShaderClass::SRCBLEND_ZERO: return BlendFactor::Zero;
+		case ShaderClass::SRCBLEND_ONE: return BlendFactor::One;
+		case ShaderClass::SRCBLEND_SRC_ALPHA: return BlendFactor::SrcAlpha;
+		case ShaderClass::SRCBLEND_ONE_MINUS_SRC_ALPHA: return BlendFactor::InvSrcAlpha;
+		default: return BlendFactor::One;
+	}
+}
 
-	auto *device = DX8Wrapper::Get_Effect_Device9();
-	if (!device)
-		return false;
+BlendFactor toBlendFactor(ShaderClass::DstBlendFuncType dst)
+{
+	switch (dst)
+	{
+		case ShaderClass::DSTBLEND_ZERO: return BlendFactor::Zero;
+		case ShaderClass::DSTBLEND_ONE: return BlendFactor::One;
+		case ShaderClass::DSTBLEND_SRC_COLOR: return BlendFactor::SrcColor;
+		case ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR: return BlendFactor::InvSrcColor;
+		case ShaderClass::DSTBLEND_SRC_ALPHA: return BlendFactor::SrcAlpha;
+		case ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA: return BlendFactor::InvSrcAlpha;
+		default: return BlendFactor::Zero;
+	}
+}
+
+NativePass *ensureRetailPass(void *device, bool normalMapped, const char *label)
+{
 	if (!runtime)
 		runtime = std::make_unique<NormalMappedRuntime>();
 	const auto slot = normalMapped ? 0u : 1u;
-	const char *label = normalMapped ? "NormalMapped Default_M" : "DefaultW3D Default";
 	auto &pass = runtime->passes[slot];
 	if (!runtime->initialized[slot])
 	{
@@ -320,32 +316,72 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		if (!pass)
 			std::fprintf(stderr, "[RetailFX] Could not load %s\n", label);
 	}
+	return pass.get();
+}
+
+void writeSortedLight(float (&dst)[4], const Register &src)
+{
+	dst[0] = src[0];
+	dst[1] = src[1];
+	dst[2] = src[2];
+	dst[3] = src[3];
+}
+
+Register readSortedLight(const float (&src)[4])
+{
+	return {src[0], src[1], src[2], src[3]};
+}
+
+bool drawEffectPass(
+	void *device,
+	bool normalMapped,
+	const W3dFx::Material *material,
+	unsigned meshPass,
+	unsigned materialId,
+	const char *meshName,
+	TextureClass *diffuse,
+	TextureClass *normalTexturePtr,
+	VertexMaterialClass *vertexMaterial,
+	const Matrix4x4 &world,
+	std::span<const Register, 4> fog,
+	std::span<const Register, 6> directional,
+	std::span<const Register, 3> point,
+	const Register &ambientLight,
+	bool havePoint,
+	float vertexOpacity,
+	float overrideOpacity,
+	bool alphaTest,
+	uint8_t alphaRef,
+	bool alphaBlend,
+	bool depthWrite,
+	bool twoSided,
+	BlendFactor srcBlend,
+	BlendFactor dstBlend,
+	std::span<const NormalMappedVertex> vertices,
+	std::span<const uint32_t> indices,
+	bool sorted,
+	const Matrix4x4 *viewOverride = nullptr)
+{
+	const char *label = normalMapped ? "NormalMapped Default_M" : "DefaultW3D Default";
+	NativePass *pass = ensureRetailPass(device, normalMapped, label);
 	if (!pass)
 		return false;
 
-	const std::unique_ptr<TextureClass, TextureRelease> normalTexture(
-		normalMapped ? WW3DAssetManager::Get_Instance()->Get_Texture(normalName.c_str()) : nullptr);
-	auto *normal = nativeTexture(normalTexture.get());
+	auto *shroud = TheTerrainRenderObject->getShroud();
+	if (!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
+		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
+		return false;
+
+	auto *normal = nativeTexture(normalTexturePtr);
 	auto *base = nativeTexture(diffuse);
 	auto *mask = nativeTexture(shroud->getShroudTexture());
 	D3DXMATRIX worldToShadow;
 	float shadowTexel = 0.0f;
 	void *shadow = nullptr;
-	const bool useShadows = normalMapped && !alphaBlend && material.technique == 2 && TheRetailTerrainShadow &&
+	const bool useShadows = normalMapped && !alphaBlend && material && material->technique == 2 && TheRetailTerrainShadow &&
 		TheRetailTerrainShadow->getAuthoredShadow(shadow, worldToShadow, shadowTexel);
 	const auto cloud = !normalMapped || useShadows ? nativeTexture(TheTerrainRenderObject->peekCloudTexture()) : nullptr;
 	if ((normalMapped && !normal) || !base || !mask)
-		return false;
-	PackedMesh temporary;
-	auto &stored = renderer.Effect_Mesh();
-	const bool cacheable = mesh.Class_ID() == RenderObjClass::CLASSID_MESH;
-	if (cacheable && !stored)
-		stored = std::make_shared<PackedMesh>();
-	auto &geometry = cacheable ? *stored : temporary;
-	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry, renderer, *materialId))
-		return false;
-	const auto vertices = poseMesh(mesh, geometry);
-	if (vertices.empty())
 		return false;
 
 	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
@@ -356,13 +392,16 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 
 	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
 	D3DXMATRIX view, projection, inverseView;
-	if (FAILED(device8->GetTransform(D3DTS_VIEW, &view)) ||
-		FAILED(device8->GetTransform(D3DTS_PROJECTION, &projection)) ||
+	if (viewOverride)
+		std::copy_n(&(*viewOverride)[0][0], 16, &view.m[0][0]);
+	else if (FAILED(device8->GetTransform(D3DTS_VIEW, &view)))
+		return false;
+	if (FAILED(device8->GetTransform(D3DTS_PROJECTION, &projection)) ||
 		!D3DXMatrixInverse(&inverseView, nullptr, &view))
 		return false;
-	const auto fog = fogBindings(device8);
+
 	Register ambient{}, colorDiffuse{}, specular{}, emissive{};
-	if (!normalMapped)
+	if (!normalMapped && vertexMaterial)
 	{
 		Vector3 color;
 		vertexMaterial->Get_Ambient(&color);
@@ -374,34 +413,9 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		vertexMaterial->Get_Emissive(&color);
 		emissive = fromVector(color);
 	}
-	std::array<Register, 6> directional{};
-	std::array<Register, 3> point{{{}, {}, {1.0f, 0.0f, 0.0f, 0.0f}}};
-	unsigned numDirectional = 0;
-	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
-	bool havePoint = false;
-	for (Int i = 0; i < lights->Get_Light_Count(); ++i)
-	{
-		if (lights->isPointLight(i))
-		{
-			if (!havePoint)
-			{
-				point[0] = fromVector(lights->getPointDiffuse(i));
-				point[1] = fromVector(lights->getPointCenter(i));
-				point[2][0] = std::max(lights->getPointOrad(i), 1.0f);
-				havePoint = true;
-			}
-		}
-		else if (numDirectional < directional.size() / 2)
-		{
-			auto diffuse = fromVector(lights->Get_Light_Diffuse(i));
-			diffuse[0] *= weatherScale.red;
-			diffuse[1] *= weatherScale.green;
-			diffuse[2] *= weatherScale.blue;
-			directional[numDirectional * 2] = diffuse;
-			directional[numDirectional * 2 + 1] = fromVector(lights->Get_Light_Direction(i));
-			++numDirectional;
-		}
-	}
+	const auto diffuseColor = material ? material->get<W3dFx::Float4>("DiffuseColor", {1.0f, 1.0f, 1.0f, 1.0f})
+		: W3dFx::Float4{1.0f, 1.0f, 1.0f, 1.0f};
+
 	if (useShadows && !runtime->shadowsInitialized)
 	{
 		runtime->shadowsInitialized = true;
@@ -414,6 +428,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 						DX8Wrapper::Create_Effect_Shader9, (index & 1u) != 0, (index & 2u) != 0);
 		}
 	}
+
 	const auto setBinding = [&](const Binding &binding, std::span<Register> floats, std::span<int>) {
 		if (floats.empty())
 			return;
@@ -444,13 +459,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		else if (name == "PointLight")
 			std::copy_n(point.begin(), std::min(point.size(), floats.size()), floats.begin());
 		else if (name == "AmbientLightColor")
-		{
-			auto ambientLight = fromVector(lights->Get_Equivalent_Ambient());
-			ambientLight[0] *= weatherScale.red;
-			ambientLight[1] *= weatherScale.green;
-			ambientLight[2] *= weatherScale.blue;
 			floats[0] = ambientLight;
-		}
 		else if (name == "DiffuseColor")
 			floats[0] = diffuseColor;
 		else if (name == "ColorAmbient")
@@ -461,22 +470,27 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 			floats[0] = specular;
 		else if (name == "ColorEmissive")
 			floats[0] = emissive;
-		else if (name == "Shininess" && !normalMapped)
+		else if (name == "Shininess" && !normalMapped && vertexMaterial)
 			floats[0][0] = vertexMaterial->Get_Shininess();
-		else if (name == "Opacity" || name == "OpacityOverride")
-			floats[0][0] = opacity;
+		else if (name == "Opacity")
+			floats[0][0] = normalMapped ? overrideOpacity : vertexOpacity;
+		else if (name == "OpacityOverride")
+			floats[0][0] = overrideOpacity;
 		else if (name == "HouseColorEnable")
 			floats[0][0] = 0.0f;
 		else if (name == "Cloud")
 			floats[0] = W3DShaderManager::getRetailCloudUV();
-		else if (const auto property = material.properties.find(name); property != material.properties.end())
+		else if (material)
 		{
-			if (const auto *scalar = std::get_if<float>(&property->second))
-				floats[0][0] = *scalar;
-			else if (const auto *v = std::get_if<W3dFx::Float4>(&property->second))
-				floats[0] = *v;
-			else if (const auto *v = std::get_if<W3dFx::Float3>(&property->second))
-				std::copy(v->begin(), v->end(), floats[0].begin());
+			if (const auto property = material->properties.find(name); property != material->properties.end())
+			{
+				if (const auto *scalar = std::get_if<float>(&property->second))
+					floats[0][0] = *scalar;
+				else if (const auto *v = std::get_if<W3dFx::Float4>(&property->second))
+					floats[0] = *v;
+				else if (const auto *v = std::get_if<W3dFx::Float3>(&property->second))
+					std::copy(v->begin(), v->end(), floats[0].begin());
+			}
 		}
 	};
 	const auto getTexture = [&](std::string_view name) -> void * {
@@ -487,12 +501,9 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		if (name == "ShadowMap") return shadow;
 		return nullptr;
 	};
-	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
-		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
 	const auto draw = [&](NativePass &effectPass) {
-		return effectPass.drawNormalMapped(device, vertices, geometry.indices, setBinding, getTexture,
-			alphaTest, alphaBlend, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE && !alphaBlend,
-			model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
+		return effectPass.drawNormalMapped(device, vertices, indices, setBinding, getTexture,
+			alphaTest, alphaBlend, depthWrite, twoSided, srcBlend, dstBlend, alphaRef);
 	};
 	const auto variant = (havePoint ? 1u : 0u) | (fog[0][0] != 0.0f ? 2u : 0u);
 	const auto &shadowedPass = runtime->shadowed[variant];
@@ -502,13 +513,17 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	if (drewShadows)
 		label = "NormalMapped Default with authored shadows";
 	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") &&
-		runtime->traced.emplace(mesh.Get_Name(), meshPass, *materialId, alphaBlend).second)
+		runtime->traced.emplace(meshName ? meshName : "", meshPass, materialId, alphaBlend, sorted).second)
 	{
-		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, mesh.Get_Name());
-		if (normalMapped && (fx->materials.size() > 1 || alphaBlend))
+		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, meshName ? meshName : "");
+		if (normalMapped && (materialId > 0 || alphaBlend))
 			std::fprintf(stderr, "[RetailFX] NormalMapped batch (%s) pass=%u material=%u triangles=%zu blend=%d opacity=%.3f\n",
-				mesh.Get_Name(), meshPass, *materialId, geometry.indices.size() / 3, alphaBlend, opacity);
+				meshName ? meshName : "", meshPass, materialId, indices.size() / 3, alphaBlend, overrideOpacity);
+		else if (!normalMapped && sorted)
+			std::fprintf(stderr, "[RetailFX] DefaultW3D sorted (%s) triangles=%zu opacity=%.3f override=%.3f\n",
+				meshName ? meshName : "", indices.size() / 3, vertexOpacity, overrideOpacity);
 	}
+	const auto slot = normalMapped ? 0u : 1u;
 	if (!drawn && !runtime->reportedFailure[slot])
 	{
 		std::fprintf(stderr, "[RetailFX] Could not bind or draw %s\n", label);
@@ -517,16 +532,333 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	return drawn;
 }
 
+bool drawSortedRetailMesh(const RenderStateStruct &state, const SortedRetailEffectData &effect,
+	const VertexFormatXYZNDUV2 *sortedVerts, unsigned vertexCount,
+	const unsigned short *sortedIndices, unsigned polygonCount)
+{
+	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !sortedVerts || !sortedIndices ||
+		vertexCount == 0 || polygonCount == 0 || !state.material || !state.Textures[0])
+		return false;
+	auto *device = DX8Wrapper::Get_Effect_Device9();
+	if (!device)
+		return false;
+	if (!runtime)
+		runtime = std::make_unique<NormalMappedRuntime>();
+
+	runtime->posed.resize(vertexCount);
+	for (unsigned i = 0; i < vertexCount; ++i)
+	{
+		const auto &src = sortedVerts[i];
+		auto &dst = runtime->posed[i];
+		dst.position[0] = src.x;
+		dst.position[1] = src.y;
+		dst.position[2] = src.z;
+		dst.normal[0] = src.nx;
+		dst.normal[1] = src.ny;
+		dst.normal[2] = src.nz;
+		dst.tangent[0] = 0.0f;
+		dst.tangent[1] = 0.0f;
+		dst.tangent[2] = 0.0f;
+		dst.bitangent[0] = 0.0f;
+		dst.bitangent[1] = 0.0f;
+		dst.bitangent[2] = 0.0f;
+		dst.uv[0] = src.u1;
+		dst.uv[1] = src.v1;
+		dst.uv1[0] = src.u2;
+		dst.uv1[1] = src.v2;
+		dst.color = src.diffuse;
+	}
+	const unsigned indexCount = polygonCount * 3;
+	runtime->sortedIndices.resize(indexCount);
+	for (unsigned i = 0; i < indexCount; ++i)
+		runtime->sortedIndices[i] = sortedIndices[i];
+
+	std::array<Register, 4> fog;
+	for (size_t i = 0; i < fog.size(); ++i)
+		fog[i] = readSortedLight(effect.fog[i]);
+	std::array<Register, 6> directional;
+	for (size_t i = 0; i < directional.size(); ++i)
+		directional[i] = readSortedLight(effect.directional[i]);
+	std::array<Register, 3> point;
+	for (size_t i = 0; i < point.size(); ++i)
+		point[i] = readSortedLight(effect.point[i]);
+	const Register ambientLight = readSortedLight(effect.ambientLight);
+
+	const Matrix4x4 world = state.world.Transpose();
+	return drawEffectPass(
+		device,
+		false,
+		nullptr,
+		0,
+		0,
+		effect.meshName,
+		static_cast<TextureClass *>(state.Textures[0]),
+		nullptr,
+		state.material,
+		world,
+		fog,
+		directional,
+		point,
+		ambientLight,
+		effect.hasPointLight,
+		effect.vertexOpacity,
+		effect.overrideOpacity,
+		effect.alphaTest,
+		effect.alphaRef,
+		effect.alphaBlend,
+		effect.depthWrite,
+		effect.twoSided,
+		static_cast<BlendFactor>(effect.srcBlend),
+		static_cast<BlendFactor>(effect.dstBlend),
+		runtime->posed,
+		runtime->sortedIndices,
+		true,
+		&state.view);
+}
+
+bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
+	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world, DX8PolygonRendererClass &renderer)
+{
+	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
+		ShaderClass::Is_Backface_Culling_Inverted() || isSkyboxMesh(mesh))
+		return false;
+	auto &model = *mesh.Peek_Model();
+	const auto *fx = model.Peek_Fx_Materials();
+	const bool normalMapped = fx && !fx->materials.empty();
+	const auto *lights = mesh.Get_Lighting_Environment();
+	auto *shroud = TheTerrainRenderObject->getShroud();
+	if (!lights ||
+		!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
+		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
+		return false;
+	const unsigned meshPass = renderer.Get_Pass();
+	const auto materialId = normalMapped ? selectMaterial(model, *fx, meshPass, vertexMaterial) : std::optional(0u);
+	if (!materialId || (normalMapped && (*materialId >= fx->materials.size() ||
+		fx->materials[*materialId].effect != "normalmapped.fx")))
+		return false;
+	if (!normalMapped && (model.Get_Pass_Count() != 1 || meshPass != 0 ||
+		secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
+		shader.Get_Depth_Compare() != ShaderClass::PASS_LEQUAL))
+		return false;
+	if (normalMapped && mesh.Get_Animation_Opacity() == 1.0f &&
+		model.Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled())
+		return false;
+
+	static const W3dFx::Material noFx{};
+	const auto &material = normalMapped ? fx->materials[*materialId] : noFx;
+	const auto normalName = material.get<std::string>("NormalMap", {});
+	const auto diffuseColor = material.get<W3dFx::Float4>("DiffuseColor", {1.0f, 1.0f, 1.0f, 1.0f});
+	if (normalMapped && (normalName.empty() || stricmp(normalName.c_str(), "None") == 0))
+		return false;
+	const float vertexOpacity = vertexMaterial ? vertexMaterial->Get_Opacity() : 1.0f;
+	const float opacity = mesh.Get_Animation_Opacity() * mesh.Get_Alpha_Override();
+	const bool shaderBlend = !normalMapped && (shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE ||
+		shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO);
+	const bool alphaBlend = normalMapped
+		? (opacity < 1.0f || diffuseColor[3] < 1.0f || material.get<bool>("AlphaBlendEnable", false))
+		: (shaderBlend || vertexOpacity < 1.0f || opacity < 1.0f);
+	const bool useSorting = !normalMapped && WW3D::Is_Sorting_Enabled() &&
+		model.Get_Sort_Level() == SORT_LEVEL_NONE &&
+		(model.Get_Flag(MeshGeometryClass::SORT) || (!mesh.Is_Additive() && alphaBlend));
+
+	auto *device = DX8Wrapper::Get_Effect_Device9();
+	if (!device)
+		return false;
+	if (!ensureRetailPass(device, normalMapped, normalMapped ? "NormalMapped Default_M" : "DefaultW3D Default"))
+		return false;
+
+	const std::unique_ptr<TextureClass, TextureRelease> normalTexture(
+		normalMapped ? WW3DAssetManager::Get_Instance()->Get_Texture(normalName.c_str()) : nullptr);
+	if (normalMapped && !nativeTexture(normalTexture.get()))
+		return false;
+
+	PackedMesh temporary;
+	auto &stored = renderer.Effect_Mesh();
+	const bool cacheable = mesh.Class_ID() == RenderObjClass::CLASSID_MESH;
+	if (cacheable && !stored)
+		stored = std::make_shared<PackedMesh>();
+	auto &geometry = cacheable ? *stored : temporary;
+	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry, renderer, *materialId))
+		return false;
+	const auto vertices = poseMesh(mesh, geometry);
+	if (vertices.empty())
+		return false;
+
+	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
+	const auto fog = fogBindings(device8);
+	std::array<Register, 6> directional{};
+	std::array<Register, 3> point{{{}, {}, {1.0f, 0.0f, 0.0f, 0.0f}}};
+	unsigned numDirectional = 0;
+	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
+	bool havePoint = false;
+	for (Int i = 0; i < lights->Get_Light_Count(); ++i)
+	{
+		if (lights->isPointLight(i))
+		{
+			if (!havePoint)
+			{
+				point[0] = fromVector(lights->getPointDiffuse(i));
+				point[1] = fromVector(lights->getPointCenter(i));
+				point[2][0] = std::max(lights->getPointOrad(i), 1.0f);
+				havePoint = true;
+			}
+		}
+		else if (numDirectional < directional.size() / 2)
+		{
+			auto diffuseLight = fromVector(lights->Get_Light_Diffuse(i));
+			diffuseLight[0] *= weatherScale.red;
+			diffuseLight[1] *= weatherScale.green;
+			diffuseLight[2] *= weatherScale.blue;
+			directional[numDirectional * 2] = diffuseLight;
+			directional[numDirectional * 2 + 1] = fromVector(lights->Get_Light_Direction(i));
+			++numDirectional;
+		}
+	}
+	auto ambientLight = fromVector(lights->Get_Equivalent_Ambient());
+	ambientLight[0] *= weatherScale.red;
+	ambientLight[1] *= weatherScale.green;
+	ambientLight[2] *= weatherScale.blue;
+
+	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
+		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
+	const uint8_t alphaRef = static_cast<uint8_t>(std::clamp(static_cast<float>(0x60) * opacity, 0.0f, 255.0f));
+	const BlendFactor srcBlend = shaderBlend ? toBlendFactor(shader.Get_Src_Blend_Func()) : BlendFactor::SrcAlpha;
+	const BlendFactor dstBlend = shaderBlend ? toBlendFactor(shader.Get_Dst_Blend_Func()) : BlendFactor::InvSrcAlpha;
+	const bool depthWrite = normalMapped
+		? (shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE && !alphaBlend)
+		: ((!alphaBlend || shaderBlend) && shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE);
+	const bool twoSided = model.Get_Flag(MeshGeometryClass::TWO_SIDED) ||
+		shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE;
+
+	if (useSorting)
+	{
+		if (!shaderBlend && opacity <= 0.0f)
+			return true;
+		if (vertices.size() >= 65536u || geometry.indices.size() >= 65536u)
+			return false;
+
+		RenderStateStruct previous;
+		DX8Wrapper::Get_Render_State(previous);
+		SortingRendererClass::Ensure_Dynamic_Sorting_Capacity(
+			static_cast<unsigned>(vertices.size()), static_cast<unsigned>(geometry.indices.size()));
+
+		DynamicVBAccessClass vb(BUFFER_TYPE_DYNAMIC_SORTING, dynamic_fvf_type, static_cast<unsigned short>(vertices.size()));
+		{
+			DynamicVBAccessClass::WriteLockClass lock(&vb);
+			VertexFormatXYZNDUV2 *dst = lock.Get_Formatted_Vertex_Array();
+			for (size_t i = 0; i < vertices.size(); ++i)
+			{
+				const auto &src = vertices[i];
+				dst[i].x = src.position[0];
+				dst[i].y = src.position[1];
+				dst[i].z = src.position[2];
+				dst[i].nx = src.normal[0];
+				dst[i].ny = src.normal[1];
+				dst[i].nz = src.normal[2];
+				dst[i].diffuse = src.color;
+				dst[i].u1 = src.uv[0];
+				dst[i].v1 = src.uv[1];
+				dst[i].u2 = src.uv1[0];
+				dst[i].v2 = src.uv1[1];
+			}
+		}
+		DynamicIBAccessClass ib(BUFFER_TYPE_DYNAMIC_SORTING, static_cast<unsigned short>(geometry.indices.size()));
+		{
+			DynamicIBAccessClass::WriteLockClass lock(&ib);
+			unsigned short *dst = lock.Get_Index_Array();
+			for (size_t i = 0; i < geometry.indices.size(); ++i)
+				dst[i] = static_cast<unsigned short>(geometry.indices[i]);
+		}
+
+		ShaderClass effectiveShader = shader;
+		if (!shaderBlend && alphaBlend)
+		{
+			effectiveShader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
+			effectiveShader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA);
+			effectiveShader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
+		}
+		DX8Wrapper::Set_Shader(effectiveShader);
+		DX8Wrapper::Set_Material(vertexMaterial);
+		DX8Wrapper::Set_Texture(0, diffuse);
+		DX8Wrapper::Set_Texture(1, secondary);
+		DX8Wrapper::Set_Transform(D3DTS_WORLD, world);
+		DX8Wrapper::Set_Vertex_Buffer(vb);
+		DX8Wrapper::Set_Index_Buffer(ib, 0);
+
+		SortedRetailEffectData effectData;
+		effectData.twoSided = twoSided;
+		effectData.alphaTest = alphaTest;
+		effectData.alphaBlend = alphaBlend;
+		effectData.depthWrite = depthWrite;
+		effectData.alphaRef = alphaRef;
+		effectData.srcBlend = static_cast<unsigned char>(srcBlend);
+		effectData.dstBlend = static_cast<unsigned char>(dstBlend);
+		effectData.vertexOpacity = vertexOpacity;
+		effectData.overrideOpacity = opacity;
+		effectData.hasPointLight = havePoint;
+		for (size_t i = 0; i < fog.size(); ++i)
+			writeSortedLight(effectData.fog[i], fog[i]);
+		for (size_t i = 0; i < directional.size(); ++i)
+			writeSortedLight(effectData.directional[i], directional[i]);
+		for (size_t i = 0; i < point.size(); ++i)
+			writeSortedLight(effectData.point[i], point[i]);
+		writeSortedLight(effectData.ambientLight, ambientLight);
+		std::snprintf(effectData.meshName, sizeof(effectData.meshName), "%s", mesh.Get_Name());
+
+		SortingRendererClass::Insert_Triangles_With_Effect(
+			mesh.Get_Bounding_Sphere(),
+			0,
+			static_cast<unsigned short>(geometry.indices.size() / 3),
+			0,
+			static_cast<unsigned short>(vertices.size()),
+			effectData);
+
+		DX8Wrapper::Set_Render_State(previous);
+		return true;
+	}
+
+	return drawEffectPass(
+		device,
+		normalMapped,
+		&material,
+		meshPass,
+		*materialId,
+		mesh.Get_Name(),
+		diffuse,
+		normalTexture.get(),
+		vertexMaterial,
+		world,
+		fog,
+		directional,
+		point,
+		ambientLight,
+		havePoint,
+		vertexOpacity,
+		opacity,
+		alphaTest,
+		alphaRef,
+		alphaBlend,
+		depthWrite,
+		twoSided,
+		srcBlend,
+		dstBlend,
+		vertices,
+		geometry.indices,
+		false);
+}
+
 }
 
 void installRetailMeshDraw()
 {
 	DX8TextureCategoryClass::Set_Effect_Draw(drawRetailMesh);
+	SortingRendererClass::Set_Effect_Draw(drawSortedRetailMesh);
 }
 
 void removeRetailMeshDraw()
 {
 	DX8TextureCategoryClass::Set_Effect_Draw(nullptr);
+	SortingRendererClass::Set_Effect_Draw(nullptr);
 	runtime.reset();
 }
 

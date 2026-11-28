@@ -753,6 +753,11 @@ DynamicVBAccessClass::~DynamicVBAccessClass()
 	REF_PTR_RELEASE (VertexBuffer);
 }
 
+unsigned DynamicVBAccessClass::Get_Sorting_Offset()
+{
+	return _DynamicSortingVertexArrayOffset;
+}
+
 // ----------------------------------------------------------------------------
 
 void DynamicVBAccessClass::_Deinit()
