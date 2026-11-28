@@ -267,13 +267,13 @@
 620 powers-fire-state Player_2 AiPowers3TreeMarker 0
 621 destroy Player_2 AiPowers3TreeCaster 0
 621 destroy Player_2 AiPowers3TreeMarker 0
-1100 create Player_2 AiPowers3TameCaster 0 2900,1300,0
+1100 create Player_2 AiPowers3TameCaster 0 3650,1750,0
 1100 create Player_2 AiPowers3TameControl 0 3060,1830,0
-1101 create Player_1 AiPowers3TameYoung 0 2920,1300,0
-1101 create Player_1 AiPowers3TameMature 0 2940,1300,0
-1101 create Player_1 AiPowers3TameIneligible 0 2930,1320,0
+1101 create Player_1 AiPowers3TameYoung 0 3670,1750,0
+1101 create Player_1 AiPowers3TameMature 0 3690,1750,0
+1101 create Player_1 AiPowers3TameIneligible 0 3680,1770,0
 1101 create Player_1 AiPowers3TameYoung 1 3070,1830,0
-1101 create Player_1 AiPowers3TameWounded 0 2930,1280,0
+1101 create Player_1 AiPowers3TameWounded 0 3680,1730,0
 1102 damage Player_1 AiPowers3TameWounded 0 550
 1420 powers-fire-state Player_2 AiPowers3TameCaster 0 AiPowers3Tame
 1420 powers-fire-state Player_2 AiPowers3TameControl 0 AiPowers3Tame
