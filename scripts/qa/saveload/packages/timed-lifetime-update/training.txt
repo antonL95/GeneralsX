@@ -1,0 +1,12 @@
+180 create Player_1 DunharrowCursedObeliskExpansion 0 1850,1500,0
+182 objupgrade Player_1 DunharrowCursedObeliskExpansion 0 Upgrade_GuldurRestlessBones
+185 timed-cast Player_1 DunharrowCursedObeliskExpansion 0 Command_SpecialAbilityDunharrowRestlessBones 1880 1500
+244 timed-count Player_1 - 0 DunharrowFaithlessDeadHorde_Skeleton
+244 timed-count Player_1 - 0 DunharrowFaithlessDead_Skeleton_Summoned
+750 timed-count Player_1 - 0 DunharrowFaithlessDeadHorde_Skeleton
+750 timed-count Player_1 - 0 DunharrowFaithlessDead_Skeleton_Summoned
+820 timed-count Player_1 - 0 DunharrowFaithlessDeadHorde_Skeleton
+820 timed-count Player_1 - 0 DunharrowFaithlessDead_Skeleton_Summoned
+1100 timed-count Player_1 - 0 DunharrowFaithlessDeadHorde_Skeleton
+1100 timed-count Player_1 - 0 DunharrowFaithlessDead_Skeleton_Summoned
+1110 destroy Player_1 DunharrowCursedObeliskExpansion 0

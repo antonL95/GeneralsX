@@ -1,0 +1,10 @@
+10 create Player_1 RohanTheoden 0 1750,1500,0
+185 objupgrade Player_1 RohanTheoden 0 Upgrade_ObjectLevel5
+190 timed-cast Player_1 RohanTheoden 0 Command_SpecialAbilityTheodenGloriousCharge
+244 timed-probe Player_1 RohanTheoden 0 USER_5
+680 timed-probe Player_1 RohanTheoden 0 USER_5
+720 timed-disable Player_1 RohanTheoden 0 180
+750 timed-probe Player_1 RohanTheoden 0 USER_5
+860 timed-probe Player_1 RohanTheoden 0 USER_5
+920 timed-probe Player_1 RohanTheoden 0 USER_5
+930 destroy Player_1 RohanTheoden 0

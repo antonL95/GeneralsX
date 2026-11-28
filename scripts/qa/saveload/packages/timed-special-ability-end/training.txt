@@ -1,0 +1,15 @@
+190 create Player_1 RohanGimli 0 1550,1500,0
+191 objupgrade Player_1 RohanGimli 0 Upgrade_ObjectLevel5
+195 timed-cast Player_1 RohanGimli 0 Command_SpecialAbilitySlayer
+200 create Player_1 ElvenGlorfindel 0 1650,1500,0
+201 objupgrade Player_1 ElvenGlorfindel 0 Upgrade_ObjectLevel3
+205 timed-cast Player_1 ElvenGlorfindel 0 Command_SpecialAbilityGlorfindelWrath
+244 timed-probe Player_1 RohanGimli 0 -
+244 timed-probe Player_1 ElvenGlorfindel 0 USER_1
+280 timed-probe Player_1 ElvenGlorfindel 0 USER_1
+1050 timed-probe Player_1 RohanGimli 0 -
+1050 timed-probe Player_1 ElvenGlorfindel 0 USER_1
+1130 timed-probe Player_1 RohanGimli 0 -
+1130 timed-probe Player_1 ElvenGlorfindel 0 USER_1
+1150 destroy Player_1 RohanGimli 0
+1150 destroy Player_1 ElvenGlorfindel 0

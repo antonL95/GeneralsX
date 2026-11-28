@@ -1,0 +1,9 @@
+180 create Player_1 DolAmrothErchirion 0 1350,1500,0
+182 objupgrade Player_1 DolAmrothErchirion 0 Upgrade_ObjectLevel7
+185 timed-cast Player_1 DolAmrothErchirion 0 Command_SpecialAbilityErchirionStarPupil
+244 timed-probe Player_1 DolAmrothErchirion 0 Upgrade_MountedBodyGuard
+1050 timed-disable Player_1 DolAmrothErchirion 0 150
+1080 timed-probe Player_1 DolAmrothErchirion 0 Upgrade_MountedBodyGuard
+1180 timed-probe Player_1 DolAmrothErchirion 0 Upgrade_MountedBodyGuard
+1220 timed-probe Player_1 DolAmrothErchirion 0 Upgrade_MountedBodyGuard
+1230 destroy Player_1 DolAmrothErchirion 0

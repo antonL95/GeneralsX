@@ -1,0 +1,44 @@
+200 create Player_1 HaradBurodapan 0 2800,1400,0
+201 objupgrade Player_1 HaradBurodapan 0 Upgrade_ObjectLevel10
+205 timed-cast Player_1 HaradBurodapan 0 Command_SpecialAbilityHornofKarna 2860 1400
+208 timed-count Player_1 - 0 HaradHornofKarna
+210 objupgrade Player_1 HaradHornofKarna 0 Upgrade_AngmarFaction
+210 create Player_1 HaradTribalAxemenHorde 0 2800,1400,0
+210 create Player_1 HaradTribalAxemenHorde 1 2800,1650,0
+210 create PlyrCreeps GondorTowerShieldGuardHorde 0 2960,1400,0
+212 timed-cast Player_1 HaradHornofKarna 0 Command_SpawnKarnaDummy 2880 1400
+215 ability Player_1 HaradHornofKarna 0
+244 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+244 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+244 timed-probe PlyrCreeps GondorTowerShieldGuardHorde 0 EMOTION_DISSIDENT
+244 timed-count Player_1 - 0 KarnaEgg
+244 timed-count Player_1 - 0 KarnaMonster
+246 autoability Player_1 HaradHornofKarna 0 on
+285 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+285 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+285 timed-probe PlyrCreeps GondorTowerShieldGuardHorde 0 EMOTION_DISSIDENT
+285 timed-count Player_1 - 0 KarnaEgg
+285 timed-count Player_1 - 0 KarnaMonster
+285 ability Player_1 HaradHornofKarna 0
+400 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+400 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+400 timed-probe PlyrCreeps GondorTowerShieldGuardHorde 0 EMOTION_DISSIDENT
+400 timed-count Player_1 - 0 KarnaMonster
+1130 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+1130 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+1130 timed-probe PlyrCreeps GondorTowerShieldGuardHorde 0 EMOTION_DISSIDENT
+1160 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+1160 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+1160 timed-probe PlyrCreeps GondorTowerShieldGuardHorde 0 EMOTION_DISSIDENT
+1160 timed-count Player_1 - 0 KarnaMonster
+1200 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+1200 timed-count Player_1 - 0 KarnaMonster
+1250 timed-probe Player_1 HaradTribalAxemenHorde 0 EMOTION_DISSIDENT
+1250 timed-probe Player_1 HaradTribalAxemenHorde 1 -
+1350 timed-count Player_1 - 0 KarnaMonster
+1350 timed-count Player_1 - 0 HaradHornofKarna
+1360 destroy Player_1 HaradBurodapan 0
+1360 destroy Player_1 HaradHornofKarna 0
+1360 destroy Player_1 HaradTribalAxemenHorde 0
+1360 destroy Player_1 HaradTribalAxemenHorde 1
+1360 destroy PlyrCreeps GondorTowerShieldGuardHorde 0

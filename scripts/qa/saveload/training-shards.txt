@@ -146,3 +146,8 @@
 3 pkg-garrison-range
 3 pkg-contained-weaponset
 3 map-play-movie-in-game
+1 horn-of-karna
+1 timed-modifier-duration
+1 timed-lifetime-update
+1 timed-upgrade-removal
+1 timed-special-ability-end
