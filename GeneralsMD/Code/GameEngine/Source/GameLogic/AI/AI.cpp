@@ -990,7 +990,7 @@ Real AI::getAdjustedVisionRangeForObject(const Object *object, Int factorsToCons
 		}
 	}
 
-	if (object->getContainedBy() != nullptr)
+	if (object->getContainedBy() != nullptr && !(factorsToConsider & AI_VISIONFACTOR_OWNVISION))
 	{
 		originalRange = object->getLargestWeaponRange();
 	}

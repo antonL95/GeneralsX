@@ -90,6 +90,8 @@ enum
 
 	// If we want to consider the inner radius, we will specify guard inner. Otherwise, use guard outer.
 	AI_VISIONFACTOR_GUARDINNER = 0x04,
+
+	AI_VISIONFACTOR_OWNVISION = 0x08,
 };
 enum {MAX_AI_UPGRADES = 20};
 

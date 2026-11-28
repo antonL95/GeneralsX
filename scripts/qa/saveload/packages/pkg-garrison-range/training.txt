@@ -1,0 +1,16 @@
+470 create Player_1 GarrisonRangeTower 0 2640,2560,0
+470 create Player_1 GarrisonRangeTower 1 2640,2640,0
+471 create Player_1 GarrisonRangeUncappedArcher 0 2600,2560,0
+471 create Player_1 GarrisonRangeCappedArcher 0 2600,2640,0
+471 create PlyrCreeps GarrisonRangeTarget 0 2860,2560,0
+472 pkg61-range Player_1 GarrisonRangeUncappedArcher 0 PlyrCreeps:GarrisonRangeTarget:0
+472 pkg61-range Player_1 GarrisonRangeCappedArcher 0 PlyrCreeps:GarrisonRangeTarget:0
+473 pkg08-enter Player_1 GarrisonRangeUncappedArcher 0 Player_1:GarrisonRangeTower:0
+473 pkg08-enter Player_1 GarrisonRangeCappedArcher 0 Player_1:GarrisonRangeTower:1
+505 pkg61-range Player_1 GarrisonRangeUncappedArcher 0 PlyrCreeps:GarrisonRangeTarget:0
+505 pkg61-range Player_1 GarrisonRangeCappedArcher 0 PlyrCreeps:GarrisonRangeTarget:0
+508 destroy Player_1 GarrisonRangeUncappedArcher 0
+508 destroy Player_1 GarrisonRangeCappedArcher 0
+509 destroy Player_1 GarrisonRangeTower 0
+509 destroy Player_1 GarrisonRangeTower 1
+509 destroy PlyrCreeps GarrisonRangeTarget 0

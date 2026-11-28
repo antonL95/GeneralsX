@@ -627,23 +627,52 @@ void WeaponTemplate::postProcessLoad()
 }
 
 //-------------------------------------------------------------------------------------------------
-Real WeaponTemplate::getAttackRange(const WeaponBonus& bonus, Real heightAdvantage) const
+static Bool isInsideGarrison(const Object* source)
+{
+	const Object* container = source->getContainedBy();
+	const ContainModuleInterface* containerModule = container ? container->getContain() : nullptr;
+	const Object* garrison = containerModule && containerModule->isHordeContain() ? container->getContainedBy() : container;
+	const ContainModuleInterface* garrisonModule = garrison ? garrison->getContain() : nullptr;
+	return source->testStatus(OBJECT_STATUS_INSIDE_GARRISON) || (garrisonModule && garrisonModule->isGarrisonable());
+}
+
+static Real rangeMultiplierForSource(const Object* source, Bool& garrisoned)
+{
+	const AttributeModifierRules::Totals* modifiers = AttributeModifiers::totalsOf(source);
+	Real multiplier = modifiers ? modifiers->rangeFactor() : 1.0f;
+	const Real garrisonedRange = TheGlobalData->m_garrisonedRangeMultiplier;
+	garrisoned = garrisonedRange >= 0.0f && isInsideGarrison(source);
+	if (garrisoned)
+		multiplier *= garrisonedRange;
+	return multiplier;
+}
+
+Real WeaponTemplate::getAttackRange(const WeaponBonus& bonus, Real heightAdvantage, const Object* source) const
 {
 	Real range = m_attackRange * bonus.getField(WeaponBonus::RANGE);
 	if (heightAdvantage >= m_rangeBonusMinHeight && hasHeightRangeBonus())
 		range += m_rangeBonus + (heightAdvantage - m_rangeBonusMinHeight) * m_rangeBonusPerFoot;
+	Bool garrisoned = FALSE;
+	const Real multiplier = source ? rangeMultiplierForSource(source, garrisoned) : 1.0f;
+	range *= multiplier;
 #ifdef RATIONALIZE_ATTACK_RANGE
-	// Note - undersize by 1/4 of a pathfind cell, so that the goal is not teetering on the edge
-	// of firing range.  jba.
 	const Real UNDERSIZE = PATHFIND_CELL_SIZE_F*0.25f;
-	Real r = range - UNDERSIZE;
-	if (r < 0.0f) r = 0.0f;
-	return r;
+	range -= UNDERSIZE;
+	if (range < 0.0f)
+		range = 0.0f;
 #else
-// fudge this a little to account for pathfinding roundoff & such
 	const Real ATTACK_RANGE_FUDGE = 1.05f;
-	return range * ATTACK_RANGE_FUDGE;
+	range *= ATTACK_RANGE_FUDGE;
 #endif
+	if (source && garrisoned && multiplier > 1.0f)
+	{
+		const Real vision = source->getAI()
+			? AI::getAdjustedVisionRangeForObject(source, AI_VISIONFACTOR_MOOD | AI_VISIONFACTOR_OWNVISION)
+			: source->getVisionRange();
+		if (range > vision)
+			range = vision;
+	}
+	return range;
 }
 
 Bool WeaponTemplate::getPreferredTargetPosition(const Object* target, Coord3D& position) const
@@ -1102,7 +1131,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	//Only perform this check if the weapon isn't a leech range weapon (which can have unlimited range!)
 	if( !ignoreRanges && !isLeechRangeWeapon() )
 	{
-		Real attackRangeSqr = sqr(getAttackRange(bonus, sourcePos->z - victimPos->z));
+		Real attackRangeSqr = sqr(getAttackRange(bonus, sourcePos->z - victimPos->z, sourceObj));
 		if (distSqr > attackRangeSqr && !isWithinRunningDownRange(*this, sourceObj, victimObj))
 		{
 			//DEBUG_ASSERTCRASH(distSqr < 5*5 || distSqr < attackRangeSqr*1.2f, ("*** victim is out of range (%f vs %f) of this weapon -- why did we attempt to fire?",WWMath::SqrtfOrigin(distSqr),WWMath::SqrtfOrigin(attackRangeSqr)));
@@ -2392,18 +2421,8 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	{
 		if (!hasNuggets)
 			bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor(useInnate));
-		bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * modifiers->rangeFactor());
 		bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * modifiers->value[AttributeModifierRules::RATE_OF_FIRE]);
 	}
-	const Real garrisonedRange = TheGlobalData->m_garrisonedRangeMultiplier;
-	if (garrisonedRange >= 0.0f)
-	{
-		const Object* garrison = containerModule && containerModule->isHordeContain() ? container->getContainedBy() : container;
-		const ContainModuleInterface* garrisonModule = garrison ? garrison->getContain() : nullptr;
-		if (source->testStatus(OBJECT_STATUS_INSIDE_GARRISON) || (garrisonModule && garrisonModule->isGarrisonable()))
-			bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * garrisonedRange);
-	}
-
 	if (hasNuggets)
 	{
 		const Object* attacker = WeaponTemplate::getNuggetAttacker(source);
@@ -2983,7 +3002,7 @@ Real Weapon::getAttackRange(const Object* source, const Coord3D* target, const C
 	WeaponBonus bonus;
 	computeBonus(source, 0, bonus);
 	const Real heightAdvantage = target ? (origin ? origin : source->getPosition())->z - target->z : 0.0f;
-	return m_template->getAttackRange(bonus, heightAdvantage);
+	return m_template->getAttackRange(bonus, heightAdvantage, source);
 
 	//Contained objects have longer ranges.
 	//const Object *container = source->getContainedBy();

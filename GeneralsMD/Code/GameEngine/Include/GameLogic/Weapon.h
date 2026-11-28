@@ -427,7 +427,7 @@ public:
 		const WeaponBonus& bonus
 	) const;
 
-	Real getAttackRange(const WeaponBonus& bonus, Real heightAdvantage = 0.0f) const;
+	Real getAttackRange(const WeaponBonus& bonus, Real heightAdvantage = 0.0f, const Object* source = nullptr) const;
 	Bool hasHeightRangeBonus() const { return m_rangeBonus != 0.0f || m_rangeBonusPerFoot != 0.0f; }
 	struct TargetReach
 	{
