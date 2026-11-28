@@ -1,0 +1,25 @@
+241 create PlyrCivilian ScriptPlayerSumUnit 0 1500,1500,0
+241 create PlyrCivilian ScriptPlayerSumUnit 1 1520,1500,0
+241 create PlyrCivilian ScriptPlayerSumBuilding 0 1540,1500,0
+241 create PlyrCivilian ScriptPlayerSumBase 0 1460,1500,0
+241 create PlyrCreeps ScriptPlayerSumUnit 1 1540,1500,0
+241 create PlyrCreeps ScriptPlayerSumBuilding 0 1580,1500,0
+241 create Player_1 ScriptPlayerSumAnchor 0 1650,1500,0
+241 create Player_1 ScriptPlayerSumAnchor 1 1650,1500,0
+241 script-sum-setup Player_1 - 0
+242 script-sum-check Player_1 - 0
+246 script-sum-check Player_1 - 0
+246 script-sum-area Player_1 - 0
+246 create PlyrCreeps ScriptPlayerSumUnit 0 1650,1500,0
+246 script-sum-upg Player_1 - 0
+247 script-sum-check Player_1 - 0
+248 destroy PlyrCivilian ScriptPlayerSumUnit 0
+248 destroy PlyrCivilian ScriptPlayerSumUnit 1
+248 destroy PlyrCivilian ScriptPlayerSumBuilding 0
+248 destroy PlyrCivilian ScriptPlayerSumBase 0
+248 destroy PlyrCreeps ScriptPlayerSumUnit 0
+248 destroy PlyrCreeps ScriptPlayerSumUnit 1
+248 destroy PlyrCreeps ScriptPlayerSumBuilding 0
+248 destroy Player_1 ScriptPlayerSumAnchor 0
+248 destroy Player_1 ScriptPlayerSumAnchor 1
+249 script-sum-clear Player_1 - 0
