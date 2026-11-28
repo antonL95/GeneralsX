@@ -56,6 +56,7 @@ public:
 		and return the amount that should be dealt.
 	*/
 	Real adjustDamage(DamageType t, Real damage, Bool flanked = FALSE) const;
+	Real applyFlankPenalty(Real multiplier, Bool flanked) const;
 
 	static void parseArmorCoefficients( INI* ini, void *instance, void* /* store */, const void* userData );
 
@@ -81,6 +82,11 @@ public:
 	inline Real adjustDamage(DamageType t, Real damage, Bool flanked = FALSE) const
 	{
 		return m_template ? m_template->adjustDamage(t, damage, flanked) : damage;
+	}
+
+	inline Real applyFlankPenalty(Real multiplier, Bool flanked) const
+	{
+		return m_template ? m_template->applyFlankPenalty(multiplier, flanked) : multiplier;
 	}
 
 	inline void clear()

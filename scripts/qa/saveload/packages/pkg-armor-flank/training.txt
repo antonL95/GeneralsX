@@ -1,0 +1,23 @@
+450 create Player_1 ArmorFlankHorde 0 2660,2310,0
+450 create PlyrCreeps ArmorFlankHorde 0 2740,2310,0
+450 create PlyrCreeps ArmorFlankHorde 1 2740,2400,0
+450 create Player_1 ArmorFlankHorde 1 2820,2400,0
+452 modapply PlyrCreeps ArmorFlankHorde 0 ArmorFlankBonus
+452 modapply PlyrCreeps ArmorFlankHorde 1 ArmorFlankBonus
+454 combat-coverage-horde PlyrCreeps ArmorFlankHorde 0 flanked-before
+454 combat-coverage-horde PlyrCreeps ArmorFlankHorde 1 front-before
+455 firetestweapon Player_1 ArmorFlankHorde 0 ArmorFlankSlash,PlyrCreeps:ArmorFlankHorde:0
+455 firetestweapon Player_1 ArmorFlankHorde 1 ArmorFlankSlash,PlyrCreeps:ArmorFlankHorde:1
+456 combat-coverage-horde PlyrCreeps ArmorFlankHorde 0 flanked-after
+456 combat-coverage-horde PlyrCreeps ArmorFlankHorde 1 front-after
+457 create PlyrCreeps MordorWitchKingOnFellBeast 0 2740,2480,0
+458 health PlyrCreeps MordorWitchKingOnFellBeast 0
+459 firetestweapon Player_1 ArmorFlankHorde 1 ArmorFlankHero,PlyrCreeps:MordorWitchKingOnFellBeast:0
+460 health PlyrCreeps MordorWitchKingOnFellBeast 0
+461 firetestweapon Player_1 ArmorFlankHorde 1 ArmorFlankHeal,PlyrCreeps:MordorWitchKingOnFellBeast:0
+462 health PlyrCreeps MordorWitchKingOnFellBeast 0
+463 destroy PlyrCreeps MordorWitchKingOnFellBeast 0
+463 destroy Player_1 ArmorFlankHorde 0
+463 destroy Player_1 ArmorFlankHorde 1
+463 destroy PlyrCreeps ArmorFlankHorde 0
+463 destroy PlyrCreeps ArmorFlankHorde 1

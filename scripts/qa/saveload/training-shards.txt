@@ -142,3 +142,4 @@
 3 map-script-world-lights
 3 pkg-ini-ui-misc
 4 ability-custom-animation
+3 pkg-armor-flank

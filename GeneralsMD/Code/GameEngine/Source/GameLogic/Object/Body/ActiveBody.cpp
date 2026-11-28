@@ -375,6 +375,19 @@ void ActiveBody::validateArmorAndDamageFX() const
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static Real applyArmorAttributeModifier(const Object* obj, const Armor& armor, DamageType type, Bool flanked)
+{
+	if (type == DAMAGE_HEALING || type == DAMAGE_UNRESISTABLE)
+		return 1.0f;
+	const AttributeModifierRules::Totals* totals = AttributeModifiers::totalsOf(obj);
+	if (!totals)
+		return 1.0f;
+	const Int damageType = static_cast<Int>(type);
+	if (std::find(totals->invulnerableTypes.begin(), totals->invulnerableTypes.end(), damageType) != totals->invulnerableTypes.end())
+		return 0.0f;
+	return armor.applyFlankPenalty(totals->damageTakenFactor(damageType, TheGlobalData->m_attributeModifierArmorMaxBonus), flanked);
+}
+
 Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 {
 	validateArmorAndDamageFX();
@@ -409,8 +422,7 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 		damageInfo.m_damageType != DAMAGE_UNRESISTABLE &&
 		HordeContain::isFlanked(getObject(), TheGameLogic->findObjectByID(damageInfo.m_sourceID), FALSE);
 	Real amount = m_curArmor.adjustDamage(damageInfo.m_damageType, damageInfo.m_amount, flanked);
-	if (getObject()->getAttributeModifierHelper() && damageInfo.m_damageType != DAMAGE_HEALING && damageInfo.m_damageType != DAMAGE_UNRESISTABLE)
-		amount *= AttributeModifiers::damageTakenFactor(getObject(), damageInfo.m_damageType);
+	amount *= applyArmorAttributeModifier(getObject(), m_curArmor, damageInfo.m_damageType, flanked);
 
 	return amount;
 }
@@ -481,8 +493,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	const Bool flanked = RetailFileLayers::enabled() && damageInfo->in.m_damageType != DAMAGE_HEALING &&
 		damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE && HordeContain::isFlanked(obj, damager);
 	Real amount = m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount, flanked);
-	if (obj->getAttributeModifierHelper() && damageInfo->in.m_damageType != DAMAGE_HEALING && damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE)
-		amount *= AttributeModifiers::damageTakenFactor(obj, damageInfo->in.m_damageType);
+	amount *= applyArmorAttributeModifier(obj, m_curArmor, damageInfo->in.m_damageType, flanked);
 
 	switch( damageInfo->in.m_damageType )
 	{

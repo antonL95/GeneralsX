@@ -68,20 +68,22 @@ void ArmorTemplate::clear()
 }
 
 //-------------------------------------------------------------------------------------------------
+Real ArmorTemplate::applyFlankPenalty(Real multiplier, Bool flanked) const
+{
+	return flanked && m_flankedPenalty != 0.0f
+		? 1.0f - (1.0f - multiplier) * (1.0f - m_flankedPenalty)
+		: multiplier;
+}
+
 Real ArmorTemplate::adjustDamage(DamageType t, Real damage, Bool flanked) const
 {
 	if (t == DAMAGE_HEALING)
 		return damage;
 
-	const auto applyFlank = [&](Real multiplier) {
-		return flanked && m_flankedPenalty != 0.0f
-			? 1.0f - (1.0f - multiplier) * (1.0f - m_flankedPenalty)
-			: multiplier;
-	};
-	damage *= applyFlank(m_damageScalar);
+	damage *= applyFlankPenalty(m_damageScalar, flanked);
 	if (t == DAMAGE_UNRESISTABLE || t == DAMAGE_SUBDUAL_UNRESISTABLE)
 		return damage;
-	damage *= applyFlank(m_damageCoefficient[t]);
+	damage *= applyFlankPenalty(m_damageCoefficient[t], flanked);
 
 	if (damage < 0.0f)
 		damage = 0.0f;
