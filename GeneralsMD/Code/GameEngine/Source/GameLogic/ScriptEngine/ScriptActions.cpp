@@ -7475,6 +7475,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				unit->getExperienceTracker()->setRetailRankCap(pAction->getParameter(1)->getInt());
 			return;
 		}
+		case ScriptAction::UNIT_GAIN_LEVEL:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (unit)
+				unit->getExperienceTracker()->gainRetailLevels(1, 0, FALSE, pAction->getParameter(1)->getInt() != 0);
+			return;
+		}
 		case ScriptAction::UNIT_TELEPORT_TO_WAYPOINT:
 		{
 			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
@@ -7571,6 +7578,25 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 						else
 							ai->aiMoveToPosition(waypoint->getLocation(), CMD_FROM_SCRIPT);
 					}
+				}
+			}
+			return;
+		}
+		case ScriptAction::ATTACK_MOVE_NAMED_UNIT_TO:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(1)->getString());
+			if (unit && waypoint)
+			{
+				if (auto* ai = unit->getAIUpdateInterface())
+				{
+					ai->clearWaypointQueue();
+					unit->leaveGroup();
+					ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+					if (unit->isAbleToAttack())
+						ai->aiAttackMoveToPosition(waypoint->getLocation(), NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+					else
+						ai->aiMoveToPosition(waypoint->getLocation(), CMD_FROM_SCRIPT);
 				}
 			}
 			return;
@@ -7938,6 +7964,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			return;
 		}
+		case ScriptAction::UNIT_FORCE_EMOTION:
+			if (Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString()))
+				EmotionTrackerUpdate::force(unit, pAction->getParameter(1)->getInt(), pAction->getParameter(2)->getReal());
+			return;
 		case ScriptAction::NAMED_HUNT:
 			doNamedHunt(pAction->getParameter(0)->getString());
 			return;

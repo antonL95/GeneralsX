@@ -1,0 +1,6 @@
+245 create Player_1 GondorAragorn 0 1000,3500,0
+246 script-unit-ops-run Player_1 GondorAragorn 0
+248 script-unit-ops-probe Player_1 GondorAragorn 0
+252 script-unit-ops-probe Player_1 GondorAragorn 0
+300 script-unit-ops-probe Player_1 GondorAragorn 0
+310 destroy Player_1 GondorAragorn 0

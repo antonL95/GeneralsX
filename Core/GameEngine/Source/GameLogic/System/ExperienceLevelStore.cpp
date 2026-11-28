@@ -766,7 +766,7 @@ void ExperienceTracker::setMinRetailRank(Int rank, Bool feedback)
 		advanceRetailLevel(static_cast<Real>(threshold), feedback);
 }
 
-Bool ExperienceTracker::gainRetailLevels(Int count, Int rankCap, Bool trainableOnly)
+Bool ExperienceTracker::gainRetailLevels(Int count, Int rankCap, Bool trainableOnly, Bool feedback)
 {
 	if ((trainableOnly && !isTrainable()) || count <= 0)
 		return FALSE;
@@ -781,7 +781,7 @@ Bool ExperienceTracker::gainRetailLevels(Int count, Int rankCap, Bool trainableO
 	}
 	if (threshold == m_retailThreshold)
 		return FALSE;
-	advanceRetailLevel(static_cast<Real>(threshold), TRUE);
+	advanceRetailLevel(static_cast<Real>(threshold), feedback);
 	return TRUE;
 }
 

@@ -56,7 +56,7 @@ public:
 	void setRetailRankCap(Int rank) { m_retailRankCap = rank; }
 	void advanceRetailLevel(Real experience, Bool feedback);
 	void setMinRetailRank(Int rank, Bool feedback = FALSE);
-	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE);
+	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE, Bool feedback = TRUE);
 	Int getExperienceValue( const Object* killer ) const;										///< How much do give for being killed
 	Int getCurrentExperience() const { return m_currentExperience; };	///< How much experience do I have at the moment?
 	Bool isTrainable() const;																						///< Can I gain experience?
