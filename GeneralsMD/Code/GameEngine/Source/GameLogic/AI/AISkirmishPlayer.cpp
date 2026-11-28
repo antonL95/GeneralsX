@@ -512,6 +512,12 @@ Bool isRetailTacticRecruit(const Object& object, const Player& owner)
 	return !horde || (!horde->hasAttackOrder() && !horde->hasGuardOrder());
 }
 
+Bool isRetailFarmRaider(const Object& object)
+{
+	return !object.isKindOf(KINDOF_ARCHER) && !object.isKindOf(KINDOF_HERO) &&
+		!object.isKindOf(KINDOF_DOZER) && !object.isKindOf(KINDOF_MACHINE);
+}
+
 const Waypoint* retailPlayerStart(Player& player)
 {
 	const Int index = player.getMpStartIndex();
@@ -2229,7 +2235,7 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 
 	std::vector<Object*> roster;
 	for (Object* unit : soldiers)
-		if (unit->isAbleToAttack() && isRetailTacticRecruit(*unit, *m_player) &&
+		if (unit->isAbleToAttack() && isRetailTacticRecruit(*unit, *m_player) && isRetailFarmRaider(*unit) &&
 			(!raid.issuedFrame || std::find(raid.members.begin(), raid.members.end(), unit->getID()) != raid.members.end()))
 			roster.push_back(unit);
 	const size_t minimum = raid.issuedFrame || phase == 0 ? 1 : 2;

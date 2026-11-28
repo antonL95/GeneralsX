@@ -1,0 +1,20 @@
+44 power-reveal - - 0
+45 create Player_1 SkirmishRaidFilterFarm 0 2740,3070,0
+45 create Player_2 SkirmishRaidFilterHorde 0 2510,2910,0
+45 create Player_2 SkirmishRaidFilterHorde 1 2510,2870,0
+45 create Player_2 SkirmishRaidFilterArcher 0 2530,2960,0
+45 create Player_2 SkirmishRaidFilterHero 0 2550,3010,0
+45 create Player_2 SkirmishRaidFilterDozer 0 2490,2960,0
+45 create Player_2 SkirmishRaidFilterMachine 0 2470,3010,0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHorde 0 Player_1:SkirmishRaidFilterFarm:0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHorde 1 Player_1:SkirmishRaidFilterFarm:0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterArcher 0 Player_1:SkirmishRaidFilterFarm:0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHero 0 Player_1:SkirmishRaidFilterFarm:0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterDozer 0 Player_1:SkirmishRaidFilterFarm:0
+80 deposit-xp-raid-probe Player_2 SkirmishRaidFilterMachine 0 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHorde 0 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHorde 1 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterArcher 0 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterHero 0 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterDozer 0 Player_1:SkirmishRaidFilterFarm:0
+81 deposit-xp-raid-probe Player_2 SkirmishRaidFilterMachine 0 Player_1:SkirmishRaidFilterFarm:0
