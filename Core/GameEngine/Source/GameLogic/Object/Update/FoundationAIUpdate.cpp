@@ -7,14 +7,17 @@
 
 #include "Common/BuildAssistant.h"
 #include "Common/INI.h"
+#include "Common/MessageStream.h"
 #include "Common/Money.h"
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/InGameUI.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CastleRules.h"
@@ -22,6 +25,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #if !RTS_GENERALS
 #include "GameLogic/LuaScriptEngine.h"
 #endif
@@ -152,14 +156,29 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 		return nullptr;
 	const UnsignedInt paid = money->withdraw(cost);
 
+	const Coord3D* at = foundation->getPosition();
+	const Coord3D ground = {at->x, at->y, TheTerrainLogic->getGroundHeight(at->x, at->y)};
+	const Real clearRadius = what->getTemplateGeometryInfo().getMinorRadius() * 1.1f;
+	if (clearRadius > 0.0f && ThePartitionManager && TheBuildAssistant)
+	{
+		ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(&ground, clearRadius, FROM_BOUNDINGSPHERE_3D);
+		MemoryPoolObjectHolder hold(iter);
+		for (Object* candidate = iter->first(); candidate; candidate = iter->next())
+		{
+			if (candidate == foundation || candidate->isDestroyed() || candidate->isKindOf(KINDOF_INERT))
+				continue;
+			if (TheBuildAssistant->isRemovableForConstruction(candidate) &&
+				!candidate->isKindOf(KINDOF_ALWAYS_SELECTABLE))
+				TheGameLogic->destroyObject(candidate);
+		}
+	}
+
 	Object* structure = TheThingFactory->newObject(what, player->getDefaultTeam(),
 		MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION));
 	structure->setProducer(foundation);
 	structure->setBuilder(foundation);
 	structure->setConstructionCostPaid(paid);
 
-	const Coord3D* at = foundation->getPosition();
-	const Coord3D ground = {at->x, at->y, TheTerrainLogic->getGroundHeight(at->x, at->y)};
 	structure->setOrientation(normalizeAngle(foundation->getOrientation() + what->getPlacementViewAngle()));
 	structure->setPosition(&ground);
 	TheAI->pathfinder()->addObjectToPathfindMap(structure);
@@ -201,6 +220,23 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 void FoundationAIUpdate::showFoundation(Bool show)
 {
 	Object* foundation = getObject();
+	if (foundation->isKindOf(KINDOF_WALL_UPGRADE))
+	{
+		if (!show && TheInGameUI && ThePlayerList &&
+			foundation->getControllingPlayer() == ThePlayerList->getLocalPlayer())
+		{
+			if (Drawable* drawable = foundation->getDrawable())
+			{
+				if (TheMessageStream)
+				{
+					GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP);
+					message->appendObjectIDArgument(foundation->getID());
+				}
+				TheInGameUI->deselectDrawable(drawable);
+			}
+		}
+		return;
+	}
 	if (show)
 		foundation->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
 	else
