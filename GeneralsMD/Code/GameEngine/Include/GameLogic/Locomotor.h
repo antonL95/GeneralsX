@@ -278,7 +278,7 @@ private:
 	Real m_lookAheadMult = 1.0f;
 	Bool m_nonDirtyTransform = FALSE;
 	Real m_slowTurnRadius = 0.0f;
-	Real m_fastTurnRadius = 0.0f;
+	Real m_fastTurnRadius = 20.0f;
 	Bool											m_waitForFormation;
 	Real											m_maxTurnWithoutReform;
 	Bool											m_turnWhileMoving;
