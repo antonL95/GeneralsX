@@ -1,0 +1,23 @@
+200 create Player_1 ElvenTransportShip 0 1725,925,0
+200 create Player_1 ElvenLorienWarriorHorde 0 1785,1015,0
+201 ship-unload-probe Player_1 ElvenTransportShip 0 ship0-spawn
+201 ship-unload-probe Player_1 ElvenLorienWarriorHorde 0 horde0-spawn
+202 ship-unload-enter Player_1 ElvenLorienWarriorHorde 0 Player_1:ElvenTransportShip:0
+280 ship-unload-probe Player_1 ElvenTransportShip 0 ship0-after-board
+281 move Player_1 ElvenTransportShip 0 - 1740 920
+325 ship-unload-probe Player_1 ElvenTransportShip 0 ship0-before-evac
+327 ship-unload-evacuate Player_1 ElvenTransportShip 0 evac
+430 ship-unload-probe Player_1 ElvenTransportShip 0 ship0-after-evac
+430 ship-unload-probe Player_1 ElvenLorienWarriorHorde 0 horde0-after-evac
+431 move Player_1 ElvenLorienWarriorHorde 0 - 1865 955
+435 destroy Player_1 ElvenTransportShip 0
+440 create Player_1 EvilMenTransportShip 0 1725,925,0
+440 create Player_1 ElvenLorienSentryHorde 0 1785,1015,0
+441 ship-unload-probe Player_1 EvilMenTransportShip 0 ship1-spawn
+442 ship-unload-enter Player_1 ElvenLorienSentryHorde 0 Player_1:EvilMenTransportShip:0
+525 ship-unload-probe Player_1 EvilMenTransportShip 0 ship1-after-board
+526 move Player_1 EvilMenTransportShip 0 - 1740 920
+565 ship-unload-probe Player_1 EvilMenTransportShip 0 ship1-before-exit
+567 ship-unload-exit Player_1 EvilMenTransportShip 0 Player_1:ElvenLorienSentryHorde:0
+670 ship-unload-probe Player_1 EvilMenTransportShip 0 ship1-after-exit
+670 ship-unload-probe Player_1 ElvenLorienSentryHorde 0 horde1-after-exit
