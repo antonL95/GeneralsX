@@ -1745,8 +1745,11 @@ static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, Me
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, previousDetail);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, alphaRef);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, factor);
+	const bool stageOwnedByShader = stage < 2;
+	const unsigned disabled[] = {D3DTOP_DISABLE, D3DTA_TEXTURE, D3DTA_DIFFUSE,
+		D3DTOP_DISABLE, D3DTA_TEXTURE, D3DTA_DIFFUSE};
 	for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i)
-		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], previous[i]);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], stageOwnedByShader ? previous[i] : disabled[i]);
 }
 
 static DX8TextureCategoryClass::EffectDraw meshEffectDraw = nullptr;
