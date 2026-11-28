@@ -111,7 +111,7 @@ UpdateSleepTime RubbleRiseUpdate::update()
 	const auto frame = TheGameLogic->getFrame();
 	if (m_waiting)
 	{
-		if (!obj->testModelConditionState(MODELCONDITION_POST_RUBBLE))
+		if (!obj->getLogicModelConditions().test(MODELCONDITION_POST_RUBBLE))
 			return UPDATE_SLEEP_NONE;
 		m_waiting = FALSE;
 		m_rising = TRUE;

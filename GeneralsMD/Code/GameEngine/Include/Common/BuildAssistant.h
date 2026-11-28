@@ -202,11 +202,9 @@ public:
 		Player* owner, const Object* site = nullptr);
 	void clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
 		Real angle, const Object* constructionSite = nullptr);
+	Bool isRemovableForConstruction(Object* obj);
 
 protected:
-
-	/// some objects will be "cleared" automatically when constructing
-	Bool isRemovableForConstruction( Object *obj );
 
 	/// will move objects that can move out of the way.
 	/// will return false if there are objects that cannot be moved out of the way.

@@ -320,7 +320,11 @@ void ActiveBody::setCorrectDamageState()
 		if (m_curDamageState < BODY_RUBBLE)
 		{
 			if (oldState == BODY_RUBBLE)
+			{
 				obj->setGeometryInfo(obj->getTemplate()->getTemplateGeometryInfo());
+				if (PartitionData* pd = obj->friend_getPartitionData())
+					pd->friend_updateCellsTouched();
+			}
 		}
 		else
 		{
@@ -329,8 +333,8 @@ void ActiveBody::setCorrectDamageState()
 
 		if (m_curDamageState > oldState && m_curDamageState == BODY_RUBBLE)
 		{
-			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
 			obj->setStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_NO_COLLISIONS, OBJECT_STATUS_CAN_NOT_WALK_ON));
+			TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
 			if (hasBookendGeometry(*obj))
 			{
 				obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BOOKENDING));
@@ -356,7 +360,11 @@ void ActiveBody::setCorrectDamageState()
 			obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CAN_NOT_WALK_ON));
 			obj->clearStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_BOOKENDING, OBJECT_STATUS_NO_COLLISIONS));
 			if (hasBookendGeometry(*obj))
+			{
 				GeometryUpgrade::refreshLuaBounds(*obj);
+				if (PartitionData* pd = obj->friend_getPartitionData())
+					pd->friend_updateCellsTouched();
+			}
 			TheAI->pathfinder()->addObjectToPathfindMap(obj);
 		}
 	}
@@ -386,7 +394,16 @@ void ActiveBody::setCorrectDamageState()
 				GeometryUpgrade::refreshLuaBounds(*obj);
 			}
 			obj->setGeometryInfoZ(rubbleHeight);
-			TheAI->pathfinder()->addObjectToPathfindMap(obj);
+			if (obj->testStatus(OBJECT_STATUS_BOOKENDING))
+			{
+				m_curDamageState = BODY_PRISTINE;
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
+				m_curDamageState = BODY_RUBBLE;
+			}
+			else
+			{
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
+			}
 			obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
 		}
 	}
@@ -2061,9 +2078,5 @@ void ActiveBody::loadPostProcess()
 	Object* obj = getObject();
 	if (!obj || !obj->testStatus(OBJECT_STATUS_BOOKENDING) || !hasBookendGeometry(*obj))
 		return;
-	if (TheAI && TheAI->pathfinder())
-		TheAI->pathfinder()->removeObjectFromPathfindMap(obj);
 	GeometryUpgrade::refreshLuaBounds(*obj);
-	if (TheAI && TheAI->pathfinder())
-		TheAI->pathfinder()->addObjectToPathfindMap(obj);
 }

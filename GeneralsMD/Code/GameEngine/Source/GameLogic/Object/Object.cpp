@@ -5893,7 +5893,7 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 /// Object level events that need to happen upon game death
 void Object::onDie( DamageInfo *damageInfo )
 {
-	if (RetailFileLayers::enabled() &&
+	if (RetailFileLayers::enabled() && !testStatus(OBJECT_STATUS_BOOKENDING) &&
 		(isKindOf(KINDOF_WALL_SEGMENT) || isKindOf(KINDOF_WALL_GATE) || isKindOf(KINDOF_WALL_HUB) ||
 		 isKindOf(KINDOF_DEFENSIVE_WALL) || isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 	{

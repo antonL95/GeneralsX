@@ -44,6 +44,7 @@ public:
 	void request(Bool open);
 	const Object* getGateObject() const { return getObject(); }
 	Bool wantsOpen() const { return m_wantsOpen; }
+	UnsignedInt getSoundFrame() const { return m_soundFrame; }
 	const AsciiString& getProxyName() const { return getGateOpenAndCloseBehaviorModuleData()->m_proxy; }
 	DisabledMaskType getDisabledTypesToProcess() const override
 	{

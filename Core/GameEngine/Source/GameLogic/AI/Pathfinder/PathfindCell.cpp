@@ -475,7 +475,8 @@ void PathfindCell::clearObstruction()
  */
 Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoord2D &pos )
 {
-	const Bool isRubble = obstacle->getBodyModule() && obstacle->getBodyModule()->getDamageState() == BODY_RUBBLE;
+	const Bool isRubble = obstacle->getBodyModule() && obstacle->getBodyModule()->getDamageState() == BODY_RUBBLE &&
+		!obstacle->testStatus(OBJECT_STATUS_BOOKENDING);
 	const Bool replacesRubble = RetailFileLayers::enabled() && m_type == CELL_RUBBLE && !isRubble;
 	if (m_type != CELL_CLEAR && m_type != CELL_IMPASSABLE && !replacesRubble) {
 		if (m_type == CELL_OBSTACLE && m_obstacleID != INVALID_ID && m_obstacleID != obstacle->getID() &&
