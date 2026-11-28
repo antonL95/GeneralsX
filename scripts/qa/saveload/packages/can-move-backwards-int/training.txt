@@ -1,0 +1,18 @@
+215 create Player_1 CanMoveBackwardsFourProbe 0 1000,880,0
+215 create Player_1 CanMoveBackwardsNoProbe 0 1000,910,0
+215 create Player_1 CanMoveBackwardsOneProbe 0 1000,940,0
+225 move Player_1 CanMoveBackwardsFourProbe 0 - 890 880
+225 move Player_1 CanMoveBackwardsNoProbe 0 - 890 910
+225 move Player_1 CanMoveBackwardsOneProbe 0 - 890 940
+240 pkg69-sample Player_1 CanMoveBackwardsFourProbe 0
+240 pkg69-sample Player_1 CanMoveBackwardsNoProbe 0
+240 pkg69-sample Player_1 CanMoveBackwardsOneProbe 0
+245 pkg69-sample Player_1 CanMoveBackwardsFourProbe 0
+245 pkg69-sample Player_1 CanMoveBackwardsNoProbe 0
+245 pkg69-sample Player_1 CanMoveBackwardsOneProbe 0
+255 pkg69-sample Player_1 CanMoveBackwardsFourProbe 0
+255 pkg69-sample Player_1 CanMoveBackwardsNoProbe 0
+255 pkg69-sample Player_1 CanMoveBackwardsOneProbe 0
+265 destroy Player_1 CanMoveBackwardsFourProbe 0
+265 destroy Player_1 CanMoveBackwardsNoProbe 0
+265 destroy Player_1 CanMoveBackwardsOneProbe 0

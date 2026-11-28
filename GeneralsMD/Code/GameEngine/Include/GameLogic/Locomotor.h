@@ -171,6 +171,7 @@ public:
 	static void parseRotwkTurnTimeDamaged(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkLift(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkLiftDamaged(INI* ini, void* instance, void* store, const void* userData);
+	static void parseCanMoveBackwards(INI* ini, void* instance, void* store, const void* userData);
 
 private:
 
@@ -249,7 +250,7 @@ private:
 	Bool											m_apply2DFrictionWhenAirborne;	// apply "2d friction" even when airborne... useful for realistic-looking movement
 	Bool											m_downhillOnly;	// pinewood derby, moves only by gravity pulling downhill
 	Bool											m_stickToGround;				// if true, can't leave ground
-	Bool											m_canMoveBackward;				// if true, can move backwards.
+	Int											m_canMoveBackward;
 	Bool											m_hasSuspension;				///< If true, calculate 4 wheel independent suspension values.
 	Real											m_maximumWheelExtension; ///< Maximum distance wheels can move down.  (negative value)
 	Real											m_maximumWheelCompression; ///< Maximum distance wheels can move up.  (positive value)
@@ -374,7 +375,7 @@ public:
 	Real getCloseEnoughDist() const { return m_closeEnoughDist; }
 	Bool isCloseEnoughDist3D() const { return getFlag(IS_CLOSE_ENOUGH_DIST_3D); }
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}
-	Bool canMoveBackwards() const {return m_template->m_canMoveBackward;}
+	Bool canMoveBackwards() const { return m_template->m_canMoveBackward != 0; }
 	Bool getWaitForFormation() const { return m_template->m_waitForFormation; }
 	Real getMaxTurnWithoutReform() const { return m_template->m_maxTurnWithoutReform; }
 	Real getMaxWheelExtension() const {return m_template->m_maximumWheelExtension;}

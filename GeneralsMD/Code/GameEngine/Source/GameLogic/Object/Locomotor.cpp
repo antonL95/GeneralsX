@@ -32,6 +32,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include <climits>	// For INT_MAX on Linux
+#include <cstdlib>
 #include <algorithm>
 #define DEFINE_SURFACECATEGORY_NAMES
 #define DEFINE_LOCO_Z_NAMES
@@ -402,7 +403,7 @@ LocomotorTemplate::LocomotorTemplate()
 	m_locomotorWorksWhenDead = false;
 	m_airborneTargetingHeight = INT_MAX;
 	m_stickToGround = false;
-	m_canMoveBackward = false;
+	m_canMoveBackward = 0;
 	m_hasSuspension = false;
 	m_wheelTurnAngle = 0;
 	m_maximumWheelExtension = 0;
@@ -652,6 +653,22 @@ void LocomotorTemplate::parseRotwkTurnTimeDamaged(INI* ini, void* instance, void
 		skipNonRotwkField(ini);
 }
 
+void LocomotorTemplate::parseCanMoveBackwards(INI* ini, void*, void* store, const void*)
+{
+	const char* token = ini->getNextToken();
+	if (usesRotwkLocomotorFields())
+	{
+		char* end = nullptr;
+		const long value = std::strtol(token, &end, 10);
+		if (end != token && *end == '\0' && value >= 1 && value <= 4)
+		{
+			*static_cast<Int*>(store) = static_cast<Int>(value);
+			return;
+		}
+	}
+	*static_cast<Int*>(store) = INI::scanBool(token) ? 1 : 0;
+}
+
 void LocomotorTemplate::applyRotwkSetSpeed(Real speedPerSecond)
 {
 	const Real speed = speedPerSecond > 0.0f ? speedPerSecond * SECONDS_PER_LOGICFRAME_REAL : m_maxSpeed;
@@ -746,7 +763,7 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "LocomotorWorksWhenDead", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_locomotorWorksWhenDead) },
 		{ "AirborneTargetingHeight", INI::parseInt, nullptr, offsetof( LocomotorTemplate, m_airborneTargetingHeight ) },
 		{ "StickToGround",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_stickToGround) },
-		{ "CanMoveBackwards",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_canMoveBackward) },
+		{ "CanMoveBackwards",				parseCanMoveBackwards,			nullptr,	offsetof(LocomotorTemplate, m_canMoveBackward) },
 		{ "HasSuspension",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_hasSuspension) },
 		{ "FrontWheelTurnAngle", INI::parseAngleReal, nullptr, offsetof(LocomotorTemplate, m_wheelTurnAngle) },
 		{ "MaximumWheelExtension", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_maximumWheelExtension) },
