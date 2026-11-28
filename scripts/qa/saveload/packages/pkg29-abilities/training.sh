@@ -16,7 +16,9 @@ check() {
 	if covers 800; then
 		grep -E '^TEST pkg29 strafe frame=310 alive=1 attacking=1 ' "$log" || return 1
 		expect 'TEST pkg29 strafe frame=800 alive=0 attacking=0 idle=0 x=0.0 y=0.0'
-		awk '/^TEST cooldown frame=[0-9]+ weapon=DragonStrikeStrafeWeapon .*phase=between / {
+		dragon=$(sed -n 's/^TEST damage frame=[0-9][0-9]* weapon=DragonStrikeStrafeWeapon .* source=\([0-9][0-9]*\) victim=[0-9][0-9]*(Pkg29StrafeInside) .*/\1/p' "$log" | head -n 1)
+		test -n "$dragon" || return 1
+		awk -v dragon="$dragon" '/^TEST cooldown frame=[0-9]+ weapon=DragonStrikeStrafeWeapon / && $5 == "source=" dragon && / phase=between / {
 			frame = substr($3, 7) + 0
 			if (shots == 0 && frame != 277) bad = 1
 			if (shots > 0 && frame - previous != 6) bad = 1
