@@ -51,6 +51,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include <limits>
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailWorldUI.h"
 
@@ -65,6 +66,9 @@
 #include "GameLogic/Module/AutoDepositUpdate.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
@@ -157,11 +161,20 @@ UpdateSleepTime AutoDepositUpdate::update()
 		}
 		m_depositOnFrame = TheGameLogic->getFrame() + modData->m_depositFrame;
 
-		if(getObject()->isNeutralControlled() || modData->m_depositAmount <= 0 )
+		Object* building = getObject();
+		const ContainModuleInterface* contain = building->getContain();
+		if (modData->m_onlyWhenGarrisoned && (!contain || contain->getContainCount() == 0))
 			return UPDATE_SLEEP_NONE;
 
-		// makes sure that buildings under construction do not get a bonus CCB
+		if(building->isNeutralControlled() || modData->m_depositAmount <= 0 )
+			return UPDATE_SLEEP_NONE;
+
 		if( getObject()->getConstructionPercent() != CONSTRUCTION_COMPLETE )
+			return UPDATE_SLEEP_NONE;
+
+		const ModelConditionFlags& conditions = building->getLogicModelConditions();
+		if (conditions.test(MODELCONDITION_RUBBLE) || conditions.test(MODELCONDITION_POST_RUBBLE) ||
+			conditions.test(MODELCONDITION_POST_COLLAPSE))
 			return UPDATE_SLEEP_NONE;
 
 		int moneyAmount = modData->m_depositAmount + getUpgradedSupplyBoost();
@@ -171,11 +184,25 @@ UpdateSleepTime AutoDepositUpdate::update()
 			moneyAmount = RetailEconomy::applyDepositUpgrade(*owner, modData->m_retailUpgrade,
 				modData->m_retailUpgradeMultiplier, moneyAmount);
 
+		const Real production = AttributeModifiers::productionFactor(building);
+		const Real scaledAmount = static_cast<Real>(moneyAmount) * production;
+		if (production != 1.0f)
+		{
+			if (scaledAmount >= static_cast<Real>(std::numeric_limits<Int>::max()))
+				moneyAmount = std::numeric_limits<Int>::max();
+			else
+				moneyAmount = scaledAmount > 0.0f ? static_cast<Int>(scaledAmount) : 0;
+		}
+
 		if( modData->m_isActualMoney )
 		{
 			owner->getMoney()->deposit( moneyAmount );
 			owner->getScoreKeeper()->addMoneyEarned( retail ? moneyAmount : modData->m_depositAmount );
 		}
+
+		if (!modData->m_giveNoXP)
+			if (ExperienceTracker* tracker = building->getExperienceTracker())
+				tracker->addRetailExperience(scaledAmount);
 
 		if (retail && modData->m_isActualMoney)
 			RetailWorldUI::showPayout(*getObject(), moneyAmount, FALSE);

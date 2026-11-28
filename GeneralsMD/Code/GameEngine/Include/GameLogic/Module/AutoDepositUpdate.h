@@ -80,6 +80,8 @@ public:
 	AsciiString m_retailUpgrade;
 	UnsignedInt m_retailUpgradeMultiplier = RetailEconomy::fullRate;
 	Bool m_isActualMoney;
+	Bool m_giveNoXP;
+	Bool m_onlyWhenGarrisoned;
 	std::list<upgradePair> m_upgradeBoost;
 
 	AutoDepositUpdateModuleData()
@@ -88,6 +90,8 @@ public:
 		m_depositAmount = 0;
 		m_initialCaptureBonus = 0;
 		m_isActualMoney = TRUE;
+		m_giveNoXP = FALSE;
+		m_onlyWhenGarrisoned = FALSE;
 		m_upgradeBoost.clear();
 	}
 
@@ -100,6 +104,8 @@ public:
 			{ "DepositAmount",					INI::parseInt,		nullptr, offsetof( AutoDepositUpdateModuleData, m_depositAmount ) },
 			{ "InitialCaptureBonus",		INI::parseInt,		nullptr, offsetof( AutoDepositUpdateModuleData, m_initialCaptureBonus ) },
 			{ "ActualMoney",						INI::parseBool,		nullptr, offsetof( AutoDepositUpdateModuleData, m_isActualMoney ) },
+			{ "GiveNoXP",						INI::parseBool,		nullptr, offsetof( AutoDepositUpdateModuleData, m_giveNoXP ) },
+			{ "OnlyWhenGarrisoned",		INI::parseBool,		nullptr, offsetof( AutoDepositUpdateModuleData, m_onlyWhenGarrisoned ) },
 			{ "UpgradedBoost",					parseUpgradePair,		nullptr, offsetof( AutoDepositUpdateModuleData, m_upgradeBoost ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};

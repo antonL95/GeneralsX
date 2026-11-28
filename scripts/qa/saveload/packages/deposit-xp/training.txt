@@ -1,0 +1,23 @@
+1260 create PlyrCivilian DepositXpPlain 0 3650,1100,0
+1261 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-a
+1279 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-b
+1280 deposit-xp-modifier PlyrCivilian DepositXpPlain 0 DepositXpProduction
+1281 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-c
+1299 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-d
+1300 deposit-xp-rubble PlyrCivilian DepositXpPlain 0
+1301 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-e
+1319 deposit-xp-probe PlyrCivilian DepositXpPlain 0 plain-f
+1320 destroy PlyrCivilian DepositXpPlain 0
+1322 create PlyrCivilian DepositXpNoXp 0 3650,1100,0
+1323 deposit-xp-probe PlyrCivilian DepositXpNoXp 0 noxp-a
+1341 deposit-xp-probe PlyrCivilian DepositXpNoXp 0 noxp-b
+1342 destroy PlyrCivilian DepositXpNoXp 0
+1345 create PlyrCivilian DepositXpGarrison 0 3680,1060,0
+1345 create PlyrCivilian DepositXpRider 0 3687,1060,0
+1346 deposit-xp-probe PlyrCivilian DepositXpGarrison 0 garrison-a
+1365 deposit-xp-probe PlyrCivilian DepositXpGarrison 0 garrison-b
+1366 pkg31-ai-enter PlyrCivilian DepositXpRider 0 PlyrCivilian:DepositXpGarrison:0
+1366 deposit-xp-probe PlyrCivilian DepositXpGarrison 0 garrison-c
+1425 deposit-xp-probe PlyrCivilian DepositXpGarrison 0 garrison-d
+1430 destroy PlyrCivilian DepositXpGarrison 0
+1430 destroy PlyrCivilian DepositXpRider 0
