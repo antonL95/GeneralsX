@@ -7306,6 +7306,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			if (!first && !info->m_hasHomeLocation)
 				return;
 			const Coord3D position = first ? *first->getPosition() : info->m_homeLocation;
+			const Real radius = first ? (TheAI && TheAI->getAiData() ? TheAI->getAiData()->m_maxRecruitDistance : 0.0f) : 99999.0f;
 			const Int criteria = list ? static_cast<Int>(list->getListSize()) : 1;
 			for (Int i = 0; i < criteria && remaining > 0; ++i)
 			{
@@ -7314,9 +7315,16 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 					continue;
 				while (remaining > 0)
 				{
-					Object* recruit = team->tryToRecruit(filter, &position, 99999.0f);
+					Object* recruit = team->tryToRecruit(filter, &position, radius);
 					if (!recruit || recruit->getTeam() == team || recruit->isEffectivelyDead())
 						break;
+					if (first)
+					{
+						const Real dx = position.x - recruit->getPosition()->x;
+						const Real dy = position.y - recruit->getPosition()->y;
+						if (dx * dx + dy * dy > radius * radius)
+							break;
+					}
 					recruit->setTeam(team);
 					--remaining;
 				}

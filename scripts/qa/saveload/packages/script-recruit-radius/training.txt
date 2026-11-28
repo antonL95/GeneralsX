@@ -1,0 +1,10 @@
+241 create Player_1 ScriptRecruitRadiusUnit 0 1500,1500,0
+241 create Player_1 ScriptRecruitRadiusUnit 1 1700,1500,0
+241 create Player_1 ScriptRecruitRadiusUnit 2 2100,1500,0
+241 create Player_1 ScriptRecruitRadiusEmptyUnit 0 1500,1500,0
+242 script-recruit-radius-test Player_1 - 0
+247 script-recruit-radius-test Player_1 - 0
+250 destroy Player_1 ScriptRecruitRadiusUnit 0
+250 destroy Player_1 ScriptRecruitRadiusUnit 1
+250 destroy Player_1 ScriptRecruitRadiusUnit 2
+250 destroy Player_1 ScriptRecruitRadiusEmptyUnit 0
