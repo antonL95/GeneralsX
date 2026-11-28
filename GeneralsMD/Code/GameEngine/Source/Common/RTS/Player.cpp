@@ -44,6 +44,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+
 #define DEFINE_SCIENCE_AVAILABILITY_NAMES
 
 #include "Common/ActionManager.h"
@@ -764,7 +766,9 @@ void Player::update()
 
 	if (RetailFileLayers::enabled())
 	{
-		if (Object* book = getRetailSpellBook())
+		std::vector<Object*> books;
+		collectRetailSpellBooks(books);
+		for (Object* book : books)
 		{
 			for (BehaviorModule** m = book->getBehaviorModules(); *m; ++m)
 			{
@@ -2657,6 +2661,29 @@ Object* Player::getRetailSpellBook() const
 		}
 	}
 	return nullptr;
+}
+
+void Player::collectRetailSpellBooks(std::vector<Object*>& books) const
+{
+	books.clear();
+	if (!RetailFileLayers::enabled() || !getPlayerTemplate())
+		return;
+	const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
+	for (PlayerTeamList::const_iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it)
+	{
+		for (DLINK_ITERATOR<Team> teamIt = (*it)->iterate_TeamInstanceList(); !teamIt.done(); teamIt.advance())
+		{
+			for (DLINK_ITERATOR<Object> objIt = teamIt.cur()->iterate_TeamMemberList(); !objIt.done(); objIt.advance())
+			{
+				Object* object = objIt.cur();
+				if (object->getControllingPlayer() != this || object->isDestroyed())
+					continue;
+				if (name.isNotEmpty() ? object->getTemplate()->getName() == name : object->isKindOf(KINDOF_SPELL_BOOK))
+					books.push_back(object);
+			}
+		}
+	}
+	std::sort(books.begin(), books.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
 }
 
 const CommandSet* Player::getRetailSpellStore() const
