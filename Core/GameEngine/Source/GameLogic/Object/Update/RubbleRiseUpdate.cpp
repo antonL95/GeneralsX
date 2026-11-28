@@ -60,6 +60,7 @@ void RubbleRiseUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
+	p.add(DieMuxData::getFieldParse(), offsetof(RubbleRiseUpdateModuleData, m_dieMuxData));
 }
 
 RubbleRiseUpdate::RubbleRiseUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data)
@@ -69,15 +70,17 @@ RubbleRiseUpdate::RubbleRiseUpdate(Thing* thing, const ModuleData* data) : Updat
 
 RubbleRiseUpdate::~RubbleRiseUpdate() = default;
 
-void RubbleRiseUpdate::onObjectCreated()
+void RubbleRiseUpdate::onDie(const DamageInfo* damageInfo)
 {
-	if (!RetailFileLayers::enabled() || !getObject()->testStatus(OBJECT_STATUS_RECONSTRUCTING))
-		return;
 	const auto* data = getRubbleRiseUpdateModuleData();
-	m_riseFrame = TheGameLogic->getFrame() + randomDelay(data->m_minRubbleRiseDelay, data->m_maxRubbleRiseDelay);
-	m_height = -std::max(0.0f, getObject()->getGeometryInfo().getMaxHeightAbovePosition() - data->m_rubbleHeight);
+	if (!data->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
+		return;
+	m_riseFrame = 0;
+	m_burstFrame = 0;
+	m_height = 0.0f;
 	m_speed = 0.0f;
-	m_rising = TRUE;
+	m_waiting = TRUE;
+	m_rising = FALSE;
 	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
 }
 
@@ -100,14 +103,24 @@ void RubbleRiseUpdate::setVisualOffset(Real x, Real y) const
 
 UpdateSleepTime RubbleRiseUpdate::update()
 {
-	if (!RetailFileLayers::enabled() || !m_rising)
+	if (!m_waiting && !m_rising)
 		return UPDATE_SLEEP_FOREVER;
 
+	Object* obj = getObject();
 	const auto* data = getRubbleRiseUpdateModuleData();
 	const auto frame = TheGameLogic->getFrame();
-	if (!getObject()->testStatus(OBJECT_STATUS_RECONSTRUCTING) || getObject()->isEffectivelyDead())
-		m_height = 0.0f;
-	else if (frame >= m_riseFrame)
+	if (m_waiting)
+	{
+		if (!obj->testModelConditionState(MODELCONDITION_POST_RUBBLE))
+			return UPDATE_SLEEP_NONE;
+		m_waiting = FALSE;
+		m_rising = TRUE;
+		m_riseFrame = frame + randomDelay(data->m_minRubbleRiseDelay, data->m_maxRubbleRiseDelay);
+		m_height = -std::max(0.0f, obj->getGeometryInfo().getMaxHeightAbovePosition() - data->m_rubbleHeight);
+		m_speed = 0.0f;
+		m_burstFrame = 0;
+	}
+	if (frame >= m_riseFrame)
 	{
 		if (!m_burstFrame)
 		{
@@ -130,6 +143,7 @@ UpdateSleepTime RubbleRiseUpdate::update()
 	{
 		playPhase(SCPHASE_FINAL);
 		setVisualOffset(0.0f, 0.0f);
+		obj->clearAndSetModelConditionState(MODELCONDITION_POST_RUBBLE, MODELCONDITION_POST_COLLAPSE);
 		m_rising = FALSE;
 		return UPDATE_SLEEP_FOREVER;
 	}
@@ -173,6 +187,11 @@ void RubbleRiseUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_height = 0.0f;
 			m_speed = 0.0f;
 			m_rising = FALSE;
+		}},
+		{"rubble-rise-wait", [this](Xfer* block) {
+			block->xferBool(&m_waiting);
+		}, [this] {
+			m_waiting = FALSE;
 		}}
 	});
 }

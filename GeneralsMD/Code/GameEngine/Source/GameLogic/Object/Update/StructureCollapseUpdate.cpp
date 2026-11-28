@@ -284,8 +284,15 @@ UpdateSleepTime StructureCollapseUpdate::update()
 				return UPDATE_SLEEP_FOREVER;
 			}
 
-			drawable->clearModelConditionState(MODELCONDITION_RUBBLE);
-			drawable->setModelConditionState(MODELCONDITION_POST_COLLAPSE);
+			if (retail && building->findUpdateModule(NAMEKEY("RubbleRiseUpdate")) != nullptr)
+			{
+				building->clearAndSetModelConditionState(MODELCONDITION_RUBBLE, MODELCONDITION_POST_RUBBLE);
+			}
+			else
+			{
+				drawable->clearModelConditionState(MODELCONDITION_RUBBLE);
+				drawable->setModelConditionState(MODELCONDITION_POST_COLLAPSE);
+			}
 			building->setOrientation(building->getOrientation());
 
 

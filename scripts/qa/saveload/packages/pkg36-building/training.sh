@@ -45,7 +45,7 @@ check() {
         site 980 Pkg36SelfControl '.* under=1 .* loop=-$'
     fi
     if covers 1324; then
-        site 1132 IsengardCampKeep '.* rise=-[0-9]+\.[0-9] '
+        site 1132 IsengardCampKeep '.* under=1 .* rise=0\.0 '
         site 1320 IsengardCampKeep '.* under=1 .* rise=0\.0 loop=BuildingBigConstructionLoop$'
         site 1324 Pkg36NoRiseKeep '.* rise=0\.0 '
     fi
