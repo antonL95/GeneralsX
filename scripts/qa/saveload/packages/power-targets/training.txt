@@ -28,11 +28,11 @@
 250 pt-troll-check Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
 260 create Player_1 PowerTargetsCarrier 0 1100,650,0
 260 create PlyrCreeps TheOneTree 1 1120,650,0
-260 create Player_1 MordorFighter1 0 1120,670,0
+260 create Player_1 PowerTargetsPassenger 0 1120,670,0
 265 pt-contain-add Player_1 PowerTargetsCarrier 0 PlyrCreeps:TheOneTree:1
-266 pt-contain-add Player_1 PowerTargetsCarrier 0 Player_1:MordorFighter1:0
+266 pt-contain-add Player_1 PowerTargetsCarrier 0 Player_1:PowerTargetsPassenger:0
 270 pt-carrier-state Player_1 PowerTargetsCarrier 0
-275 pt-contain-remove Player_1 PowerTargetsCarrier 0 Player_1:MordorFighter1:0
+275 pt-contain-remove Player_1 PowerTargetsCarrier 0 Player_1:PowerTargetsPassenger:0
 280 pt-carrier-state Player_1 PowerTargetsCarrier 0
 285 pt-contain-remove Player_1 PowerTargetsCarrier 0 PlyrCreeps:TheOneTree:1
 290 pt-carrier-state Player_1 PowerTargetsCarrier 0
