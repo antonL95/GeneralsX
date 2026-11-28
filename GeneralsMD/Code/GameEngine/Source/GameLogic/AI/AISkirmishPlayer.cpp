@@ -243,6 +243,17 @@ struct RetailAITuning
 	Real teamIdleCheckRadius = 50.0f;
 	Real teamTimeUntilConsideredIdle = 3.0f;
 	Real defenseTreeNodeRadius = 300.0f;
+	Real defaultTargetThreatRadius = 0.0f;
+	Int farmingThreshold = 0;
+	Int armyQualityBias = 0;
+	Int armyQuantityBias = 0;
+	Int heroQualityBias = 0;
+	Int mapControlBias = 0;
+	Int baseStrengthBias = 0;
+	Int ringOwnershipBias = 0;
+	Int retreatChecksStartFrames = 0;
+	Int retreatCheckIntervalFrames = 0;
+	Int selfDestructFrames = 0;
 };
 
 std::vector<RetailArmy> retailArmies;
@@ -1117,6 +1128,17 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "TeamIdleCheckRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, teamIdleCheckRadius) },
 		{ "TeamTimeUntilConsideredIdle", INI::parseReal, nullptr, offsetof(RetailAITuning, teamTimeUntilConsideredIdle) },
 		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
+		{ "DefaultTargetThreatRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defaultTargetThreatRadius) },
+		{ "FarmingThreshold", INI::parseInt, nullptr, offsetof(RetailAITuning, farmingThreshold) },
+		{ "ArmyQualityBias", INI::parseInt, nullptr, offsetof(RetailAITuning, armyQualityBias) },
+		{ "ArmyQuantityBias", INI::parseInt, nullptr, offsetof(RetailAITuning, armyQuantityBias) },
+		{ "HeroQualityBias", INI::parseInt, nullptr, offsetof(RetailAITuning, heroQualityBias) },
+		{ "MapControlBias", INI::parseInt, nullptr, offsetof(RetailAITuning, mapControlBias) },
+		{ "BaseStrengthBias", INI::parseInt, nullptr, offsetof(RetailAITuning, baseStrengthBias) },
+		{ "RingOwnershipBias", INI::parseInt, nullptr, offsetof(RetailAITuning, ringOwnershipBias) },
+		{ "LogicFramesTillRetreatChecksStart", INI::parseInt, nullptr, offsetof(RetailAITuning, retreatChecksStartFrames) },
+		{ "LogicFrameBetweenRetreatChecks", INI::parseInt, nullptr, offsetof(RetailAITuning, retreatCheckIntervalFrames) },
+		{ "LogicFramesTillAISelfDestructs", INI::parseInt, nullptr, offsetof(RetailAITuning, selfDestructFrames) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&retailTuning, fields);
