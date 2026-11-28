@@ -1,0 +1,34 @@
+260 create Player_1 GuldurGwanthaur 0 1700,1350,0
+260 reveal Player_1 GuldurGwanthaur 0
+262 hero-ability-select Player_1 GuldurGwanthaur 0 -
+262 hero-ability-button Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurSoulTrap
+262 hero-ability-button Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurSacrifice
+262 hero-ability-button Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurReclamation
+262 hero-ability-button Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurExpulsion
+263 create PlyrCreeps GondorFighter 1 1750,1370,0
+265 hero-ability-press Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurSoulTrap 1750 1370
+295 hero-ability-probe Player_1 GuldurGwanthaur 0 soultrap_caster|SpecialAbilityGwanthaurSoulTrap
+295 hero-ability-world - - 0 soultrap_spawn|GuldurGwanthaurSoulTrap
+295 hero-ability-probe PlyrCreeps GondorFighter 0 soultrap_enemy
+318 destroy PlyrCreeps GondorFighter 0
+318 create PlyrCreeps GondorFighter 0 1725,1350,0
+320 hero-ability-probe Player_1 GuldurGwanthaur 0 sacrifice_pre|SpecialAbilityAngmarShadeEatMeGrab
+320 hero-ability-press Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurSacrifice|GondorFighter
+350 hero-ability-probe Player_1 GuldurGwanthaur 0 sacrifice_mid|SpecialAbilityAngmarShadeEatMeGrab
+350 hero-ability-probe PlyrCreeps GondorFighter 0 sacrifice_victim_mid
+450 hero-ability-probe Player_1 GuldurGwanthaur 0 sacrifice_end|SpecialAbilityAngmarShadeEatMeGrab
+468 destroy PlyrCreeps GondorFighter 0
+468 create PlyrCreeps GondorBattleTower 0 1800,1350,0
+470 hero-ability-press Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurReclamation 1800 1350
+478 hero-ability-world - - 0 reclamation_fx|GuldurGwanthaurDarkReclamationFX
+530 hero-ability-probe Player_1 GuldurGwanthaur 0 reclamation_caster|SpecialAbilityGwanthaurReclamation
+530 hero-ability-probe PlyrCreeps GondorBattleTower 0 reclamation_tower
+530 hero-ability-world - - 0 reclamation_tree|GuldurTwistedTree*
+558 destroy PlyrCreeps GondorBattleTower 0
+558 create PlyrCreeps GondorFighter 2 1770,1380,0
+560 hero-ability-press Player_1 GuldurGwanthaur 0 Command_SpecialAbilityGwanthaurExpulsion 1770 1380
+610 hero-ability-probe Player_1 GuldurGwanthaur 0 expulsion_caster|SpecialAbilityGwanthaurFlood
+610 hero-ability-world - - 0 expulsion_flood|GwanthaurShadesFlood
+660 hero-ability-probe PlyrCreeps GondorFighter 0 expulsion_enemy
+700 destroy Player_1 GuldurGwanthaur 0
+700 destroy PlyrCreeps GondorFighter 0

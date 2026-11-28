@@ -153,3 +153,5 @@
 1 timed-upgrade-removal
 1 timed-special-ability-end
 4 spirit-of-zigur
+4 gwanthaur-abilities
+4 harad-hero-abilities

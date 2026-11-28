@@ -500,10 +500,19 @@ void cmdProbe(const RetailTestCommands::Context& ctx)
 void cmdWorld(const RetailTestCommands::Context& ctx)
 {
 	const ParsedArg arg = splitArg(ctx.argument);
+	const Bool prefixMatch = !arg.secondary.empty() && arg.secondary.back() == '*';
+	const std::string targetPattern = prefixMatch
+		? arg.secondary.substr(0, arg.secondary.size() - 1)
+		: arg.secondary;
 	std::vector<const Object*> matches;
 	for (const Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
 	{
-		if (obj->getTemplate()->getName().compareNoCase(arg.secondary.c_str()) == 0)
+		const char* name = obj->getTemplate()->getName().str();
+		const Bool matched = prefixMatch
+			? (std::strlen(name) >= targetPattern.size() &&
+				strnicmp(name, targetPattern.c_str(), targetPattern.size()) == 0)
+			: (obj->getTemplate()->getName().compareNoCase(targetPattern.c_str()) == 0);
+		if (matched)
 			matches.push_back(obj);
 	}
 	std::sort(matches.begin(), matches.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
