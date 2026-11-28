@@ -3332,11 +3332,20 @@ Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const
 void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle)
 {
 	const GeometryInfo treeGeometry(GEOMETRY_CYLINDER, FALSE, 35.0f, 14.0f, 14.0f);
-	const auto removed = std::erase_if(m_mapTrees, [&](const MapTree& tree) {
-		return ThePartitionManager->geomCollidesWithGeom(&pos, geometry, angle, &tree.position, treeGeometry, 0.0f);
-	});
+	Bool removed = FALSE;
+	for (size_t i = 0; i < m_mapTrees.size();)
+	{
+		if (ThePartitionManager->geomCollidesWithGeom(&pos, geometry, angle, &m_mapTrees[i].position, treeGeometry, 0.0f))
+		{
+			m_mapTrees.erase(m_mapTrees.begin() + static_cast<std::ptrdiff_t>(i));
+			adjustTargetedTreePowerGroups(m_targetedTreePowerGroups, i);
+			removed = TRUE;
+			continue;
+		}
+		++i;
+	}
 	if (removed)
-		clearTreePowerGroups();
+		m_treePowerGroups.clear();
 }
 
 Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,
@@ -3423,12 +3432,18 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 	std::uint64_t boxes = 0;
 	const Real treeRadius = 7.0f;
 	const Real radiusSquared = sqr(radius + treeRadius);
-	const auto removed = std::erase_if(m_mapTrees, [&](const MapTree& tree) {
+	Bool removed = FALSE;
+	for (size_t i = 0; i < m_mapTrees.size();)
+	{
+		const MapTree& tree = m_mapTrees[i];
 		const Real dx = tree.position.x - origin.x;
 		const Real dy = tree.position.y - origin.y;
 		const Real dz = tree.position.z - origin.z;
 		if (tree.boxes <= 0 || dx * dx + dy * dy + dz * dz >= radiusSquared)
-			return false;
+		{
+			++i;
+			continue;
+		}
 
 		boxes += tree.boxes;
 		if (TheTerrainVisual)
@@ -3439,10 +3454,12 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 		}
 		if (fx)
 			FXList::doFXPos(fx, &tree.position);
-		return true;
-	});
+		m_mapTrees.erase(m_mapTrees.begin() + static_cast<std::ptrdiff_t>(i));
+		adjustTargetedTreePowerGroups(m_targetedTreePowerGroups, i);
+		removed = TRUE;
+	}
 	if (removed)
-		clearTreePowerGroups();
+		m_treePowerGroups.clear();
 	return boxes;
 }
 
