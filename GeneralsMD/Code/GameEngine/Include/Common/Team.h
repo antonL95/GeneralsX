@@ -33,6 +33,8 @@
 #include "Common/Thing.h"
 #include "GameLogic/Object.h"
 
+struct SpecialPowerObjectFilter;
+
 // ------------------------------------------------------------------------------------------------
 typedef UnsignedInt TeamID;
 #define TEAM_ID_INVALID 0
@@ -426,6 +428,7 @@ public:
 		a convenience routine to quickly check if any buildings with a specific KindOfType flag are owned.
 	*/
 	Bool hasAnyBuildings(KindOfMaskType kindOf) const;
+	Bool hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete) const;
 
 	/**
 		a convenience routine to quickly check if any units are owned.
@@ -594,6 +597,7 @@ public:
 		a convenience routine to quickly check if any buildings with a specific KindOfType flag are owned.
 	*/
 	Bool hasAnyBuildings(KindOfMaskType kindOf) const;
+	Bool hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete) const;
 
 	/**
 		a convenience routine to quickly check if any units are owned.

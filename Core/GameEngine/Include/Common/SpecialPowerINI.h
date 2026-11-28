@@ -12,6 +12,8 @@ class ThingTemplate;
 
 struct SpecialPowerObjectFilter
 {
+	static constexpr UnsignedInt RULE_ALL = 1u << 10;
+	static constexpr UnsignedInt RULE_ANY = 1u << 11;
 	static constexpr UnsignedInt RULE_NONE = 1u << 12;
 
 	UnsignedInt m_rules = 0;
@@ -20,6 +22,7 @@ struct SpecialPowerObjectFilter
 	std::vector<AsciiString> m_includeObjects;
 	std::vector<AsciiString> m_excludeObjects;
 
+	Bool isActive() const;
 	Bool matchesTemplate(const ThingTemplate& thing) const;
 	Bool matchesObject(const Object* source, const Object* target, const Player* sourcePlayer = nullptr) const;
 	static void parse(INI* ini, void* instance, void* store, const void* userData);

@@ -892,7 +892,7 @@ Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target,
 		!m_specialPower->isUnlockedFor(book->getControllingPlayer()))
 		return FALSE;
 	const SpecialPowerModuleInterface* module = book->getSpecialPowerModule(m_specialPower);
-	if (!module || module->getPercentReady() < 1.0f)
+	if (!module || !module->isRetailCastAllowed(m_options) || module->getPercentReady() < 1.0f)
 		return FALSE;
 	if (BitIsSet(m_options, COMMAND_OPTION_NEED_OBJECT_TARGET) && !isValidObjectTarget(book, target))
 		return FALSE;

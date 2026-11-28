@@ -762,6 +762,18 @@ void Player::update()
 		tunnelSystem->healObjects();
 #endif
 
+	if (RetailFileLayers::enabled())
+	{
+		if (Object* book = getRetailSpellBook())
+		{
+			for (BehaviorModule** m = book->getBehaviorModules(); *m; ++m)
+			{
+				if (SpecialPowerModuleInterface* sp = (*m)->getSpecialPower())
+					sp->refreshRequirementsPause();
+			}
+		}
+	}
+
 	m_money.updateIncomeBucket();
 }
 
@@ -1927,6 +1939,17 @@ Bool Player::hasAnyBuildings(KindOfMaskType kindOf) const
 	return false;
 }
 
+Bool Player::hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete) const
+{
+	for (PlayerTeamList::const_iterator it = m_playerTeamPrototypes.begin();
+			 it != m_playerTeamPrototypes.end(); ++it)
+	{
+		if ((*it)->hasAnyBuildings(filter, source, ignoreIncomplete))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 //=============================================================================
 Bool Player::hasAnyUnits() const
 {
@@ -2610,21 +2633,27 @@ Object* Player::getRetailSpellBook() const
 	if (!RetailFileLayers::enabled() || !TheGameLogic || !getPlayerTemplate())
 		return nullptr;
 	const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
-	if (name.isEmpty())
-		return nullptr;
 	const auto matches = [this, &name](const Object* object)
 	{
-		return object && object->getControllingPlayer() == this && !object->isDestroyed() &&
-			object->getTemplate()->getName() == name;
+		if (!object || object->getControllingPlayer() != this || object->isDestroyed())
+			return false;
+		return name.isNotEmpty() ? object->getTemplate()->getName() == name : object->isKindOf(KINDOF_SPELL_BOOK);
 	};
 	if (Object* book = TheGameLogic->findObjectByID(m_retailSpellBookID); matches(book))
 		return book;
-	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	for (PlayerTeamList::const_iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it)
 	{
-		if (matches(object))
+		for (DLINK_ITERATOR<Team> teamIt = (*it)->iterate_TeamInstanceList(); !teamIt.done(); teamIt.advance())
 		{
-			m_retailSpellBookID = object->getID();
-			return object;
+			for (DLINK_ITERATOR<Object> objIt = teamIt.cur()->iterate_TeamMemberList(); !objIt.done(); objIt.advance())
+			{
+				Object* object = objIt.cur();
+				if (matches(object))
+				{
+					m_retailSpellBookID = object->getID();
+					return object;
+				}
+			}
 		}
 	}
 	return nullptr;

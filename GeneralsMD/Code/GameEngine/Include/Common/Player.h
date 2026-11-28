@@ -513,6 +513,7 @@ public:
 		a convenience routine to quickly check if any buildings with a specific KindOfType flag are owned.
 	*/
 	Bool hasAnyBuildings(KindOfMaskType kindOf) const;
+	Bool hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete = TRUE) const;
 
 	/**
 		a convenience routine to quickly check if any units are owned.

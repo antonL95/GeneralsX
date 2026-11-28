@@ -68,6 +68,8 @@ public:
 	virtual void doSpecialPower( UnsignedInt commandOptions ) = 0;
 	virtual Bool isValidPowerTarget(const Object*) const { return TRUE; }
 	virtual Bool isRetailCastAllowed(UnsignedInt commandOptions = 0) const { return TRUE; }
+	virtual Bool meetsRequirementsFilter() const { return TRUE; }
+	virtual void refreshRequirementsPause() {}
 	virtual Bool wasLastCastAccepted() const { return FALSE; }
 	virtual void resetLastCastAccepted() {}
 	virtual void doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions ) = 0;
@@ -188,6 +190,9 @@ public:
 	//
 	virtual void doSpecialPower( UnsignedInt commandOptions ) override;
 	Bool isRetailCastAllowed(UnsignedInt commandOptions = 0) const override;
+	Bool meetsRequirementsFilter() const override;
+	void refreshRequirementsPause() override;
+	Bool isPaused() const { return m_pausedCount > 0; }
 	Bool wasLastCastAccepted() const override { return m_lastCastAccepted; }
 	void resetLastCastAccepted() override { m_lastCastAccepted = FALSE; }
 	virtual void doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions ) override;
@@ -241,11 +246,16 @@ protected:
 	void resolveSpecialPower();
 	void aboutToDoSpecialPower( const Coord3D *location );
 	void applyRotwkTrigger( const Coord3D *location );
+	const SpecialPowerObjectFilter* activeRequirementsFilter() const;
+	Bool hasActiveRequirementsFilter() const;
+	void updateRequirementsPause();
+	void xferRetailBlocks( Xfer* xfer, Bool present );
 
 	UnsignedInt m_availableOnFrame;			///< on this frame, this special power is available
 	Int m_pausedCount;									///< Reference count of sources pausing me
 	UnsignedInt m_pausedOnFrame;
 	Real m_pausedPercent;
 	Bool m_lastCastAccepted = FALSE;
+	Bool m_pausedByRequirements = FALSE;
 
 };

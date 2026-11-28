@@ -37,6 +37,7 @@
 #include "GameClient/ControlBar.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/BitFlagsIO.h"
@@ -504,7 +505,8 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 		return FALSE;
 
 	// as a first sanity check, the object must have a module capable of executing the power
-	if( obj->getSpecialPowerModule( specialPowerTemplate ) == nullptr )
+	const SpecialPowerModuleInterface* module = obj->getSpecialPowerModule( specialPowerTemplate );
+	if( module == nullptr || !module->meetsRequirementsFilter() )
 		return FALSE;
 	if (TheRetailCommandCatalog)
 	{

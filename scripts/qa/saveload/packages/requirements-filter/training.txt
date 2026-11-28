@@ -1,0 +1,22 @@
+200 create PlyrCivilian ReqFilterFortress 0 2600,1800,0
+201 create PlyrCivilian ReqFilterBook 0 2640,1800,0
+202 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+205 req-filter-cast PlyrCivilian ReqFilterBook 0 ReqFilterButton 2660 1800
+220 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+225 destroy PlyrCivilian ReqFilterFortress 0
+227 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+240 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+241 req-filter-cast PlyrCivilian ReqFilterBook 0 ReqFilterButton 2660 1800
+248 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+255 create PlyrCivilian ReqFilterFortress 0 2600,1800,0
+255 req-filter-uc PlyrCivilian ReqFilterFortress 0 1
+257 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+265 req-filter-uc PlyrCivilian ReqFilterFortress 0 0
+267 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+360 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+385 req-filter-probe PlyrCivilian ReqFilterBook 0 ReqFilterPower
+388 req-filter-cast PlyrCivilian ReqFilterBook 0 ReqFilterButton 2660 1800
+395 destroy PlyrCivilian ReqFilterMarker 1
+395 destroy PlyrCivilian ReqFilterMarker 0
+395 destroy PlyrCivilian ReqFilterBook 0
+395 destroy PlyrCivilian ReqFilterFortress 0

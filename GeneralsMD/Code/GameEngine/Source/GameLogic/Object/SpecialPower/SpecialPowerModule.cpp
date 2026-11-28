@@ -44,6 +44,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "Common/Science.h"
@@ -200,6 +201,9 @@ SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleDa
 	const SpecialPowerModuleData *md = (const SpecialPowerModuleData *)moduleData;
 	if( md->m_startsPaused )
 		pauseCountdown( TRUE );
+
+	if (hasActiveRequirementsFilter())
+		updateRequirementsPause();
 
 	resolveSpecialPower();
 
@@ -535,6 +539,11 @@ void SpecialPowerModule::startPowerRecharge()
 		}
 		m_availableOnFrame = TheGameLogic->getFrame() + reload;
 	}
+	if (m_pausedCount > 0)
+	{
+		m_pausedOnFrame = TheGameLogic->getFrame();
+		m_pausedPercent = m_availableOnFrame <= m_pausedOnFrame ? 1.0f : 0.0f;
+	}
 	RetailEva::watchRecharge(*obj, *modData->m_specialPowerTemplate);
 }
 
@@ -836,10 +845,62 @@ void SpecialPowerModule::aboutToDoSpecialPower( const Coord3D *location )
 //then all we do is initiate the special power, and trust that the update module will
 //do the rest.
 //-------------------------------------------------------------------------------------------------
+const SpecialPowerObjectFilter* SpecialPowerModule::activeRequirementsFilter() const
+{
+	if (!RetailFileLayers::enabled())
+		return nullptr;
+	const Object* self = getObject();
+	const Player* player = self ? self->getControllingPlayer() : nullptr;
+	if (!player || !player->usesRetailMultiplayerPowers())
+		return nullptr;
+	return &getSpecialPowerModuleData()->m_requirementsFilterMPSkirmish;
+}
+
+Bool SpecialPowerModule::hasActiveRequirementsFilter() const
+{
+	return RetailFileLayers::enabled() &&
+		getSpecialPowerModuleData()->m_requirementsFilterMPSkirmish.isActive();
+}
+
+Bool SpecialPowerModule::meetsRequirementsFilter() const
+{
+	const SpecialPowerObjectFilter* filter = activeRequirementsFilter();
+	if (!filter || !filter->isActive())
+		return TRUE;
+	const Object* self = getObject();
+	const Player* player = self ? self->getControllingPlayer() : nullptr;
+	if (!player)
+		return FALSE;
+	return player->hasAnyBuildings(*filter, self, TRUE);
+}
+
+void SpecialPowerModule::refreshRequirementsPause()
+{
+	if (hasActiveRequirementsFilter())
+		updateRequirementsPause();
+}
+
+void SpecialPowerModule::updateRequirementsPause()
+{
+	const Bool met = meetsRequirementsFilter();
+	if (!met && !m_pausedByRequirements)
+	{
+		m_pausedByRequirements = TRUE;
+		pauseCountdown(TRUE);
+	}
+	else if (met && m_pausedByRequirements)
+	{
+		m_pausedByRequirements = FALSE;
+		pauseCountdown(FALSE);
+	}
+}
+
 Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
 {
 	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog)
 		return TRUE;
+	if (!meetsRequirementsFilter())
+		return FALSE;
 	const Object* obj = getObject();
 	const SpecialPowerTemplate* power = getSpecialPowerTemplate();
 	if (!obj || !power)
@@ -999,6 +1060,18 @@ void SpecialPowerModule::crc( Xfer *xfer )
 	// extend base class
 	BehaviorModule::crc( xfer );
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks( xfer, TRUE );
+
+}
+
+void SpecialPowerModule::xferRetailBlocks( Xfer* xfer, Bool present )
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"requirements-pause", [this](Xfer* block) {
+			block->xferBool(&m_pausedByRequirements);
+		}, [this] { m_pausedByRequirements = FALSE; }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1009,8 +1082,7 @@ void SpecialPowerModule::crc( Xfer *xfer )
 void SpecialPowerModule::xfer( Xfer *xfer )
 {
 
-	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1028,6 +1100,9 @@ void SpecialPowerModule::xfer( Xfer *xfer )
 
 	// paused percent
 	xfer->xferReal( &m_pausedPercent );
+
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks( xfer, version >= 2 );
 
 }
 

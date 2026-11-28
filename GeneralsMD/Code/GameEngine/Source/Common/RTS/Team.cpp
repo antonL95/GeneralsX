@@ -37,6 +37,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
@@ -1034,6 +1035,16 @@ Bool TeamPrototype::hasAnyBuildings(KindOfMaskType kindOf) const
 	return false;
 }
 
+Bool TeamPrototype::hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete) const
+{
+	for (DLINK_ITERATOR<Team> iter = iterate_TeamInstanceList(); !iter.done(); iter.advance())
+	{
+		if (iter.cur()->hasAnyBuildings(filter, source, ignoreIncomplete))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 // ------------------------------------------------------------------------
 Bool TeamPrototype::hasAnyUnits() const
 {
@@ -1732,6 +1743,25 @@ Bool Team::hasAnyBuildings(KindOfMaskType kindOf) const
 			return true;
 	}
 	return false;
+}
+
+Bool Team::hasAnyBuildings(const SpecialPowerObjectFilter& filter, const Object* source, Bool ignoreIncomplete) const
+{
+	const Player* owner = getControllingPlayer();
+	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		const Object* obj = iter.cur();
+		if (obj->isDestroyed() || obj->isEffectivelyDead())
+			continue;
+		if (obj->isKindOf(KINDOF_MINE))
+			continue;
+		if (ignoreIncomplete && obj->isKindOf(KINDOF_STRUCTURE) &&
+			(obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->testStatus(OBJECT_STATUS_SOLD)))
+			continue;
+		if (filter.matchesObject(source, obj, owner))
+			return TRUE;
+	}
+	return FALSE;
 }
 
 // ------------------------------------------------------------------------

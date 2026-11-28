@@ -48,8 +48,12 @@ constexpr UnsignedInt FILTER_SELF = 1u << 0;
 constexpr UnsignedInt FILTER_ALLIES = 1u << 1;
 constexpr UnsignedInt FILTER_ENEMIES = 1u << 2;
 constexpr UnsignedInt FILTER_NEUTRALS = 1u << 3;
-constexpr UnsignedInt FILTER_ALL = 1u << 10;
 constexpr UnsignedInt FILTER_SAME_PLAYER = 1u << 13;
+}
+
+Bool SpecialPowerObjectFilter::isActive() const
+{
+	return (m_rules & (RULE_ALL | RULE_ANY)) != 0 || m_includeKinds.any() || !m_includeObjects.empty();
 }
 
 Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object* target, const Player* sourcePlayer) const
@@ -64,7 +68,7 @@ Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object*
 	if (!sourcePlayer && source)
 		sourcePlayer = source->getControllingPlayer();
 	WeaponNuggetRules::FilterFacts facts{};
-	facts.ruleAll = (m_rules & FILTER_ALL) != 0;
+	facts.ruleAll = (m_rules & RULE_ALL) != 0;
 	facts.ruleNone = (m_rules & SpecialPowerObjectFilter::RULE_NONE) != 0;
 	facts.wantsSelf = (m_rules & FILTER_SELF) != 0;
 	facts.wantsAllies = (m_rules & FILTER_ALLIES) != 0;
@@ -116,6 +120,8 @@ void SpecialPowerObjectFilter::addTokens(INI* ini, const char* token)
 		"SELF", "ALLIES", "ENEMIES", "NEUTRALS", "SUICIDE", "NOT_SIMILAR", "NOT_AIRBORNE",
 		"PROJECTILES", "SAME_HEIGHT_ONLY", "MINES", "ALL", "ANY", "NONE", "SAME_PLAYER", nullptr
 	};
+	static_assert(std::string_view(rules[10]) == "ALL");
+	static_assert(std::string_view(rules[11]) == "ANY");
 	static_assert(std::string_view(rules[12]) == "NONE");
 	for (; token; token = ini->getNextTokenOrNull())
 	{
