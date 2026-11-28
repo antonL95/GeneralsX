@@ -2833,6 +2833,7 @@ void PartitionManager::shutdown()
 	removeAllDirtyModules();
 	m_loadedCollisionChecks.clear();
 	m_triggerReveals.clear();
+	m_logicFogEnabled = TRUE;
 
 #ifdef RTS_DEBUG
 	// the above *should* remove all the touched cells (via unRegisterObject), but let's check:
@@ -3160,16 +3161,16 @@ ICoord2D PartitionManager::getTriggerRevealGridSize()
 	return {worldToCellDist(maximum.width()), worldToCellDist(maximum.height())};
 }
 
-void PartitionManager::adjustTriggerReveal(const RetailTriggerReveal& reveal, Bool add)
+void PartitionManager::adjustTriggerCells(const std::vector<ICoord2D>& cells, PlayerMaskType players, Bool add)
 {
-	for (const ICoord2D& point : reveal.cells)
+	for (const ICoord2D& point : cells)
 	{
 		PartitionCell* cell = getCellAt(point.x, point.y);
 		if (!cell)
 			continue;
 		for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
 		{
-			if (!(reveal.players & (PlayerMaskType{1} << i)))
+			if (!(players & (PlayerMaskType{1} << i)))
 				continue;
 			if (add)
 				cell->addLooker(i);
@@ -3179,13 +3180,14 @@ void PartitionManager::adjustTriggerReveal(const RetailTriggerReveal& reveal, Bo
 	}
 }
 
-void PartitionManager::revealTriggerPermanently(const PolygonTrigger& area, PlayerMaskType players, const AsciiString& name)
+void PartitionManager::adjustTriggerReveal(const RetailTriggerReveal& reveal, Bool add)
 {
-	if (!players || name.isEmpty() || area.getNumPoints() < 3 || !m_cells ||
-		std::any_of(m_triggerReveals.begin(), m_triggerReveals.end(), [&name](const RetailTriggerReveal& reveal) { return reveal.name == name; }))
-		return;
+	adjustTriggerCells(reveal.cells, reveal.players, add);
+}
 
-	RetailTriggerReveal reveal{name, players, {}};
+std::vector<ICoord2D> PartitionManager::collectTriggerCells(const PolygonTrigger& area)
+{
+	std::vector<ICoord2D> cells;
 	const IRegion2D& bounds = area.getBounds();
 	ICoord2D lo, hi;
 	worldToCell(bounds.lo.x, bounds.lo.y, &lo.x, &lo.y);
@@ -3199,11 +3201,30 @@ void PartitionManager::revealTriggerPermanently(const PolygonTrigger& area, Play
 			getCellCenterPos(x, y, wx, wy);
 			ICoord3D point{static_cast<Int>(REAL_TO_INT_FLOOR(wx)), static_cast<Int>(REAL_TO_INT_FLOOR(wy)), 0};
 			if (area.pointInTrigger(point))
-				reveal.cells.push_back({x, y});
+				cells.push_back({x, y});
 		}
 	}
+	return cells;
+}
+
+void PartitionManager::revealTriggerPermanently(const PolygonTrigger& area, PlayerMaskType players, const AsciiString& name)
+{
+	if (!players || name.isEmpty() || area.getNumPoints() < 3 || !m_cells ||
+		std::any_of(m_triggerReveals.begin(), m_triggerReveals.end(), [&name](const RetailTriggerReveal& reveal) { return reveal.name == name; }))
+		return;
+
+	RetailTriggerReveal reveal{name, players, collectTriggerCells(area)};
 	m_triggerReveals.push_back(std::move(reveal));
 	adjustTriggerReveal(m_triggerReveals.back(), TRUE);
+}
+
+void PartitionManager::exploreTriggerForPlayers(const PolygonTrigger& area, PlayerMaskType players)
+{
+	if (!players || area.getNumPoints() < 3 || !m_cells)
+		return;
+	const std::vector<ICoord2D> cells = collectTriggerCells(area);
+	adjustTriggerCells(cells, players, TRUE);
+	adjustTriggerCells(cells, players, FALSE);
 }
 
 void PartitionManager::undoTriggerReveal(const AsciiString& name)
@@ -3280,7 +3301,12 @@ CellShroudStatus PartitionManager::getShroudStatusForPlayer(Int playerIndex, Int
 		return CELLSHROUD_SHROUDED;// Safety.  There are no Negative players, but PlayerIndex is typedef'd to Int, not UnsignedInt
 
 	const PartitionCell* cell = getCellAt(x, y);
-	return cell ? cell->getShroudStatusForPlayer(playerIndex) : CELLSHROUD_SHROUDED;
+	if (!cell)
+		return CELLSHROUD_SHROUDED;
+	const CellShroudStatus status = cell->getShroudStatusForPlayer(playerIndex);
+	if (status == CELLSHROUD_FOGGED && !m_logicFogEnabled)
+		return CELLSHROUD_CLEAR;
+	return status;
 }
 
 //-----------------------------------------------------------------------------
@@ -5111,7 +5137,10 @@ void PartitionManager::xferRetailBlocks(Xfer* xfer, Bool present)
 					}
 				}
 			},
-			[this] { m_triggerReveals.clear(); } }
+			[this] { m_triggerReveals.clear(); } },
+		{ "logic-fog",
+			[this](Xfer* x) { x->xferBool(&m_logicFogEnabled); },
+			[this] { m_logicFogEnabled = TRUE; } }
 	});
 }
 

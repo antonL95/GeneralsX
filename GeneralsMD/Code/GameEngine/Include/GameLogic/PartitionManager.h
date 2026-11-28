@@ -1267,8 +1267,11 @@ private:
 	PartitionData*	m_dirtyModules;
 	std::vector<ObjectID> m_loadedCollisionChecks;
 	std::vector<RetailTriggerReveal> m_triggerReveals;
+	Bool m_logicFogEnabled = TRUE;
 	ICoord2D getTriggerRevealGridSize();
+	std::vector<ICoord2D> collectTriggerCells(const PolygonTrigger& area);
 	void adjustTriggerReveal(const RetailTriggerReveal& reveal, Bool add);
+	void adjustTriggerCells(const std::vector<ICoord2D>& cells, PlayerMaskType players, Bool add);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	Bool						m_updatedSinceLastReset;	///< Used to force a return of OBJECTSHROUD_INVALID before update has been called.
 
@@ -1534,6 +1537,9 @@ public:
 		Resets the shroud for the given player with passive shroud (can re-explore).
 		*/
 	void shroudMapForPlayer( Int playerIndex );
+	void exploreTriggerForPlayers(const PolygonTrigger& area, PlayerMaskType players);
+	void setLogicFogEnabled(Bool enabled) { m_logicFogEnabled = enabled; }
+	Bool isLogicFogEnabled() const { return m_logicFogEnabled; }
 
 	/** this doesn't change the actual shroud values in logic, just pushes them
 		back out to the display... this should generally only be used when the local

@@ -655,6 +655,8 @@ public:
 		DIM_WORLD_LIGHTS,
 		RESTORE_WORLD_LIGHTS,
 		PLAY_MOVIE_IN_GAME,
+		MAP_REVEAL_IN_TRIGGER,
+		SET_LOGIC_FOG_STATE,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

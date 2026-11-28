@@ -8796,6 +8796,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				ThePartitionManager->revealTriggerPermanently(*area,
 					TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(1)->getString()), pAction->getParameter(2)->getString());
 			return;
+		case ScriptAction::MAP_REVEAL_IN_TRIGGER:
+			if (const PolygonTrigger* area = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(0)->getString()))
+				ThePartitionManager->exploreTriggerForPlayers(*area,
+					TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(1)->getString()));
+			return;
+		case ScriptAction::SET_LOGIC_FOG_STATE:
+			ThePartitionManager->setLogicFogEnabled(pAction->getParameter(0)->getInt() != 0);
+			return;
 		case ScriptAction::MAP_UNDO_REVEAL_PERMANENTLY_IN_TRIGGER:
 			ThePartitionManager->undoTriggerReveal(pAction->getParameter(0)->getString());
 			return;
