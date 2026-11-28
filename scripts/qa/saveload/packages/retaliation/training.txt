@@ -1,6 +1,6 @@
-220 create Player_1 RetaliationSaveCottage 0 1350,1700,0
-230 create PlyrCreeps RetaliationSaveBulwark 0 1430,1600,0
-235 create Player_1 RetaliationSaveHorde 0 1330,1800,0
+220 create Player_1 RetaliationSaveCottage 0 750,1150,0
+230 create PlyrCreeps RetaliationSaveBulwark 0 830,1050,0
+235 create Player_1 RetaliationSaveHorde 0 730,1250,0
 237 snapshot-partition-scale Player_1 RetaliationSaveHorde 0 4
 260 destroy Player_1 RetaliationSaveHorde 0
 260 destroy Player_1 RetaliationSaveCottage 0
