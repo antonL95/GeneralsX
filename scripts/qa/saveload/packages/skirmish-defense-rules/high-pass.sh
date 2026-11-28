@@ -1,3 +1,10 @@
+prepare() {
+    if grep -q '^95 create Player_2 SkirmishDefenseRuleAnchor ' "$out/commands.txt"; then
+        printf '%s\n' 'set environment GENERALSX_RETAIL_SKIRMISH_AI brutal' 'set environment GENERALSX_SKIRMISH_AI_TRACE 1' >> "$out/start.gdb"
+        printf '%s\n' 'set environment GENERALSX_SKIRMISH_AI_TRACE 1' >> "$out/resume.gdb"
+    fi
+}
+
 check() {
     if ! grep -q '^95 create Player_2 SkirmishDefenseRuleAnchor ' "$out/continue.txt" || ! covers 424; then
         return 0
