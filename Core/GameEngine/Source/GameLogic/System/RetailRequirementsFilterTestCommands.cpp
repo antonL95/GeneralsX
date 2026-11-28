@@ -3,6 +3,8 @@
 
 #if !RTS_GENERALS
 #include <cstdio>
+#include <string>
+#include <vector>
 
 #include "Common/ActionManager.h"
 #include "Common/Player.h"
@@ -25,6 +27,27 @@ void probeRequirementsFilter(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST req-filter frame=%u ready=%d paused=%d met=%d store=%d pct=%.3f\n",
 		ctx.frame, module->isReady() ? 1 : 0, module->isPaused() ? 1 : 0,
 		module->meetsRequirementsFilter() ? 1 : 0, storeOk ? 1 : 0, module->getPercentReady());
+}
+
+void probeRequirementsFilterBooks(const RetailTestCommands::Context& ctx)
+{
+	Object* anchor = ctx.requireObject();
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(ctx.argument);
+	Player* player = anchor ? anchor->getControllingPlayer() : nullptr;
+	if (!player || !power)
+		return;
+	std::vector<Object*> books;
+	player->collectRetailSpellBooks(books);
+	std::string paused;
+	for (const Object* book : books)
+	{
+		const auto* module = static_cast<const SpecialPowerModule*>(book->getSpecialPowerModule(power));
+		if (!paused.empty())
+			paused += ',';
+		paused += module ? (module->isPaused() ? '1' : '0') : '-';
+	}
+	std::fprintf(stderr, "TEST req-filter-books frame=%u count=%u paused=%s\n",
+		ctx.frame, static_cast<unsigned>(books.size()), paused.c_str());
 }
 
 void castRequirementsFilter(const RetailTestCommands::Context& ctx)
@@ -76,6 +99,7 @@ void registerRetailRequirementsFilterTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("req-filter-probe", probeRequirementsFilter);
+	registerAction("req-filter-books", probeRequirementsFilterBooks);
 	registerAction("req-filter-cast", castRequirementsFilter);
 	registerAction("req-filter-uc", setUnderConstruction);
 #endif

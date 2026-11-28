@@ -35,4 +35,10 @@ check() {
     if covers 388; then
         expect 'TEST req-filter-cast frame=388 allowed=1 accepted=1' || return 1
     fi
+    for pair in 202:0,0 227:1,1 248:1,1 257:1,1 267:0,0; do
+        frame=${pair%%:*}
+        if covers "$frame"; then
+            expect "TEST req-filter-books frame=$frame count=2 paused=${pair#*:}" || return 1
+        fi
+    done
 }
