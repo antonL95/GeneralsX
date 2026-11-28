@@ -1399,11 +1399,11 @@ void WeaponFireSpecialAbilityUpdate::triggerAbilityEffect()
 	{
 		Object* target = TheGameLogic->findObjectByID(getAbilityTargetID());
 		if (target && !(data->m_needLivingTargets && target->isEffectivelyDead()))
-			TheWeaponStore->createAndFireTempWeapon(data->m_specialWeapon, self, target);
+			TheWeaponStore->createAndFireTempWeapon(data->m_specialWeapon, self, target, TRUE);
 		return;
 	}
 	const Coord3D position = hasAbilityTargetPos() ? getAbilityTargetPos() : *self->getPosition();
-	TheWeaponStore->createAndFireTempWeapon(data->m_specialWeapon, self, &position);
+	TheWeaponStore->createAndFireTempWeapon(data->m_specialWeapon, self, &position, TRUE);
 }
 
 Bool WeaponFireSpecialAbilityUpdate::skipsContinue() const
