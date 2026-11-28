@@ -1,0 +1,9 @@
+44 power-reveal - - 0
+44 create PlyrCivilian SkirmishFlagCenterTargetFlag 0 2000,1750,0
+46 create Player_2 SkirmishFlagCenterEscortHorde 0 2020,1770,0
+46 create Player_2 SkirmishFlagCenterEscortHorde 1 2040,1790,0
+156 create Player_2 MordorFighterHorde 0 2350,1500,0
+200 skirmish-tactic-capture Player_2 MordorFighterHorde 0 PlyrCivilian:SkirmishFlagCenterTargetFlag:0
+200 skirmish-tactic-guard Player_2 SkirmishFlagCenterEscortHorde 1 Player_2:MordorFighterHorde:0
+201 skirmish-tactic-capture Player_2 MordorFighterHorde 0 PlyrCivilian:SkirmishFlagCenterTargetFlag:0
+201 skirmish-tactic-guard Player_2 SkirmishFlagCenterEscortHorde 1 Player_2:MordorFighterHorde:0

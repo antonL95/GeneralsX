@@ -170,6 +170,7 @@ protected:
 		UnsignedInt idleSince = 0;
 	};
 	RetailFarmRaid m_retailFarmRaid;
+	Player* retailStrategicEnemy() const;
 	Bool updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
 		UnsignedInt frame, Bool canStart, Bool trace);
 	UnsignedInt m_retailRoamNextFrame = 0;

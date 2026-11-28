@@ -2092,79 +2092,144 @@ Bool AISkirmishPlayer::updateRetailFlagCapture(const std::vector<Object*>& owned
 	}
 	if (!canStart || frame < m_retailFlagRetryFrame)
 		return FALSE;
-	Object* capturer = nullptr;
-	Object* flag = nullptr;
-	const CommandButton* capture = nullptr;
-	Real closest = 0.0f;
+	std::vector<Object*> recruits;
+	std::vector<Object*> flags;
 	for (Object* unit : owned)
 	{
-		const auto* ability = unit->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
-		if (!ability)
-			continue;
-		if (ability->isActive())
+		if (const auto* ability = unit->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+			ability && ability->isActive())
 			return TRUE;
-		if (!isRetailTacticRecruit(*unit, *m_player))
-			continue;
-		const CommandSet* commands = retailCommands(*unit);
+		if (isRetailTacticRecruit(*unit, *m_player))
+			recruits.push_back(unit);
+	}
+	std::sort(recruits.begin(), recruits.end(), [](const Object* a, const Object* b) {
+		return a->getID() < b->getID();
+	});
+	for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
+		if (target->isKindOf(KINDOF_CAPTUREFLAG) && !target->isDestroyed() && !target->isEffectivelyDead() &&
+			m_player->getRelationship(target->getTeam()) != ALLIES)
+			flags.push_back(target);
+	if (recruits.empty() || flags.empty())
+		return FALSE;
+
+	const auto findCaptureButton = [](Object& unit, Object& target) -> const CommandButton* {
+		const auto* ability = unit.findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+		if (!ability || ability->isActive())
+			return nullptr;
+		const CommandSet* commands = retailCommands(unit);
 		if (!commands)
-			continue;
+			return nullptr;
 		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 		{
 			const CommandButton* button = commands->getCommandButton(slot);
 			const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
 			if (!power || button->getCommandType() != GUI_COMMAND_SPECIAL_POWER ||
 				power->getSpecialPowerType() != SPECIAL_INFANTRY_CAPTURE_BUILDING ||
-				button->getRequiredRank() > unit->getExperienceTracker()->getRank() ||
-				!HeroRoster::buttonUpgradesMet(button, unit->getControllingPlayer(), unit))
+				button->getRequiredRank() > unit.getExperienceTracker()->getRank() ||
+				!HeroRoster::buttonUpgradesMet(button, unit.getControllingPlayer(), &unit))
 				continue;
-			for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
-			{
-				if (!target->isKindOf(KINDOF_CAPTUREFLAG) || target->isDestroyed() || target->isEffectivelyDead() ||
-					unit->getRelationship(target) == ALLIES)
-					continue;
-				const Coord3D delta = *target->getPosition() - *unit->getPosition();
-				const Real distance = sqr(delta.x) + sqr(delta.y);
-				if (flag && std::make_tuple(distance, target->getID(), unit->getID()) >=
-					std::make_tuple(closest, flag->getID(), capturer->getID()))
-					continue;
-				if (!TheActionManager->canDoSpecialPowerAtObject(unit, target, CMD_FROM_AI, power, button->getOptions()))
-					continue;
-				capturer = unit;
-				flag = target;
-				capture = button;
-				closest = distance;
-			}
+			if (TheActionManager->canDoSpecialPowerAtObject(&unit, &target, CMD_FROM_AI, power, button->getOptions()))
+				return button;
+		}
+		return nullptr;
+	};
+
+	auto seed = recruits.end();
+	Real seedDistance = 0.0f;
+	for (auto unit = recruits.begin(); unit != recruits.end(); ++unit)
+		for (Object* candidateFlag : flags)
+		{
+			const Real distance = (*candidateFlag->getPosition() - *(*unit)->getPosition()).asCoord2D().lengthSqr();
+			if (seed != recruits.end() && std::make_pair(distance, (*unit)->getID()) >= std::make_pair(seedDistance, (*seed)->getID()))
+				continue;
+			if (!findCaptureButton(**unit, *candidateFlag))
+				continue;
+			seed = unit;
+			seedDistance = distance;
+		}
+	if (seed == recruits.end())
+		return FALSE;
+	Object* const leader = *seed;
+	recruits.erase(seed);
+	std::sort(recruits.begin(), recruits.end(), [&](const Object* a, const Object* b) {
+		const auto rank = [&](const Object* object) {
+			return std::make_pair(tacticalDistanceSquared(*object->getPosition(), *leader->getPosition()), object->getID());
+		};
+		return rank(a) < rank(b);
+	});
+	const size_t squadLimit = std::min(recruits.size() + 1, static_cast<size_t>(GameLogicRandomValue(1, 3)));
+	std::vector<Object*> squad{leader};
+	squad.insert(squad.end(), recruits.begin(), recruits.begin() + static_cast<std::ptrdiff_t>(squadLimit - 1));
+	Coord3D squadCenter{};
+	for (const Object* member : squad)
+		squadCenter = squadCenter + *member->getPosition();
+	squadCenter.scale(1.0f / static_cast<Real>(squad.size()));
+
+	Object* flag = nullptr;
+	Real closestFlag = 0.0f;
+	for (Object* candidateFlag : flags)
+	{
+		const Real distance = (*candidateFlag->getPosition() - squadCenter).asCoord2D().lengthSqr();
+		if (!flag || std::make_pair(distance, candidateFlag->getID()) < std::make_pair(closestFlag, flag->getID()))
+		{
+			flag = candidateFlag;
+			closestFlag = distance;
+		}
+	}
+	if (!flag)
+		return FALSE;
+
+	Object* capturer = nullptr;
+	const CommandButton* capture = nullptr;
+	Real closestCapturer = 0.0f;
+	for (Object* member : squad)
+	{
+		const CommandButton* button = findCaptureButton(*member, *flag);
+		if (!button)
+			continue;
+		const Real distance = tacticalDistanceSquared(*member->getPosition(), *flag->getPosition());
+		if (!capturer || std::make_pair(distance, member->getID()) < std::make_pair(closestCapturer, capturer->getID()))
+		{
+			capturer = member;
+			capture = button;
+			closestCapturer = distance;
 		}
 	}
 	if (!capturer)
+	{
+		m_retailFlagRetryFrame = frame + GameLogicRandomValue(20 * LOGICFRAMES_PER_SECOND, 90 * LOGICFRAMES_PER_SECOND);
 		return FALSE;
+	}
 	capturer->doCommandButtonAtObject(capture, flag, CMD_FROM_AI);
 	const auto* ability = capturer->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
 	if (!ability || !ability->isActive())
 		return FALSE;
 
 	m_retailFlagSquad.capturer = capturer->getID();
-	std::vector<Object*> recruits;
-	for (Object* unit : owned)
-		if (unit != capturer && isRetailTacticRecruit(*unit, *m_player))
-			recruits.push_back(unit);
-	std::sort(recruits.begin(), recruits.end(), [&](const Object* a, const Object* b) {
-		const auto rank = [&](const Object* object) {
-			return std::make_pair(tacticalDistanceSquared(*object->getPosition(), *capturer->getPosition()), object->getID());
-		};
-		return rank(a) < rank(b);
-	});
-	const size_t count = std::min(recruits.size(), static_cast<size_t>(GameLogicRandomValue(1, 3) - 1));
-	for (size_t i = 0; i < count; ++i)
+	size_t count = 0;
+	for (Object* member : squad)
 	{
-		Object* recruit = recruits[i];
-		recruit->getAI()->aiGuardObject(capturer, GUARDMODE_GUARD_WITHOUT_PURSUIT, CMD_FROM_AI);
-		m_retailFlagSquad.escorts[i] = recruit->getID();
+		if (member == capturer)
+			continue;
+		member->getAI()->aiGuardObject(capturer, GUARDMODE_GUARD_WITHOUT_PURSUIT, CMD_FROM_AI);
+		m_retailFlagSquad.escorts[count++] = member->getID();
 	}
 	if (trace)
-		std::fprintf(stderr, "AI_FLAG_CAPTURE\t%u\t%d\t%d\t%d\t%zu\n",
-			frame, m_player->getPlayerIndex(), capturer->getID(), flag->getID(), count);
+		std::fprintf(stderr, "AI_FLAG_CAPTURE\t%u\t%d\t%d\t%d\t%zu\t%zu\t%zu\n",
+			frame, m_player->getPlayerIndex(), capturer->getID(), flag->getID(), count, squad.size(), recruits.size());
 	return TRUE;
+}
+
+Player* AISkirmishPlayer::retailStrategicEnemy() const
+{
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player* candidate = ThePlayerList->getNthPlayer(i);
+		if (candidate && candidate != m_player && candidate->isPlayableSide() && candidate->isPlayerActive() &&
+			m_player->getRelationship(candidate->getDefaultTeam()) == ENEMIES)
+			return candidate;
+	}
+	return nullptr;
 }
 
 Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
@@ -2255,22 +2320,7 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 		center = center + *unit->getPosition();
 	center.scale(1.0f / static_cast<Real>(roster.size()));
 
-	Player* enemy = nullptr;
-	Real enemyDistance = std::numeric_limits<Real>::infinity();
-	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
-	{
-		Player* candidate = ThePlayerList->getNthPlayer(i);
-		if (!candidate || !candidate->isPlayableSide() || !candidate->isPlayerActive() ||
-			m_player->getRelationship(candidate->getDefaultTeam()) != ENEMIES)
-			continue;
-		const Waypoint* start = retailPlayerStart(*candidate);
-		const Real distance = start ? tacticalDistanceSquared(home, *start->getLocation()) : enemyDistance;
-		if (!enemy || distance < enemyDistance)
-		{
-			enemy = candidate;
-			enemyDistance = distance;
-		}
-	}
+	Player* enemy = retailStrategicEnemy();
 	if (!enemy)
 		return endRaid();
 	if (phase == 0 && raid.rushPolicy == 0)

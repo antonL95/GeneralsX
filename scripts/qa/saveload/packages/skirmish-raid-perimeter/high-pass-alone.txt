@@ -1,0 +1,17 @@
+44 power-reveal - - 0
+45 create Player_1 SkirmishPerimeterOpenFarm 0 2740,3070,0
+45 create Player_1 SkirmishPerimeterBlockedFarm 0 2960,2960,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 0 2960,2860,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 1 2960,3060,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 2 2860,2960,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 3 3060,2960,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 4 2885,2885,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 5 3035,2885,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 6 2885,3035,0
+45 create PlyrCivilian SkirmishPerimeterBlocker 7 3035,3035,0
+45 create Player_2 SkirmishPerimeterRaidHorde 0 2510,2910,0
+45 create Player_2 SkirmishPerimeterRaidHorde 1 2530,2960,0
+80 skirmish-tactic-attack Player_2 SkirmishPerimeterRaidHorde 0 Player_1:SkirmishPerimeterOpenFarm:0
+80 skirmish-tactic-attack Player_2 SkirmishPerimeterRaidHorde 1 Player_1:SkirmishPerimeterOpenFarm:0
+81 skirmish-tactic-attack Player_2 SkirmishPerimeterRaidHorde 0 Player_1:SkirmishPerimeterOpenFarm:0
+81 skirmish-tactic-attack Player_2 SkirmishPerimeterRaidHorde 1 Player_1:SkirmishPerimeterOpenFarm:0
