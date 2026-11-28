@@ -1059,10 +1059,13 @@ void AIStateMachine::clear()
 	m_goalSquad = nullptr;
 
 #if !RETAIL_COMPATIBLE_CRC
-	if (m_temporaryState)
+	if (m_temporaryState &&
+		(!RetailFileLayers::enabled() || m_temporaryState->getID() != AI_BUSY ||
+			m_temporaryStateFramEnd <= TheGameLogic->getFrame()))
+	{
 		m_temporaryState->onExit(EXIT_RESET);
-
-	m_temporaryState = nullptr;
+		m_temporaryState = nullptr;
+	}
 #endif
 
 	AIUpdateInterface* ai = getOwner()->getAI();

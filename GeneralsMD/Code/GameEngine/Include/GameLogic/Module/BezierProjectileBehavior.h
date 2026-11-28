@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "GameLogic/Module/DumbProjectileBehavior.h"
 
 class FXList;
@@ -45,7 +47,29 @@ public:
 	virtual UpdateSleepTime update() override;
 	virtual void projectileLaunchAtObjectOrPosition(const Object* victim, const Coord3D* victimPos, const Object* launcher,
 		WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride) override;
+	virtual void projectileFireAtObjectOrPosition(const Object* victim, const Coord3D* victimPos, const WeaponTemplate* detWeap,
+		const ParticleSystemTemplate* exhaustSysOverride) override;
+	virtual Bool projectileHandleCollision(Object* other) override;
+	virtual void crcSelfFlight(Xfer* xfer) override;
+
+	Int getBounceIndex() const { return m_bounceIndex; }
 
 protected:
 	Bool killsPassengerOnImpact() const override { return getBezierProjectileBehaviorModuleData()->m_dieOnImpact; }
+	Bool snapsTargetToGround() const override { return getBezierProjectileBehaviorModuleData()->m_crushStyle; }
+	virtual Bool calcFlightPath(Bool recalcNumSegments) override;
+	virtual void detonate(const Object* hit = nullptr) override;
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void backOffFromCollision(const Object* other);
+	Bool hasCrushedObject(ObjectID id) const;
+	void recordCrushedObject(ObjectID id);
+	void startBounce();
+	void finishCrushStyleLanding();
+
+	Int m_bounceIndex = 0;
+	Real m_curveFlattenScale = 1.0f;
+	Coord3D m_launcherPos{};
+	std::vector<ObjectID> m_crushHitIDs;
 };

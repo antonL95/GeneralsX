@@ -97,7 +97,7 @@ public:
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate* launchWeapon) override { m_launchWeaponTmpl = launchWeapon; }
 	virtual const WeaponTemplate* projectileGetLaunchWeapon() const override { return m_launchWeaponTmpl; }
 	virtual Bool projectileGetImpactVelocity(Coord3D& velocity) const override;
-	void crcSelfFlight(Xfer* xfer);
+	virtual void crcSelfFlight(Xfer* xfer);
 	Bool isSelfFlight() const;
 	Bool isPassengerFlight() const;
 	const Coord3D& landingPosition() const { return m_flightPathEnd; }
@@ -109,27 +109,27 @@ protected:
 	Bool isApproachingLanding(UnsignedInt lead) const;
 	Bool isWithinLandingTime(UnsignedInt lead) const;
 	virtual Bool killsPassengerOnImpact() const { return FALSE; }
-	void detonate(const Object* hit = nullptr);
+	virtual Bool snapsTargetToGround() const { return FALSE; }
+	virtual void detonate(const Object* hit = nullptr);
+	virtual Bool calcFlightPath(Bool recalcNumSegments);
+	void clearFlight();
 
-private:
-
-	ObjectID							m_launcherID;							///< ID of object that launched us (zero if not yet launched)
-	ObjectID							m_victimID;								///< ID of object we are targeting (zero if not yet launched)
-	const WeaponTemplate*	m_detonationWeaponTmpl;		///< weapon to fire at end (or null)
+	ObjectID							m_launcherID;
+	ObjectID							m_victimID;
+	const WeaponTemplate*	m_detonationWeaponTmpl;
 	const WeaponTemplate* m_launchWeaponTmpl;
-	UnsignedInt						m_lifespanFrame;					///< if we haven't collided by this frame, blow up anyway
-	VecCoord3D						m_flightPath;							///< The frame by frame flight path in a Bezier curve
-	Coord3D								m_flightPathStart;				///< where flight path started (in case we must regen it)
-	Coord3D								m_flightPathEnd;					///< where flight path ends (in case we must regen it)
-	Real									m_flightPathSpeed;				///< flight path speed (in case we must regen it)
-	Int										m_flightPathSegments;			///< number of segments in the flightpath (in case we must regen it)
-	Int										m_currentFlightPathStep;	///< Our current index in the flight path vector.  Quicker than popping off.
+	UnsignedInt						m_lifespanFrame;
+	VecCoord3D						m_flightPath;
+	Coord3D								m_flightPathStart;
+	Coord3D								m_flightPathEnd;
+	Real									m_flightPathSpeed;
+	Int										m_flightPathSegments;
+	Int										m_currentFlightPathStep;
 	WeaponBonusConditionFlags		m_extraBonusFlags;
 
-  Bool                  m_hasDetonated;           ///<
+  Bool                  m_hasDetonated;
 
-	Bool calcFlightPath(Bool recalcNumSegments);
-	void clearFlight();
+private:
 #if defined(RTS_DEBUG)
 	void displayFlightPath();	///< Uses little debug icons in worldspace to show the path chosen when it is decided upon
 #endif

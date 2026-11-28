@@ -1,0 +1,32 @@
+140 create Player_1 BezierGroundHitThrower 0 1600,1680,0
+140 create Player_1 BezierGroundHitBody 0 1608,1680,0
+140 create PlyrCreeps BezierGroundHitTarget 0 1720,1680,180
+140 create PlyrCreeps BezierGroundHitTarget 1 1720,1695,180
+140 create PlyrCreeps BezierGroundHitTarget 2 1760,1695,180
+140 create PlyrCreeps BezierGroundHitTarget 3 1800,1695,180
+141 testcontain Player_1 BezierGroundHitThrower 0 Player_1:BezierGroundHitBody:0
+197 orderattack Player_1 BezierGroundHitThrower 0 PlyrCreeps:BezierGroundHitTarget:0
+
+305 bezier-ground-hit-state Player_1 BezierGroundHitBody 0
+305 bezier-ground-hit-state PlyrCreeps BezierGroundHitTarget 1
+305 bezier-ground-hit-state PlyrCreeps BezierGroundHitTarget 2
+305 bezier-ground-hit-state PlyrCreeps BezierGroundHitTarget 3
+
+325 create Player_1 BezierGroundHitGimli 0 1900,500,0
+325 stance Player_1 BezierGroundHitGimli 0 HoldGround
+325 create PlyrCreeps BezierGroundHitTarget 4 1970,515,180
+326 objupgrade Player_1 BezierGroundHitGimli 0 Upgrade_ObjectLevel2
+330 bezier-ground-hit-cast Player_1 BezierGroundHitGimli 0 Command_RohanGimliLeap 1970 500
+395 move Player_1 BezierGroundHitGimli 0 - 1910 500
+395 bezier-ground-hit-state PlyrCreeps BezierGroundHitTarget 4
+405 bezier-ground-hit-state Player_1 BezierGroundHitGimli 0
+475 bezier-ground-hit-state Player_1 BezierGroundHitGimli 0
+
+480 destroy Player_1 BezierGroundHitThrower 0
+480 destroy Player_1 BezierGroundHitBody 0
+480 destroy Player_1 BezierGroundHitGimli 0
+480 destroy PlyrCreeps BezierGroundHitTarget 0
+480 destroy PlyrCreeps BezierGroundHitTarget 1
+480 destroy PlyrCreeps BezierGroundHitTarget 2
+480 destroy PlyrCreeps BezierGroundHitTarget 3
+480 destroy PlyrCreeps BezierGroundHitTarget 4

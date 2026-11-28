@@ -1174,6 +1174,24 @@ void Drawable::startRetailOclFade(UnsignedInt frames, Bool fadeIn, Bool fadeOut,
 	m_oclFadePayload = fadeIn && fadePayload && frames != 0;
 }
 
+void Drawable::startRetailProjectileFade(UnsignedInt invisibleFrames, UnsignedInt fadeInFrames)
+{
+	if (invisibleFrames > 0)
+	{
+		setDrawableHidden(true);
+		m_projectileRevealFrame = TheGameLogic->getFrame() + invisibleFrames;
+		m_projectileFadeInFrames = fadeInFrames;
+		return;
+	}
+	m_projectileRevealFrame = 0;
+	m_projectileFadeInFrames = 0;
+	if (fadeInFrames > 0)
+	{
+		setDrawableHidden(false);
+		fadeIn(fadeInFrames);
+	}
+}
+
 void Drawable::inheritRetailOclFadeIn(const Drawable& parent)
 {
 	if (!parent.m_oclFadePayload ||
@@ -1355,9 +1373,15 @@ void Drawable::updateDrawable(Real timeScale)
 	}
 
 	{
-
-		// handle fading in or out
-		// TheSuperHackers @tweak bobtista 15/09/2026 Decouple Drawable fade timing from render updates.
+		if (m_projectileRevealFrame != 0 && TheGameLogic->getFrame() >= m_projectileRevealFrame)
+		{
+			const UnsignedInt revealFade = m_projectileFadeInFrames;
+			m_projectileRevealFrame = 0;
+			m_projectileFadeInFrames = 0;
+			setDrawableHidden(false);
+			if (revealFade > 0)
+				fadeIn(revealFade);
+		}
 		if (m_fadeMode != FADING_NONE)
 		{
 			m_timeElapsedFade += timeScale;
@@ -5875,6 +5899,13 @@ void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 				block->xferMatrix3D(&m_passengerReleaseTransform);
 			}
 		}, [this] { m_passengerReleaseSnap = 1.0f; }},
+		{"projectile-fade", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_projectileRevealFrame);
+			block->xferUnsignedInt(&m_projectileFadeInFrames);
+		}, [this] {
+			m_projectileRevealFrame = 0;
+			m_projectileFadeInFrames = 0;
+		}},
 	});
 }
 

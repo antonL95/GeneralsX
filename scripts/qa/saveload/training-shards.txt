@@ -23,6 +23,7 @@
 1 group-speed
 1 linked-limit
 1 scripts-economy
+1 bezier-ground-hit
 2 pkg68-production-bonus
 2 combo-split
 2 reform-regroup

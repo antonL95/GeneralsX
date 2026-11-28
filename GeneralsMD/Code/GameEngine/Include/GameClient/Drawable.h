@@ -578,6 +578,7 @@ public:
 	void fadeOut( UnsignedInt frames );		///< fade object out...how gradually this is done is determined by frames
 	void fadeIn( UnsignedInt frames );		///< fade object in...how gradually this is done is determined by frames
 	void startRetailOclFade(UnsignedInt frames, Bool fadeIn, Bool fadeOut, Bool fadePayload);
+	void startRetailProjectileFade(UnsignedInt invisibleFrames, UnsignedInt fadeInFrames);
 	void inheritRetailOclFadeIn(const Drawable& parent);
 
 	void preloadAssets( TimeOfDay timeOfDay );	///< preload the assets
@@ -751,6 +752,8 @@ private:
 	Bool m_oclFadeIn = FALSE;
 	Bool m_oclFadeOut = FALSE;
 	Bool m_oclFadePayload = FALSE;
+	UnsignedInt m_projectileRevealFrame = 0;
+	UnsignedInt m_projectileFadeInFrames = 0;
 
 	UnsignedInt		m_shroudClearFrame;						///< Last frame the local player saw this drawable "OBJECTSHROUD_CLEAR"
 

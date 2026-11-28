@@ -367,7 +367,6 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 	Real weaponSpeed = speedWeap ? speedWeap->getWeaponSpeed() : 0.0f;
 	Real minWeaponSpeed = speedWeap ? speedWeap->getMinWeaponSpeed() : 0.0f;
 
-	// if an object, aim at the center, not the ground part
 	Coord3D victimPosToUse;
 	if (isSelfFlight())
 	{
@@ -375,13 +374,23 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 		victimPosToUse.z = TheTerrainLogic->getLayerHeight(victimPosToUse.x, victimPosToUse.y,
 			TheTerrainLogic->getHighestLayerForDestination(&victimPosToUse));
 	}
-	else if (victim)
-	{
-		if (!m_launchWeaponTmpl || !m_launchWeaponTmpl->getPreferredTargetPosition(victim, victimPosToUse))
-			victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), victimPosToUse);
-	}
 	else
-		victimPosToUse = *victimPos;
+	{
+		if (victim)
+		{
+			if (!m_launchWeaponTmpl || !m_launchWeaponTmpl->getPreferredTargetPosition(victim, victimPosToUse))
+				victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), victimPosToUse);
+		}
+		else
+		{
+			victimPosToUse = *victimPos;
+		}
+		if (snapsTargetToGround() &&
+			TheTerrainLogic->getHighestLayerForDestination(&victimPosToUse) == LAYER_GROUND)
+		{
+			victimPosToUse.z = TheTerrainLogic->getGroundHeight(victimPosToUse.x, victimPosToUse.y);
+		}
+	}
 
 	if( speedWeap && speedWeap->isScaleWeaponSpeed() )
 	{
