@@ -684,13 +684,13 @@ static Object* findRetailCombatTarget(const Object* attacker, Real range, Partit
 	MemoryPoolObjectHolder holder(iter);
 	Object* selected = nullptr;
 	Real bestScore = 0.0f;
-	Player* const owner = attacker->getControllingPlayer();
+	const Player* const strategicEnemy = AISkirmishPlayer::retailTargetBiasEnemy(attacker->getControllingPlayer());
 	for (Object* target = iter->first(); target; target = iter->next())
 	{
 		const Real chainModifier = AISkirmishPlayer::getRetailCombatChainModifier(*attacker->getTemplate(), *target->getTemplate());
 		if (chainModifier == -1.0f)
 			continue;
-		const Real modifier = chainModifier + AISkirmishPlayer::getRetailStrategicEnemyBias(owner, target->getControllingPlayer());
+		const Real modifier = chainModifier + AISkirmishPlayer::getRetailStrategicEnemyBias(strategicEnemy, target->getControllingPlayer());
 		TPriorityInfo priorityInfo;
 		priorityInfo.priority = info->getPriority(target->getTemplate());
 		priorityInfo.info = info;

@@ -2255,11 +2255,14 @@ Player* AISkirmishPlayer::retailStrategicEnemy(const Player& player)
 	return nullptr;
 }
 
-Real AISkirmishPlayer::getRetailStrategicEnemyBias(Player* attackerOwner, const Player* targetOwner)
+const Player* AISkirmishPlayer::retailTargetBiasEnemy(Player* attackerOwner)
 {
-	if (!attackerOwner || !targetOwner || !attackerOwner->isSkirmishAIPlayer())
-		return 0.0f;
-	return retailStrategicEnemy(*attackerOwner) == targetOwner ? RETAIL_STRATEGIC_ENEMY_TARGET_BIAS : 0.0f;
+	return attackerOwner && attackerOwner->isSkirmishAIPlayer() ? retailStrategicEnemy(*attackerOwner) : nullptr;
+}
+
+Real AISkirmishPlayer::getRetailStrategicEnemyBias(const Player* strategicEnemy, const Player* targetOwner)
+{
+	return strategicEnemy && targetOwner == strategicEnemy ? RETAIL_STRATEGIC_ENEMY_TARGET_BIAS : 0.0f;
 }
 
 Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,

@@ -58,7 +58,8 @@ public:	 // AISkirmish specific methods.
 	static Bool rollRetailSpecialPowerActivation(const Player& player);
 	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
 	static Real getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target);
-	static Real getRetailStrategicEnemyBias(Player* attackerOwner, const Player* targetOwner);
+	static const Player* retailTargetBiasEnemy(Player* attackerOwner);
+	static Real getRetailStrategicEnemyBias(const Player* strategicEnemy, const Player* targetOwner);
 	virtual Bool computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord3D *pos, Int playerNdx, Real weaponRadius) override; ///< Calculates best pos for weapon given radius.
 
 public:	// AIPlayer interface methods.
