@@ -2352,7 +2352,7 @@ void ParticleSystem::updateEmission(Int localPlayerIndex, ParticlePriorityType p
 {
 	if (m_burstDelayLeft != 0)
 	{
-		--m_burstDelayLeft;
+		m_burstDelayLeft = m_isOneShot ? 1 : m_burstDelayLeft - 1;
 		return;
 	}
 
