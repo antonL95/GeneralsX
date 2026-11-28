@@ -12,6 +12,7 @@ def configure(fixture, faction, fortress):
     return {
         "PLAYTEST_FACTION": faction,
         "PLAYTEST_STATIC_CAPTURES": "1",
+        "PLAYTEST_PIN_DYNAMIC_LOD": "1",
         "GENERALSX_TEST_DRAWTRACE": fortress,
     }, check
 
