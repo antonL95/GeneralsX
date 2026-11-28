@@ -1,0 +1,42 @@
+200 create Player_1 RrBookendWall 0 1650,2650,0
+200 create Player_1 RrSideStructure 0 1800,2650,0
+200 create Player_1 RrNormalPlot 0 1920,2650,0
+200 create Player_1 RrRemovableProp 0 1935,2650,0
+200 create Player_1 RrTaintObject 0 1905,2650,0
+200 create Player_1 RrWallUpgradePlot 0 2020,2650,0
+200 create Player_1 RrDefaultSoundGate 0 2120,2650,0
+200 create Player_1 RrRubbleRiseKeep 0 2220,2650,0
+205 rr-wall-state Player_1 RrBookendWall 0
+205 rr-cell-owner Player_1 RrBookendWall 0 0,0
+205 rr-cell-owner Player_1 RrBookendWall 0 35,0
+210 rr-kill Player_1 RrBookendWall 0
+212 rr-wall-state Player_1 RrBookendWall 0
+212 rr-cell-owner Player_1 RrBookendWall 0 0,0
+212 rr-cell-owner Player_1 RrBookendWall 0 35,0
+214 rr-siege-damage Player_1 RrSideStructure 0 Player_1:RrNormalPlot:0
+216 rr-count Player_1 RrSideStructure 0 RrSideMarker
+218 rr-heal-full Player_1 RrSideStructure 0
+220 rr-siege-damage Player_1 RrSideStructure 0 Player_1:RrNormalPlot:0
+222 rr-count Player_1 RrSideStructure 0 RrSideMarker
+224 rr-plot-build Player_1 RrNormalPlot 0 RrPlotBuilding
+224 rr-plot-build Player_1 RrWallUpgradePlot 0 RrPlotBuilding
+226 rr-plot-state Player_1 RrNormalPlot 0
+226 rr-plot-state Player_1 RrWallUpgradePlot 0
+226 rr-count Player_1 RrNormalPlot 0 RrRemovableProp
+226 rr-count Player_1 RrNormalPlot 0 RrTaintObject
+228 rr-gate-open Player_1 RrDefaultSoundGate 0
+230 rr-kill Player_1 RrRubbleRiseKeep 0
+246 rr-wall-state Player_1 RrBookendWall 0
+246 rr-cell-owner Player_1 RrBookendWall 0 0,0
+246 rr-cell-owner Player_1 RrBookendWall 0 35,0
+247 create Player_1 RrSwarmWorker 0 1620,2625,0
+247 create Player_1 RrSwarmWorker 0 1640,2625,0
+248 rr-order-repair Player_1 RrSwarmWorker 0 Player_1:RrBookendWall:0
+248 rr-order-repair Player_1 RrSwarmWorker 1 Player_1:RrBookendWall:0
+260 rr-worker-state Player_1 RrSwarmWorker 0
+260 rr-worker-state Player_1 RrSwarmWorker 1
+260 rr-wall-state Player_1 RrBookendWall 0
+350 rr-heal-full Player_1 RrBookendWall 0
+360 rr-wall-state Player_1 RrBookendWall 0
+360 rr-cell-owner Player_1 RrBookendWall 0 0,0
+360 rr-rise-state Player_1 RrRubbleRiseKeep 0
