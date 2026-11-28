@@ -8,6 +8,7 @@
 211 create PlyrCivilian MordorOrcPit 1 980,1280,0
 211 create PlyrCivilian MordorOrcPit 2 1140,1280,0
 211 create PlyrCivilian MordorOrcPit_WotR 0 820,1280,0
+212 create PlyrCivilian Pkg68Fortress 0 500,1440,0
 212 create PlyrCivilian MordorSpellBook 0 660,1440,0
 216 science PlyrCivilian - 0 SCIENCE_MordorCalltheHorde
 220 pkg68-queue PlyrCivilian MordorOrcPit 0 MordorFighterHorde
