@@ -98,3 +98,9 @@ TEST(RotwkLocomotorRulesTest, TurnTimeIsOneFullTurn)
 	EXPECT_FLOAT_EQ(resolved.turnRate, RotwkLocomotorRules::FULL_TURN / 48.0f);
 	EXPECT_FLOAT_EQ(resolved.turnRateDamaged, resolved.turnRate);
 }
+
+TEST(RotwkLocomotorRulesTest, UnauthoredBackingUpSpeedDefaultsToThreeQuarters)
+{
+	RotwkLocomotorRules::Authored authored;
+	EXPECT_FLOAT_EQ(authored.backingUpSpeedFraction, 0.75f);
+}

@@ -1,0 +1,6 @@
+215 create Player_1 BackingUpDefaultProbe 0 1000,880,0
+225 move Player_1 BackingUpDefaultProbe 0 - 890 880
+240 pkg69-sample Player_1 BackingUpDefaultProbe 0
+245 pkg69-sample Player_1 BackingUpDefaultProbe 0
+255 pkg69-sample Player_1 BackingUpDefaultProbe 0
+265 destroy Player_1 BackingUpDefaultProbe 0
