@@ -2475,3 +2475,10 @@ UnsignedInt SpecialAbilityUpdate::secondsToFrames( Real seconds )
 		return 0;
 	return (UnsignedInt)REAL_TO_INT_CEIL( seconds * static_cast<Real>(LOGICFRAMES_PER_SECOND) );
 }
+
+DisabledMaskType SpecialAbilityUpdate::getDisabledTypesToProcess() const
+{
+	return RetailFileLayers::enabled()
+		? MAKE_DISABLED_MASK( DISABLED_HELD )
+		: SpecialPowerUpdateModule::getDisabledTypesToProcess();
+}

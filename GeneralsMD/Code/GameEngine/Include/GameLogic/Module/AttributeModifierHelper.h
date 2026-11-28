@@ -36,6 +36,7 @@ public:
 	AttributeModifierHelper( Thing *thing, const ModuleData *modData );
 
 	virtual UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
 
 	AttributeModifierRules::ApplyResult apply( Int list, UnsignedInt durationFrames, UnsignedInt antiMask, AttributeModifierRules::Owner owner );
 	Bool remove( Int list, AttributeModifierRules::Owner owner );

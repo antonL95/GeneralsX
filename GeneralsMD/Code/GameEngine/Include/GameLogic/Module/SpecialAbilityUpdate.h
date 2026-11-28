@@ -263,6 +263,7 @@ public:
 	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() override { return this; }
 	virtual CommandOption getCommandOption() const override { return (CommandOption)0; }
 	virtual UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
 
 	// ??? ugh, public stuff that shouldn't be -- hell yeah!
 	UnsignedInt getSpecialObjectCount() const;

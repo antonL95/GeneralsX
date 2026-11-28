@@ -399,6 +399,11 @@ UpdateSleepTime AttributeModifierHelper::update()
 	return UPDATE_SLEEP(next > now ? next - now : 1);
 }
 
+DisabledMaskType AttributeModifierHelper::getDisabledTypesToProcess() const
+{
+	return RetailFileLayers::enabled() ? DISABLEDMASK_ALL : ObjectHelper::getDisabledTypesToProcess();
+}
+
 void AttributeModifierHelper::crc( Xfer *xfer )
 {
 	ObjectHelper::crc( xfer );
