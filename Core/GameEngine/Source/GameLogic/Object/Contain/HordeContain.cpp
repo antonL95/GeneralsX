@@ -391,16 +391,90 @@ Bool HordeContain::areMembersAtFormationSlots() const
 }
 
 AODHordeContain::~AODHordeContain() = default;
-void AODHordeContain::crc(Xfer* xfer) { HordeContain::crc(xfer); }
+
+void AODHordeContain::crc(Xfer* xfer)
+{
+	HordeContain::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
 void AODHordeContain::xfer(Xfer* xfer)
 {
-	XferVersion version = 2;
-	xfer->xferVersion(&version, 2);
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	m_legacySnapshot = version == 1;
 	if (m_legacySnapshot)
 		ObjectModule::xfer(xfer);
 	else
 		HordeContain::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 3);
+}
+
+void AODHordeContain::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"aod-state", [this, loading](Xfer* block) {
+			block->xferBool(&m_aodInitialized);
+			UnsignedInt count = static_cast<UnsignedInt>(m_slotParams.size());
+			block->xferUnsignedInt(&count);
+			if (loading)
+				m_slotParams.resize(count);
+			for (SlotWobbleParams& p : m_slotParams)
+			{
+				block->xferReal(&p.freqPhase);
+				block->xferReal(&p.ampRand);
+				block->xferReal(&p.freqRand);
+				block->xferReal(&p.freqPhaseZ);
+				block->xferReal(&p.ampRandZ);
+				block->xferReal(&p.freqRandZ);
+			}
+			count = static_cast<UnsignedInt>(m_trail.size());
+			block->xferUnsignedInt(&count);
+			if (loading)
+				m_trail.resize(count);
+			for (TrailNode& node : m_trail)
+			{
+				block->xferCoord3D(&node.pos);
+				block->xferReal(&node.orientation);
+			}
+			count = static_cast<UnsignedInt>(m_lanes.size());
+			block->xferUnsignedInt(&count);
+			if (loading)
+				m_lanes.resize(count);
+			for (RankLane& lane : m_lanes)
+			{
+				block->xferReal(&lane.rankX);
+				block->xferReal(&lane.orientation);
+				block->xferCoord3D(&lane.pos);
+				block->xferBool(&lane.active);
+			}
+			block->xferCoord3D(&m_lastTrailPushPos);
+			block->xferObjectID(&m_largeUnitID);
+			block->xferUnsignedInt(&m_largeUnitStartFrame);
+			block->xferCoord3D(&m_largeUnitPos);
+			block->xferReal(&m_largeUnitWidth);
+			block->xferReal(&m_largeUnitHeight);
+			block->xferReal(&m_oathFulfilledProgress);
+			block->xferUnsignedInt(&m_lastAodUpdateFrame);
+		}, [this] {
+			m_aodInitialized = FALSE;
+			m_slotParams.clear();
+			m_trail.clear();
+			m_lanes.clear();
+			m_lastTrailPushPos.zero();
+			m_largeUnitID = INVALID_ID;
+			m_largeUnitStartFrame = 0;
+			m_largeUnitPos.zero();
+			m_largeUnitWidth = 0.0f;
+			m_largeUnitHeight = 0.0f;
+			m_oathFulfilledProgress = 0.0f;
+			m_lastAodUpdateFrame = 0;
+		}}
+	});
 }
 
 void AODHordeContain::loadPostProcess()
@@ -408,6 +482,463 @@ void AODHordeContain::loadPostProcess()
 	if (m_legacySnapshot)
 		m_payloadCreated = TRUE;
 	HordeContain::loadPostProcess();
+}
+
+void AODHordeContain::createPayload()
+{
+	HordeContain::createPayload();
+	if (RetailFileLayers::enabled())
+		ensureAodInitialized();
+}
+
+void AODHordeContain::ensureAodInitialized()
+{
+	if (!RetailFileLayers::enabled() || m_aodInitialized || !m_payloadCreated || m_initialPayloadPending)
+		return;
+	const Object* anchor = getObject();
+	if (!anchor)
+		return;
+	const auto* d = getAODHordeContainModuleData();
+	const auto& slots = d->m_layout.slots();
+	const Real twoPi = 2.0f * PI;
+	auto drawRand = [](Real a, Real b) {
+		const Real lo = std::min(a, b);
+		const Real hi = std::max(a, b);
+		return GameLogicRandomValueReal(lo, hi);
+	};
+
+	m_slotParams.resize(slots.size());
+	for (SlotWobbleParams& p : m_slotParams)
+	{
+		p.ampRand = drawRand(1.0f - d->m_amplitudeRandomness, 1.0f + d->m_amplitudeRandomness);
+		p.freqPhase = drawRand(0.0f, twoPi * d->m_frequencyRandomness);
+		p.freqRand = drawRand(1.0f - d->m_frequencyRandomness, 1.0f + d->m_frequencyRandomness);
+		p.ampRandZ = drawRand(1.0f - d->m_amplitudeRandomnessZ, 1.0f + d->m_amplitudeRandomnessZ);
+		p.freqPhaseZ = drawRand(0.0f, twoPi * d->m_frequencyRandomnessZ);
+		p.freqRandZ = drawRand(1.0f - d->m_frequencyRandomnessZ, 1.0f + d->m_frequencyRandomnessZ);
+	}
+
+	const Coord3D anchorPos = *anchor->getPosition();
+	const Real anchorAngle = anchor->getOrientation();
+	const Real cosAngle = Cos(anchorAngle);
+	const Real sinAngle = Sin(anchorAngle);
+	m_lanes.clear();
+	Real leadRankX = 0.0f;
+	for (const auto& slot : slots)
+	{
+		const Real rx = slot.position.x;
+		const Bool exists = std::any_of(m_lanes.begin(), m_lanes.end(), [rx](const RankLane& lane) {
+			return lane.rankX == rx;
+		});
+		if (exists || m_lanes.size() >= 20)
+			continue;
+		if (m_lanes.empty())
+			leadRankX = rx;
+		const HordePoint rotated = HordeLayout::rotate(HordePoint{rx - leadRankX, 0.0f}, cosAngle, sinAngle);
+		RankLane lane;
+		lane.rankX = rx;
+		lane.orientation = anchorAngle;
+		lane.pos.set(anchorPos.x + rotated.x, anchorPos.y + rotated.y, anchorPos.z);
+		lane.active = TRUE;
+		m_lanes.push_back(lane);
+	}
+
+	m_trail.clear();
+	for (std::size_t i = m_lanes.size(); i > 0; --i)
+		pushTrailNode(m_lanes[i - 1].pos, m_lanes[i - 1].orientation);
+	if (m_trail.empty())
+		pushTrailNode(anchorPos, anchorAngle);
+	m_lastTrailPushPos = anchorPos;
+	m_aodInitialized = TRUE;
+}
+
+void AODHordeContain::pushTrailNode(const Coord3D& pos, Real orientation)
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	constexpr std::size_t MAX_TRAIL_NODES = 60;
+	if (m_trail.size() < MAX_TRAIL_NODES)
+		m_trail.resize(m_trail.size() + 1);
+	for (std::size_t i = m_trail.size() - 1; i > 0; --i)
+		m_trail[i] = m_trail[i - 1];
+	m_trail[0] = TrailNode{pos, orientation};
+}
+
+void AODHordeContain::updateTrailLanes()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	const Object* anchor = getObject();
+	if (!anchor || m_lanes.empty())
+		return;
+	const Coord3D anchorPos = *anchor->getPosition();
+	const Real anchorAngle = anchor->getOrientation();
+	const AIUpdateInterface* ai = anchor->getAI();
+	const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+	const Real perFrameMaxSpeed = loco
+		? loco->getMaxSpeedForCondition(anchor->getBodyModule()->getDamageState(), anchor)
+		: (100.0f / static_cast<Real>(LOGICFRAMES_PER_SECOND));
+	const Real pushThreshold = std::max(2.0f, perFrameMaxSpeed * (static_cast<Real>(LOGICFRAMES_PER_SECOND) / 5.0f) * 0.8f);
+	const Coord3D sinceLast{
+		anchorPos.x - m_lastTrailPushPos.x,
+		anchorPos.y - m_lastTrailPushPos.y,
+		anchorPos.z - m_lastTrailPushPos.z
+	};
+	if (sinceLast.length() > pushThreshold)
+	{
+		pushTrailNode(anchorPos, anchorAngle);
+		m_lastTrailPushPos = anchorPos;
+	}
+
+	TrailNode effectiveHead{anchorPos, anchorAngle};
+	const Bool hasHeadDelta = std::fabs(anchorPos.x - (m_trail.empty() ? anchorPos.x : m_trail[0].pos.x)) > 1e-4f ||
+		std::fabs(anchorPos.y - (m_trail.empty() ? anchorPos.y : m_trail[0].pos.y)) > 1e-4f;
+	const std::size_t nodeCount = m_trail.size() + (hasHeadDelta ? 1 : 0);
+	auto nodeAt = [&](std::size_t idx) -> const TrailNode& {
+		if (hasHeadDelta)
+			return idx == 0 ? effectiveHead : m_trail[idx - 1];
+		return m_trail[idx];
+	};
+	if (nodeCount == 0)
+		return;
+
+	const Real leadRankX = m_lanes[0].rankX;
+	const Real maxYawStep = (PI / 18.0f) * (5.0f / static_cast<Real>(LOGICFRAMES_PER_SECOND));
+	Real accDist = 0.0f;
+	std::size_t seg = 0;
+	Real dirX = -1.0f;
+	Real dirY = 0.0f;
+	for (RankLane& lane : m_lanes)
+	{
+		Real rem = (leadRankX - lane.rankX) - accDist;
+		Real segLen = 999999.0f;
+		while (true)
+		{
+			if (seg + 1 < nodeCount)
+			{
+				const TrailNode& a = nodeAt(seg);
+				const TrailNode& b = nodeAt(seg + 1);
+				const Real dx = b.pos.x - a.pos.x;
+				const Real dy = b.pos.y - a.pos.y;
+				segLen = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+				if (segLen > 1e-5f)
+				{
+					dirX = dx / segLen;
+					dirY = dy / segLen;
+				}
+				else
+				{
+					dirX = -Cos(a.orientation);
+					dirY = -Sin(a.orientation);
+				}
+			}
+			else
+			{
+				segLen = 999999.0f;
+			}
+			if (rem < segLen)
+				break;
+			++seg;
+			rem -= segLen;
+			accDist += segLen;
+		}
+		const TrailNode& segStart = nodeAt(seg);
+		lane.pos.set(segStart.pos.x + dirX * rem, segStart.pos.y + dirY * rem, segStart.pos.z);
+
+		Real targetAngle = segStart.orientation;
+		if (seg + 1 < nodeCount && segLen > 1e-5f)
+		{
+			const Real frac = std::clamp(rem / segLen, 0.0f, 1.0f);
+			targetAngle = normalizeAngle(segStart.orientation + stdAngleDiff(nodeAt(seg + 1).orientation, segStart.orientation) * frac);
+		}
+		const Real diff = stdAngleDiff(targetAngle, lane.orientation);
+		if (diff > maxYawStep)
+			lane.orientation = normalizeAngle(lane.orientation + maxYawStep);
+		else if (diff < -maxYawStep)
+			lane.orientation = normalizeAngle(lane.orientation - maxYawStep);
+		else
+			lane.orientation = targetAngle;
+	}
+}
+
+void AODHordeContain::refreshLargeUnit()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	const Object* other = m_largeUnitID != INVALID_ID ? TheGameLogic->findObjectByID(m_largeUnitID) : nullptr;
+	if (!other)
+		return;
+	m_largeUnitPos = *other->getPosition();
+	m_largeUnitWidth = 17.0f;
+	m_largeUnitHeight = other->getGeometryInfo().getMaxHeightAbovePosition();
+}
+
+void AODHordeContain::notifyLargeUnit(const Object* other)
+{
+	if (!RetailFileLayers::enabled() || !other || other->isDestroyed())
+		return;
+	if (other->getTemplate()->getRotWKObjectData().deadCollideSize != 2)
+		return;
+	if (other->getID() != m_largeUnitID)
+	{
+		m_largeUnitID = other->getID();
+		refreshLargeUnit();
+		m_largeUnitStartFrame = TheGameLogic->getFrame();
+	}
+}
+
+Bool AODHordeContain::isAodFormation() const
+{
+	return RetailFileLayers::enabled() && m_aodInitialized && !isAlternateFormation();
+}
+
+Bool AODHordeContain::getFormationGoal(const Object* member, FormationGoal& goal) const
+{
+	if (RetailFileLayers::enabled() && isAodFormation() && !m_backingMoves.contains(member->getID()))
+		return FALSE;
+	return HordeContain::getFormationGoal(member, goal);
+}
+
+Coord3D AODHordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
+{
+	if (RetailFileLayers::enabled() && isAodFormation())
+	{
+		const Int slot = getMemberSlot(id);
+		if (slot >= 0)
+		{
+			Real laneOrientation = 0.0f;
+			return computeTargetPosition(id, slot, laneOrientation);
+		}
+	}
+	return HordeContain::getMemberPosition(id, followLeader);
+}
+
+Coord3D AODHordeContain::computeTargetPosition(ObjectID id, Int slot, Real& outOrientation) const
+{
+	if (!RetailFileLayers::enabled())
+		return HordeContain::getMemberPosition(id, FALSE);
+	const Object* anchor = getObject();
+	const auto* d = getAODHordeContainModuleData();
+	const auto& slots = d->m_layout.slots();
+	const Real slotX = slots[slot].position.x;
+	const Real slotY = slots[slot].position.y;
+	std::size_t laneIdx = 0;
+	if (!m_lanes.empty())
+	{
+		for (std::size_t i = m_lanes.size() - 1; i > 0; --i)
+		{
+			if (m_lanes[i].rankX == slotX)
+			{
+				laneIdx = i;
+				break;
+			}
+		}
+		if (m_lanes[laneIdx].rankX != slotX && m_lanes[0].rankX == slotX)
+			laneIdx = 0;
+	}
+	const Real laneAngle = m_lanes.empty() ? anchor->getOrientation() : m_lanes[laneIdx].orientation;
+	outOrientation = laneAngle;
+	Coord3D target = m_lanes.empty() ? *anchor->getPosition() : m_lanes[laneIdx].pos;
+	Real x = target.x - Sin(laneAngle) * slotY;
+	Real y = target.y + Cos(laneAngle) * slotY;
+	Real z = target.z;
+
+	if (!m_payloadCreated || static_cast<std::size_t>(slot) >= m_slotParams.size())
+		return Coord3D{x, y, z};
+
+	const AIUpdateInterface* anchorAI = anchor->getAI();
+	const Locomotor* loco = anchorAI ? anchorAI->getCurLocomotor() : nullptr;
+	Real speedRatio = 0.0f;
+	if (loco)
+	{
+		const Real maxSpd = loco->getMaxSpeedForCondition(anchor->getBodyModule()->getDamageState(), anchor);
+		if (maxSpd > 0.0f)
+			speedRatio = std::clamp(loco->getRetailScalarSpeed() / maxSpd, 0.0f, 1.0f);
+	}
+
+	const Real retailTime = static_cast<Real>(TheGameLogic->getFrame()) * (5.0f / static_cast<Real>(LOGICFRAMES_PER_SECOND));
+	const SlotWobbleParams& p = m_slotParams[slot];
+	const Real still = std::clamp(d->m_stillAmplitude, 0.0f, 1.0f);
+	const Real latBlend = (1.0f - still) * speedRatio + still;
+	const Real latOffset = latBlend * d->m_amplitudeScale *
+		Sin(retailTime * d->m_frequencyScale * p.freqRand + p.freqPhase) * p.ampRand;
+	Real dx = -Sin(laneAngle) * latOffset;
+	Real dy = Cos(laneAngle) * latOffset;
+
+	const Real stillZ = std::clamp(d->m_stillAmplitudeZ, 0.0f, 1.0f);
+	const Real zBlend = (1.0f - stillZ) * speedRatio + stillZ;
+	const Real zOffset = zBlend * d->m_amplitudeScaleZ *
+		(Sin(retailTime * d->m_frequencyScaleZ * p.freqRandZ + p.freqPhaseZ) * p.ampRandZ + 0.95f);
+
+	const Bool oathFulfilled = anchor->getLogicModelConditions().test(MODELCONDITION_OATH_FULLFILLED);
+	if (oathFulfilled)
+	{
+		const Real anchorYaw = anchor->getOrientation();
+		const HordePoint rotated = HordeLayout::rotate(slots[slot].position, Cos(anchorYaw), Sin(anchorYaw));
+		const Real len = WWMath::SqrtfOrigin(rotated.x * rotated.x + rotated.y * rotated.y);
+		if (len > 1e-5f)
+		{
+			const Real scatterDist = (static_cast<Real>(slot % 5) * d->m_scatterRandomness * 0.25f + d->m_scatterSpeedFactor) *
+				m_oathFulfilledProgress;
+			dx += (rotated.x / len) * scatterDist;
+			dy += (rotated.y / len) * scatterDist;
+		}
+	}
+
+	x += dx;
+	y += dy;
+	const Real ground = TheTerrainLogic ? TheTerrainLogic->getLayerHeight(x, y, anchor->getLayer()) : 0.0f;
+	z = ground + zOffset;
+
+	if (m_largeUnitID != INVALID_ID && d->m_largeUnitTimeout > 0)
+	{
+		const UnsignedInt elapsed = TheGameLogic->getFrame() - m_largeUnitStartFrame;
+		if (elapsed < d->m_largeUnitTimeout)
+		{
+			const Real height = std::clamp(d->m_largeUnitHeightFactor * m_largeUnitHeight,
+				d->m_largeUnitMinHeight, d->m_largeUnitMaxHeight);
+			const UnsignedInt half = d->m_largeUnitTimeout >> 1;
+			Real timeFactor = 1.0f;
+			if (half > 0 && elapsed > half)
+				timeFactor = 1.0f - static_cast<Real>(elapsed - half) / static_cast<Real>(half);
+			const Coord3D& anchorDir = *anchor->getUnitDirectionVector2D();
+			const Real relX = x - m_largeUnitPos.x;
+			const Real relY = y - m_largeUnitPos.y;
+			const Real along = std::fabs(relX * anchorDir.x + relY * anchorDir.y);
+			const Real perp = std::max(0.0f, std::fabs(-relX * anchorDir.y + relY * anchorDir.x) - m_largeUnitWidth);
+			const Real dist = along + perp;
+			const Real maxDist = d->m_largeUnitTailOff * height;
+			if (maxDist > 0.0f && dist < maxDist)
+			{
+				const Real u = dist / maxDist;
+				const Real curve = 1.0f - ((1.0f - u) * u * u + WWMath::SqrtfOrigin(u) * u);
+				z += curve * height * timeFactor;
+			}
+		}
+	}
+
+	if (oathFulfilled)
+	{
+		z += (static_cast<Real>((slot + 2) % 5) * d->m_scatterRandomness * 0.25f + d->m_scatterSpeedFactor) *
+			d->m_oathFulfilledZFactor * m_oathFulfilledProgress;
+	}
+	return Coord3D{x, y, z};
+}
+
+void AODHordeContain::moveAodMember(Object* member, const Coord3D& targetPos, Real laneOrientation)
+{
+	if (!RetailFileLayers::enabled() || !member || member->isEffectivelyDead())
+		return;
+	if (member->getLogicModelConditions().test(MODELCONDITION_JUST_BUILT))
+		return;
+	AIUpdateInterface* ai = member->getAI();
+	if (ai && ai->isAttacking())
+		return;
+
+	Real maxStep = 9999.0f;
+	Real maxTurn = PI;
+	if (const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr)
+	{
+		const BodyDamageType damage = member->getBodyModule()->getDamageState();
+		maxStep = loco->getMaxSpeedForCondition(damage, member) * 1.25f;
+		maxTurn = loco->getMaxTurnRate(damage);
+	}
+
+	const Object* anchor = getObject();
+	if (anchor->testStatus(OBJECT_STATUS_IS_ATTACKING))
+	{
+		member->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IS_ATTACKING));
+		const Real anchorYaw = anchor->getOrientation();
+		const Int slot = getMemberSlot(member->getID());
+		if (slot >= 0)
+		{
+			const HordePoint& pt = getAODHordeContainModuleData()->m_layout.slots()[slot].position;
+			const HordePoint rotated = HordeLayout::rotate(pt, Cos(anchorYaw), Sin(anchorYaw));
+			if (rotated.x != 0.0f || rotated.y != 0.0f)
+			{
+				const Real desiredAngle = WWMath::Atan2(rotated.y, rotated.x);
+				const Real diff = std::clamp(stdAngleDiff(desiredAngle, member->getOrientation()), -maxTurn, maxTurn);
+				laneOrientation = normalizeAngle(member->getOrientation() + diff);
+			}
+		}
+	}
+	else
+	{
+		member->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IS_ATTACKING));
+	}
+
+	const Coord3D prevPos = *member->getPosition();
+	Coord3D nextPos = targetPos;
+	const Real dx = targetPos.x - prevPos.x;
+	const Real dy = targetPos.y - prevPos.y;
+	const Real dz = targetPos.z - prevPos.z;
+	const Real dist = WWMath::SqrtfOrigin(dx * dx + dy * dy + dz * dz);
+	if (dist > maxStep && dist > 1e-5f)
+	{
+		const Real scale = maxStep / dist;
+		nextPos.set(prevPos.x + dx * scale, prevPos.y + dy * scale, prevPos.z + dz * scale);
+	}
+	member->setPosition(&nextPos);
+	member->setOrientation(laneOrientation);
+	if (PhysicsBehavior* physics = member->getPhysics())
+	{
+		physics->setAllowToFall(FALSE);
+		physics->setFlightPathVelocity(Coord3D{nextPos.x - prevPos.x, nextPos.y - prevPos.y, nextPos.z - prevPos.z});
+	}
+}
+
+Bool AODHordeContain::updateAodFormation()
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	ensureAodInitialized();
+	if (!m_aodInitialized || isAlternateFormation())
+		return FALSE;
+	const Object* anchor = getObject();
+	if (!anchor || anchor->isEffectivelyDead() || anchor->getContainedBy())
+		return FALSE;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_lastAodUpdateFrame == now)
+		return TRUE;
+	m_lastAodUpdateFrame = now;
+
+	const auto* d = getAODHordeContainModuleData();
+	if (m_largeUnitID != INVALID_ID && (d->m_largeUnitTimeout == 0 || now - m_largeUnitStartFrame >= d->m_largeUnitTimeout))
+		m_largeUnitID = INVALID_ID;
+
+	updateTrailLanes();
+
+	if (anchor->getLogicModelConditions().test(MODELCONDITION_OATH_FULLFILLED))
+	{
+		const AIUpdateInterface* ai = anchor->getAI();
+		const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+		const Real speedPerFrame = loco
+			? loco->getMaxSpeedForCondition(anchor->getBodyModule()->getDamageState(), anchor)
+			: (100.0f / static_cast<Real>(LOGICFRAMES_PER_SECOND));
+		m_oathFulfilledProgress += speedPerFrame;
+	}
+
+	for (Object* member : getContainList())
+	{
+		if (member->isEffectivelyDead())
+			continue;
+		const Int slot = getMemberSlot(member->getID());
+		if (slot < 0)
+			continue;
+		Real laneOrientation = anchor->getOrientation();
+		const Coord3D targetPos = computeTargetPosition(member->getID(), slot, laneOrientation);
+		moveAodMember(member, targetPos, laneOrientation);
+	}
+	return TRUE;
+}
+
+UpdateSleepTime AODHordeContain::update()
+{
+	const UpdateSleepTime sleep = HordeContain::update();
+	if (RetailFileLayers::enabled() && !getObject()->isEffectivelyDead())
+		updateAodFormation();
+	return sleep;
 }
 
 HordeContain::HordeContain( Thing *thing, const ModuleData *moduleData ) : TransportContain( thing, moduleData )

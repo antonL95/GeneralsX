@@ -9,6 +9,7 @@
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -73,6 +74,10 @@ void AODCrushCollide::onCollide(Object* other, const Coord3D*, const Coord3D*)
 		other->isKindOf(KINDOF_HORDE) || other->isKindOf(KINDOF_CRATE) ||
 		!other->getBodyModule() || other->getBodyModule()->isIndestructible())
 		return;
+
+	if (!self->getLogicModelConditions().test(MODELCONDITION_OATH_FULLFILLED))
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(self->getContainedBy())))
+			horde->notifyLargeUnit(other);
 
 	const auto* data = getAODCrushCollideModuleData();
 	const Bool special = data->m_specialObject.matchesObject(self, other);

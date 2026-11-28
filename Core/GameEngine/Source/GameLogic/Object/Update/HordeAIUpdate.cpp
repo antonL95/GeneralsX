@@ -637,7 +637,8 @@ UpdateSleepTime HordeAIUpdate::update()
 		}
 #endif
 	}
-	else if (fabs(turn) > (locomotor ? locomotor->getMaxTurnWithoutReform() : FORMATION_REFORM_ANGLE))
+	else if (!contain->isAodFormation() &&
+		fabs(turn) > (locomotor ? locomotor->getMaxTurnWithoutReform() : FORMATION_REFORM_ANGLE))
 	{
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 	}
@@ -868,6 +869,12 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 		}
 
+		if (contain->isAodFormation())
+		{
+			if (!ai->isIdle())
+				ai->aiIdle(CMD_FROM_SCRIPT);
+			continue;
+		}
 		HordeContain::FormationGoal goal;
 		if (!contain->getFormationGoal(member, goal))
 			continue;
@@ -882,6 +889,9 @@ UpdateSleepTime HordeAIUpdate::update()
 		else if (goal.error > 1.0f || goal.hordeMoving)
 			ai->wakeForFormation();
 	}
+
+	if (contain->isAodFormation())
+		const_cast<HordeContain*>(contain)->updateAodFormation();
 
 	if (attackGround && m_engaging && !groundAttackInProgress)
 	{

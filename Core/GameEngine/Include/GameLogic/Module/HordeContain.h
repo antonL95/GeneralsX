@@ -107,6 +107,7 @@ class HordeContain : public TransportContain
 {
 	friend class HordeAIUpdate;
 	friend class BannerCarrierUpdate;
+	friend class AODHordeContain;
 	friend struct RetailHordeSnapshotFixture;
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HordeContain, "HordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeContain, HordeContainModuleData )
@@ -155,8 +156,11 @@ public:
 		Bool backing;
 		ObjectID backingSource;
 	};
-	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
-	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
+	virtual Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
+	virtual Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
+	virtual Bool isAodFormation() const { return FALSE; }
+	virtual Bool updateAodFormation() { return FALSE; }
+	virtual void notifyLargeUnit(const Object*) {}
 	static Bool canSteerToFormationGoal(const Object* member, const FormationGoal& goal);
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	static void separateGroundMovement(const Object* member, Coord3D& movement);
@@ -308,14 +312,14 @@ struct AODHordeContainModuleData : public HordeContainModuleData
 	Real m_amplitudeScaleZ = 0.0f;
 	Real m_amplitudeRandomnessZ = 0.0f;
 	Real m_stillAmplitudeZ = 0.0f;
-	Real m_oathFulfilledZFactor = 0.0f;
-	Real m_largeUnitHeightFactor = 0.0f;
+	Real m_oathFulfilledZFactor = 1.0f;
+	Real m_largeUnitHeightFactor = 0.45f;
 	Real m_largeUnitMinHeight = 0.0f;
-	Real m_largeUnitMaxHeight = 0.0f;
-	UnsignedInt m_largeUnitTimeout = 0;
-	Real m_largeUnitTailOff = 0.0f;
-	Real m_scatterSpeedFactor = 0.0f;
-	Real m_scatterRandomness = 0.0f;
+	Real m_largeUnitMaxHeight = 999999.0f;
+	UnsignedInt m_largeUnitTimeout = 2 * (LOGICFRAMES_PER_SECOND / 5);
+	Real m_largeUnitTailOff = 1.0f;
+	Real m_scatterSpeedFactor = 0.3f;
+	Real m_scatterRandomness = 0.4f;
 };
 
 class HorseHordeContain final : public HordeContain
@@ -338,7 +342,57 @@ class AODHordeContain final : public HordeContain
 
 public:
 	AODHordeContain(Thing* thing, const ModuleData* data) : HordeContain(thing, data) {}
+	UpdateSleepTime update() override;
+	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const override;
+	Bool getFormationGoal(const Object* member, FormationGoal& goal) const override;
+	Bool isAodFormation() const override;
+	Bool updateAodFormation() override;
+	void notifyLargeUnit(const Object* other) override;
+
+protected:
+	void createPayload() override;
 
 private:
+	struct SlotWobbleParams
+	{
+		Real freqPhase = 0.0f;
+		Real ampRand = 1.0f;
+		Real freqRand = 1.0f;
+		Real freqPhaseZ = 0.0f;
+		Real ampRandZ = 1.0f;
+		Real freqRandZ = 1.0f;
+	};
+	struct TrailNode
+	{
+		Coord3D pos{};
+		Real orientation = 0.0f;
+	};
+	struct RankLane
+	{
+		Real rankX = 0.0f;
+		Real orientation = 0.0f;
+		Coord3D pos{};
+		Bool active = FALSE;
+	};
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void ensureAodInitialized();
+	void pushTrailNode(const Coord3D& pos, Real orientation);
+	void updateTrailLanes();
+	void refreshLargeUnit();
+	Coord3D computeTargetPosition(ObjectID memberId, Int slot, Real& outOrientation) const;
+	void moveAodMember(Object* member, const Coord3D& targetPos, Real laneOrientation);
+
 	Bool m_legacySnapshot = FALSE;
+	Bool m_aodInitialized = FALSE;
+	std::vector<SlotWobbleParams> m_slotParams;
+	std::vector<TrailNode> m_trail;
+	std::vector<RankLane> m_lanes;
+	Coord3D m_lastTrailPushPos{};
+	ObjectID m_largeUnitID = INVALID_ID;
+	UnsignedInt m_largeUnitStartFrame = 0;
+	Coord3D m_largeUnitPos{};
+	Real m_largeUnitWidth = 0.0f;
+	Real m_largeUnitHeight = 0.0f;
+	Real m_oathFulfilledProgress = 0.0f;
+	UnsignedInt m_lastAodUpdateFrame = 0;
 };
