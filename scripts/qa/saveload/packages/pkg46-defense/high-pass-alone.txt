@@ -1,0 +1,1 @@
+200 destroy Player_1 GondorFarm 0

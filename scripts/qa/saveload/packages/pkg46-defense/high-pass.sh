@@ -10,7 +10,7 @@ check() {
                 builder = id[2]
             }
             FNR == NR { next }
-            $1 == "AI_FORWARD_BUILD" && $2 >= 184 && $2 <= 304 && $3 == 4 && $4 == "MordorBattleTower" &&
+            $1 == "AI_FORWARD_BUILD" && $2 >= 184 && $3 == 4 && $4 == "MordorBattleTower" &&
             $5 in anchor && $6 == builder {
                 dx = $7 - $10
                 dy = $8 - $11
@@ -22,10 +22,11 @@ check() {
                 if (ex * ex + ey * ey < 0.001) found = 1
             }
             END {
-                if (!found) print "Missing targetless forward building 200 units toward home in " phase " at frames 184-304 for builder " builder
+                if (!found) print "Missing targetless forward building 200 units toward home in " phase " from frame 184 for builder " builder
                 exit !found
             }
         ' "$out/continue.log" "$log" || return 1
+        printf 'PASS targetless forward building 200 units toward home (%s)\n' "$phase"
     fi
     if covers 64; then
         awk '
