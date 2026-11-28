@@ -1,7 +1,7 @@
 prepare() {
     awk 'BEGIN {
         for (frame = 280; frame <= 450; ++frame)
-            print frame, "summon-busy-probe Player_1 SummonBusyBalrog 0 ordered 3140 800"
+            print frame, "summon-busy-probe Player_1 SummonBusyBalrog 0 ordered 2390 800"
         for (frame = 645; frame <= 740; ++frame)
             print frame, "summon-busy-probe Player_1 SummonBusyBalrog 0 control"
     }'
