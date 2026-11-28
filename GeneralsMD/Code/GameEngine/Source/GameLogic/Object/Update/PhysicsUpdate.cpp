@@ -999,7 +999,7 @@ UpdateSleepTime PhysicsBehavior::update()
 	}
 
 	// If we are effectively dead, we shouldn't recall kill.
-	if (d->m_killWhenRestingOnGround && !airborneAtEnd && isVerySmall3D(m_vel))
+	if (d->m_killWhenRestingOnGround && !airborneAtEnd && isVerySmall3D(m_vel) && (!m_pui || !m_pui->projectileIsFlying()))
 	{
 		if( !obj->isKindOf( KINDOF_DRONE ) || obj->isEffectivelyDead() || obj->isDisabledByType( DISABLED_UNMANNED ) )
 		{

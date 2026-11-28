@@ -266,6 +266,7 @@ public:
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate*) {}
 	virtual const WeaponTemplate* projectileGetLaunchWeapon() const { return nullptr; }
 	virtual Bool projectileGetImpactVelocity(Coord3D&) const { return FALSE; }
+	virtual Bool projectileIsFlying() const { return FALSE; }
 };
 
 //-------------------------------------------------------------------------------------------------

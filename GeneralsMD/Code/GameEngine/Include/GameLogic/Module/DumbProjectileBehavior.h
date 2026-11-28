@@ -106,6 +106,7 @@ protected:
 
 	void positionForLaunch(const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse);
 	Bool hasLaunched() const { return m_lifespanFrame != 0 || !m_flightPath.empty(); }
+	Bool projectileIsFlying() const override { return hasLaunched(); }
 	Bool isApproachingLanding(UnsignedInt lead) const;
 	Bool isWithinLandingTime(UnsignedInt lead) const;
 	virtual Bool killsPassengerOnImpact() const { return FALSE; }
