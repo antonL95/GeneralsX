@@ -1,0 +1,20 @@
+190 create Player_1 ForestFireAttacker 0 2700,500,0
+190 create PlyrCivilian ForestFireNeutralTree 0 2800,500,0
+192 forest-fire-flag - - 0 0
+193 forest-fire-attack Player_1 ForestFireAttacker 0 PlyrCivilian:ForestFireNeutralTree:0
+205 forest-fire-health PlyrCivilian ForestFireNeutralTree 0
+206 forest-fire-flag - - 0 restore
+265 forest-fire-flag - - 0 1
+266 forest-fire-attack Player_1 ForestFireAttacker 0 PlyrCivilian:ForestFireNeutralTree:0
+300 forest-fire-health PlyrCivilian ForestFireNeutralTree 0
+301 destroy Player_1 ForestFireAttacker 0
+301 destroy PlyrCivilian ForestFireNeutralTree 0
+302 create Player_1 ForestFireIdleArcher 0 2700,500,0
+302 create PlyrCivilian ForestFireNeutralTree 0 2800,500,0
+332 forest-fire-victim Player_1 ForestFireIdleArcher 0
+362 forest-fire-victim Player_1 ForestFireIdleArcher 0
+395 forest-fire-victim Player_1 ForestFireIdleArcher 0
+395 forest-fire-health PlyrCivilian ForestFireNeutralTree 0
+396 forest-fire-flag - - 0 restore
+397 destroy Player_1 ForestFireIdleArcher 0
+397 destroy PlyrCivilian ForestFireNeutralTree 0
