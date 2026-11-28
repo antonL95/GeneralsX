@@ -205,6 +205,14 @@ UpdateSleepTime GateOpenAndCloseBehavior::update()
 	}
 	if (getObject()->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 4);
+	if (m_teamOpenRequestCount >= 0)
+	{
+		const Bool shouldBeOpen = m_teamOpenRequestCount > 0;
+		if (m_wantsOpen != shouldBeOpen)
+			request(shouldBeOpen);
+		if (m_teamOpenRequestCount == 0)
+			m_teamOpenRequestCount = -1;
+	}
 	const UnsignedInt frame = TheGameLogic->getFrame();
 	const auto* data = getGateOpenAndCloseBehaviorModuleData();
 	if (frame >= m_pathFrame && m_passable != m_wantsOpen)
@@ -223,9 +231,33 @@ UpdateSleepTime GateOpenAndCloseBehavior::update()
 	return m_moving || m_soundPending || m_passable != m_wantsOpen ? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
 }
 
+void GateOpenAndCloseBehavior::adjustTeamOpenRequest(Int delta)
+{
+	if (delta != -1 && delta != 1)
+		return;
+	if (m_teamOpenRequestCount < 0)
+		m_teamOpenRequestCount = 0;
+	m_teamOpenRequestCount += delta;
+	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+}
+
+Bool GateOpenAndCloseBehavior::isReadyForScript() const
+{
+	const Object* gate = getObject();
+	if (!gate || gate->isEffectivelyDead() || gate->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		return FALSE;
+	if (m_teamOpenRequestCount > 0 && !m_passable)
+		return FALSE;
+	return TRUE;
+}
+
 void GateOpenAndCloseBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "team-open-requests",
+			[this](Xfer* x) { x->xferInt(&m_teamOpenRequestCount); },
+			[this] { m_teamOpenRequestCount = -1; } }
+	});
 }
 
 void GateOpenAndCloseBehavior::crc(Xfer* xfer)
@@ -234,6 +266,8 @@ void GateOpenAndCloseBehavior::crc(Xfer* xfer)
 	xfer->xferBool(&m_wantsOpen);
 	xfer->xferBool(&m_passable);
 	xfer->xferUnsignedInt(&m_pathFrame);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 void GateOpenAndCloseBehavior::xfer(Xfer* xfer)

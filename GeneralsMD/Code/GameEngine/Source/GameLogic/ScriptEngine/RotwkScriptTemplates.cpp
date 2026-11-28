@@ -128,6 +128,8 @@ const RotwkTemplate s_actions[] = {
 	{ ScriptAction::UNIT_GAIN_LEVEL, 523, "UNIT_GAIN_LEVEL", "RotWK/UNIT_GAIN_LEVEL", "<14> <8>", 2, { 14, 8 }, TRUE },
 	{ ScriptAction::UNIT_FORCE_EMOTION, 519, "UNIT_FORCE_EMOTION", "RotWK/UNIT_FORCE_EMOTION", "<14> <63> <1>", 3, { 14, 63, 1 }, TRUE },
 	{ ScriptAction::ATTACK_MOVE_NAMED_UNIT_TO, 546, "ATTACK_MOVE_NAMED_UNIT_TO", "RotWK/ATTACK_MOVE_NAMED_UNIT_TO", "<14> <7>", 2, { 14, 7 }, TRUE },
+	{ ScriptAction::TEAM_NEEDS_OPEN_GATE, 498, "TEAM_NEEDS_OPEN_GATE", "RotWK/TEAM_NEEDS_OPEN_GATE", "<3> <14> <8>", 3, { 3, 14, 8 }, TRUE },
+	{ ScriptAction::GATE_READY, 497, "GATE_READY", "RotWK/GATE_READY", "<14>", 1, { 14 }, TRUE },
 };
 
 const RotwkTemplate s_conditions[] = {

@@ -198,6 +198,7 @@ private:
 
 	AsciiString		m_state;						///< Name of the current AI state.
 	std::vector<AsciiString> m_customStates;
+	std::vector<ObjectID> m_neededOpenGates;
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
@@ -272,6 +273,7 @@ public:
 	const AsciiString& getState() const {return m_state;}
 	Bool hasCustomState(const AsciiString& state) const;
 	void setCustomState(const AsciiString& state, Bool enabled);
+	void setNeedsOpenGate(ObjectID gateID, Bool needsOpen);
 
 	/**
 		fill pAIGroup (which must be NONNULL) with the members of this team as a Group.

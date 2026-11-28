@@ -42,9 +42,13 @@ public:
 	static Bool canPass(const Object* obstacle, const Object* unit, Bool planning);
 	static Bool couldConnect(const Object* unit);
 	void request(Bool open);
+	void adjustTeamOpenRequest(Int delta);
+	Int getTeamOpenRequestCount() const { return m_teamOpenRequestCount; }
+	Bool isReadyForScript() const;
 	const Object* getGateObject() const { return getObject(); }
 	Bool wantsOpen() const { return m_wantsOpen; }
 	UnsignedInt getSoundFrame() const { return m_soundFrame; }
+	Bool isPassable() const { return m_passable; }
 	const AsciiString& getProxyName() const { return getGateOpenAndCloseBehaviorModuleData()->m_proxy; }
 	DisabledMaskType getDisabledTypesToProcess() const override
 	{
@@ -66,6 +70,7 @@ private:
 	UnsignedInt m_pathFrame = 0;
 	UnsignedInt m_soundFrame = 0;
 	UnsignedInt m_endFrame = 0;
+	Int m_teamOpenRequestCount = -1;
 	Bool m_wantsOpen = FALSE;
 	Bool m_passable = FALSE;
 	Bool m_moving = FALSE;

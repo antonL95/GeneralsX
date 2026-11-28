@@ -1,0 +1,17 @@
+235 create Player_1 ScriptGateOpsGate 0 1150,1500,0
+236 script-gate-ops-need Player_1 ScriptGateOpsGate 0 Player_1:1
+236 script-gate-ops-need Player_1 ScriptGateOpsGate 0 Player_1:1
+236 script-gate-ops-need Player_1 ScriptGateOpsGate 0 PlyrCreeps:1
+238 script-gate-ops-probe Player_1 ScriptGateOpsGate 0
+285 script-gate-ops-probe Player_1 ScriptGateOpsGate 0
+286 script-gate-ops-need Player_1 ScriptGateOpsGate 0 Player_1:0
+288 script-gate-ops-probe Player_1 ScriptGateOpsGate 0
+290 script-gate-ops-need Player_1 ScriptGateOpsGate 0 PlyrCreeps:0
+340 script-gate-ops-probe Player_1 ScriptGateOpsGate 0
+341 create PlyrCivilian GondorFighter 0 1050,1500,0
+341 script-gate-ops-seq-start PlyrCivilian GondorFighter 0 Player_1:ScriptGateOpsGate:0
+343 script-gate-ops-seq-probe Player_1 ScriptGateOpsGate 0
+395 script-gate-ops-seq-probe Player_1 ScriptGateOpsGate 0
+405 script-gate-ops-seq-cleanup PlyrCivilian GondorFighter 0
+406 destroy Player_1 ScriptGateOpsGate 0
+406 destroy PlyrCivilian GondorFighter 0

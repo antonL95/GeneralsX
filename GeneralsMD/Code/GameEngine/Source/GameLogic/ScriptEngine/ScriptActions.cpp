@@ -7097,6 +7097,15 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				gate->request(pAction->getActionType() == ScriptAction::GATE_OPEN);
 			return;
 		}
+		case ScriptAction::TEAM_NEEDS_OPEN_GATE:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString());
+			GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::resolveForControl(object);
+			if (team && gate && gate->getGateObject())
+				team->setNeedsOpenGate(gate->getGateObject()->getID(), pAction->getParameter(2)->getInt() != 0);
+			return;
+		}
 		case ScriptAction::BUILD_BUILDING_ON_FOUNDATION:
 		{
 			Object* plot = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString());
@@ -8746,6 +8755,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_WAIT_FOR_NOT_CONTAINED_PARTIAL:
 			// We should never get here.
 			DEBUG_CRASH(("\"[Team] Wait for team no longer contained - partial\" should never be used outside of Sequential scripts. - jkmcd"));
+			return;
+
+		case ScriptAction::GATE_READY:
+			DEBUG_CRASH(("GATE_READY should never be used outside of Sequential scripts."));
 			return;
 
 		case ScriptAction::TEAM_SPIN_FOR_FRAMECOUNT:

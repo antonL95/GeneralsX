@@ -8236,6 +8236,10 @@ void ScriptEngine::evaluateAndProgressAllSequentialScripts()
 						if (TheScriptConditions->evaluateTeamIsContained(action->getParameter(0), false)) {
 							seqScript->m_dontAdvanceInstruction = TRUE;
 						}
+					} else if (action->getActionType() == ScriptAction::GATE_READY) {
+						if (!TheScriptConditions->evaluateGateReady(action->getParameter(0))) {
+							seqScript->m_dontAdvanceInstruction = TRUE;
+						}
 					} else {
 						executeActions(action);
 					}

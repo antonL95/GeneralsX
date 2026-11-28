@@ -660,6 +660,8 @@ public:
 		UNIT_GAIN_LEVEL,
 		UNIT_FORCE_EMOTION,
 		ATTACK_MOVE_NAMED_UNIT_TO,
+		TEAM_NEEDS_OPEN_GATE,
+		GATE_READY,
 		NUM_ITEMS
 	};
 	ScriptAction(ScriptActionType type);

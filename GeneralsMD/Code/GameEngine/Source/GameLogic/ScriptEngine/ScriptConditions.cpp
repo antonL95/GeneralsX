@@ -57,6 +57,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Object.h"
@@ -2196,7 +2197,13 @@ Bool ScriptConditions::evaluateUnitHasEmptied(Parameter *pUnitParm)
 	return false;
 }
 
-//-------------------------------------------------------------------------------------------------
+Bool ScriptConditions::evaluateGateReady(Parameter *pUnitParm)
+{
+	const Object* object = pUnitParm ? TheScriptEngine->getUnitNamed(pUnitParm->getString()) : nullptr;
+	const GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::resolveForControl(object);
+	return gate && gate->isReadyForScript();
+}
+
 Bool ScriptConditions::evaluateTeamIsContained(Parameter *pTeamParm, Bool allContained)
 {
 	Team* pTeam = TheScriptEngine->getTeamNamed(pTeamParm->getString());

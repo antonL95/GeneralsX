@@ -52,6 +52,7 @@ public:
 
 	virtual Bool evaluateSkirmishCommandButtonIsReady( Parameter *pSkirmishPlayerParm, Parameter *pTeamParm, Parameter *pCommandButtonParm, Bool allReady ) = 0;
 	virtual Bool evaluateTeamIsContained(Parameter *pTeamParm, Bool allContained) = 0;
+	virtual Bool evaluateGateReady(Parameter *pUnitParm) = 0;
 
 };
 extern ScriptConditionsInterface *TheScriptConditions;   ///< singleton definition
@@ -159,6 +160,7 @@ protected:
 	Bool evaluatePlayerHasUnitKindInArea(Condition *pCondition, Parameter *pPlayerParm, Parameter *pComparisonParm, Parameter *pCountParm,Parameter *pKindParm, Parameter *pTriggerParm);
 	Bool evaluateUnitHasEmptied(Parameter *pUnitParm);
 	virtual Bool evaluateTeamIsContained(Parameter *pTeamParm, Bool allContained) override;
+	virtual Bool evaluateGateReady(Parameter *pUnitParm) override;
 	Bool evaluateMusicHasCompleted(Parameter *pMusicParm, Parameter *pIntParm);
 	Bool evaluatePlayerLostObjectType(Parameter *pPlayerParm, Parameter *pTypeParm);
 

@@ -43,10 +43,12 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/PartitionManager.h"
@@ -1395,11 +1397,15 @@ Team::~Team()
 	if (m_proto && m_proto->isInList_TeamInstanceList(this))
 		m_proto->removeFrom_TeamInstanceList(this);
 
-	// delete the relation maps (the destructor clears the actual map if any data is present)
 	deleteInstance(m_teamRelations);
 	deleteInstance(m_playerRelations);
 
-	// make sure the xfer list is clear
+	for (ObjectID gateID : m_neededOpenGates)
+		if (GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(
+				TheGameLogic ? TheGameLogic->findObjectByID(gateID) : nullptr))
+			gate->adjustTeamOpenRequest(-1);
+	m_neededOpenGates.clear();
+
 	m_xferMemberIDList.clear();
 
 }
@@ -2623,11 +2629,33 @@ void Team::setCustomState(const AsciiString& state, Bool enabled)
 		m_customStates.erase(entry);
 }
 
+void Team::setNeedsOpenGate(ObjectID gateID, Bool needsOpen)
+{
+	if (gateID == INVALID_ID || !TheGameLogic)
+		return;
+	const auto entry = std::find(m_neededOpenGates.begin(), m_neededOpenGates.end(), gateID);
+	if (needsOpen)
+	{
+		if (entry != m_neededOpenGates.end())
+			return;
+		if (GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(TheGameLogic->findObjectByID(gateID)))
+		{
+			gate->adjustTeamOpenRequest(1);
+			m_neededOpenGates.push_back(gateID);
+		}
+		return;
+	}
+	if (entry == m_neededOpenGates.end())
+		return;
+	if (GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(TheGameLogic->findObjectByID(gateID)))
+		gate->adjustTeamOpenRequest(-1);
+	m_neededOpenGates.erase(entry);
+}
+
 void Team::xfer( Xfer *xfer )
 {
 
-	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2751,7 +2779,10 @@ void Team::xfer( Xfer *xfer )
 	xfer->xferSnapshot( m_playerRelations );
 
 	if (xfer->getXferMode() == XFER_LOAD)
+	{
 		m_customStates.clear();
+		m_neededOpenGates.clear();
+	}
 	if (version >= 2)
 	{
 		UnsignedInt count = static_cast<UnsignedInt>(m_customStates.size());
@@ -2760,6 +2791,15 @@ void Team::xfer( Xfer *xfer )
 			m_customStates.resize(count);
 		for (AsciiString& state : m_customStates)
 			xfer->xferAsciiString(&state);
+	}
+	if (version >= 3)
+	{
+		UnsignedInt gateCount = static_cast<UnsignedInt>(m_neededOpenGates.size());
+		xfer->xferUnsignedInt(&gateCount);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_neededOpenGates.resize(gateCount, INVALID_ID);
+		for (ObjectID& gateID : m_neededOpenGates)
+			xfer->xferObjectID(&gateID);
 	}
 }
 
