@@ -4,3 +4,4 @@
 60 particle-systems Player_1 - 0 TestOneShotDelayed
 60 particle-systems Player_1 - 0 TestOneShotContinuous
 60 particle-systems Player_1 - 0 TestRepeatingDelayed
+60 particle-systems Player_1 - 0 TestOneShotHalfDelay
