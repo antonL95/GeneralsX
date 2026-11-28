@@ -21,6 +21,7 @@
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/WeaponSet.h"
 
 #include <algorithm>
@@ -739,7 +740,101 @@ W3DScriptedModelDraw::W3DScriptedModelDraw(Thing* thing, const ModuleData* data)
 {
 }
 
-W3DScriptedModelDraw::~W3DScriptedModelDraw() = default;
+W3DScriptedModelDraw::~W3DScriptedModelDraw()
+{
+	destroyWadingParticleSystem();
+}
+
+void W3DScriptedModelDraw::doDrawModule(const Matrix3D* transformMtx)
+{
+	W3DModelDraw::doDrawModule(transformMtx);
+	updateWadingParticleSystem();
+}
+
+void W3DScriptedModelDraw::setHidden(Bool h)
+{
+	W3DModelDraw::setHidden(h);
+	updateWadingParticleSystem();
+}
+
+void W3DScriptedModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
+{
+	W3DModelDraw::setFullyObscuredByShroud(fullyObscured);
+	updateWadingParticleSystem();
+}
+
+void W3DScriptedModelDraw::destroyWadingParticleSystem()
+{
+	if (m_wadingParticleSystemID != INVALID_PARTICLE_SYSTEM_ID)
+	{
+		if (TheParticleSystemManager)
+		{
+			if (ParticleSystem* sys = TheParticleSystemManager->findParticleSystem(m_wadingParticleSystemID))
+				sys->destroy();
+		}
+		m_wadingParticleSystemID = INVALID_PARTICLE_SYSTEM_ID;
+	}
+}
+
+void W3DScriptedModelDraw::updateWadingParticleSystem()
+{
+	const auto* data = static_cast<const W3DScriptedModelDrawModuleData*>(getModuleData());
+	if (!data || data->wadingParticleSys().isEmpty() || data->wadingParticleSys().isNone())
+		return;
+
+	const Drawable* drawable = getDrawable();
+	if (!drawable || !TheParticleSystemManager)
+		return;
+
+	const Bool active = drawable->getModelConditionFlags().test(MODELCONDITION_WADING) &&
+		!drawable->testDrawableStatus(DRAWABLE_STATUS_NO_STATE_PARTICLES);
+	if (!active)
+	{
+		destroyWadingParticleSystem();
+		return;
+	}
+
+	if (!m_wadingParticleTemplateResolved)
+	{
+		m_wadingParticleTemplate = TheParticleSystemManager->findTemplate(data->wadingParticleSys());
+		m_wadingParticleTemplateResolved = TRUE;
+	}
+	if (!m_wadingParticleTemplate)
+		return;
+
+	ParticleSystem* sys = m_wadingParticleSystemID != INVALID_PARTICLE_SYSTEM_ID
+		? TheParticleSystemManager->findParticleSystem(m_wadingParticleSystemID)
+		: nullptr;
+	if (!sys)
+	{
+		sys = TheParticleSystemManager->createParticleSystem(m_wadingParticleTemplate);
+		if (!sys)
+		{
+			m_wadingParticleSystemID = INVALID_PARTICLE_SYSTEM_ID;
+			return;
+		}
+		sys->attachToDrawable(drawable);
+		sys->setSaveable(FALSE);
+		m_wadingParticleSystemID = sys->getSystemID();
+	}
+
+	Coord3D offset;
+	offset.zero();
+	const Coord3D* pos = drawable->getPosition();
+	if (pos && TheTerrainLogic)
+	{
+		Real waterZ = 0.0f;
+		if (TheTerrainLogic->isUnderwater(pos->x, pos->y, &waterZ))
+			offset.z = waterZ - pos->z;
+	}
+	sys->setPosition(&offset);
+
+	const Bool hidden = isHiddenByScript() || drawable->isDrawableEffectivelyHidden() || getFullyObscuredByShroud();
+	if (hidden)
+		sys->stop();
+	else
+		sys->start();
+}
 
 ScriptedStateResult W3DScriptedModelDraw::evaluateStateScript(const ModelConditionInfo* previous,
 	const ModelConditionInfo* destination, Int previousAnimation, Real previousFraction, Bool inTransition)

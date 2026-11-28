@@ -1,0 +1,21 @@
+10 create Player_1 GondorFighterHorde 0 2410,1980,0
+10 create Player_1 GondorCavalry 0 2410,1900,0
+10 create Player_1 GondorCavalry 0 3000,2500,0
+11 reveal Player_1 GondorFighterHorde 0
+11 reveal Player_1 GondorCavalry 1
+20 wading-sample Player_1 GondorFighterHorde 0
+20 wading-sample Player_1 GondorCavalry 0
+20 wading-sample Player_1 GondorCavalry 1
+22 move Player_1 GondorFighterHorde 0 - 2640 1980
+22 move Player_1 GondorCavalry 0 - 2640 1900
+100 wading-sample Player_1 GondorFighterHorde 0
+100 wading-sample Player_1 GondorCavalry 0
+140 wading-sample Player_1 GondorFighterHorde 0
+140 wading-sample Player_1 GondorCavalry 0
+145 move Player_1 GondorFighterHorde 0 - 2390 1980
+145 move Player_1 GondorCavalry 0 - 2390 1900
+165 wading-sample Player_1 GondorCavalry 1
+240 wading-sample Player_1 GondorFighterHorde 0
+240 wading-sample Player_1 GondorCavalry 0
+285 wading-sample Player_1 GondorFighterHorde 0
+285 wading-sample Player_1 GondorCavalry 0

@@ -1,0 +1,4 @@
+18 Player_1 GondorFighterHorde 2420 1940 0.55
+120 Player_1 GondorFighterHorde 2640 1940 0.55
+155 Player_1 GondorCavalry 3000 2500 0.55
+270 Player_1 GondorFighterHorde 2400 1940 0.55

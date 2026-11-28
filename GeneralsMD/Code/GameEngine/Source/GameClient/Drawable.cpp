@@ -60,11 +60,13 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 
+#include "GameLogic/AI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/RetailFileLayers.h"
-#include "GameLogic/GameLogic.h"		// for logic frame count
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -1281,13 +1283,61 @@ void Drawable::imitateStealthLook( Drawable& otherDraw )
 /** update is called once per frame */
 //-------------------------------------------------------------------------------------------------
 //DECLARE_PERF_TIMER(updateDrawable)
+static void updateWadeConditions(Drawable& drawable, const Object* obj)
+{
+	Bool wading = FALSE;
+	Bool swimming = FALSE;
+	if (obj && TheTerrainLogic && TheAI && TheAI->getAiData() &&
+		obj->getLayer() == LAYER_GROUND &&
+		!obj->isKindOf(KINDOF_STRUCTURE) &&
+		!obj->isKindOf(KINDOF_AIRCRAFT) &&
+		!obj->isAirborneTarget() &&
+		obj->getAIUpdateInterface() != nullptr)
+	{
+		const Bool inNonHordeContainer = obj->isContained() &&
+			(!obj->getContainedBy() || !obj->getContainedBy()->isKindOf(KINDOF_HORDE));
+		const Coord3D* pos = obj->getPosition();
+		if (!inNonHordeContainer && pos)
+		{
+			Real waterZ = 0.0f;
+			Real groundZ = 0.0f;
+			if (TheTerrainLogic->isUnderwater(pos->x, pos->y, &waterZ, &groundZ) && pos->z <= waterZ + 1.0f)
+			{
+				const Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
+				const Real depth = waterZ - groundZ;
+				if (wadeDepth > 0.0f && depth > wadeDepth * 0.25f)
+				{
+					wading = TRUE;
+					if (depth > wadeDepth)
+						swimming = TRUE;
+				}
+			}
+		}
+	}
+
+	const ModelConditionFlags& current = drawable.getModelConditionFlags();
+	if (wading == current.test(MODELCONDITION_WADING) && swimming == current.test(MODELCONDITION_SWIMMING))
+		return;
+
+	ModelConditionFlags clearFlags;
+	ModelConditionFlags setFlags;
+	if (wading)
+		setFlags.set(MODELCONDITION_WADING);
+	else
+		clearFlags.set(MODELCONDITION_WADING);
+	if (swimming)
+		setFlags.set(MODELCONDITION_SWIMMING);
+	else
+		clearFlags.set(MODELCONDITION_SWIMMING);
+	drawable.clearAndSetModelConditionFlags(clearFlags, setFlags);
+}
+
 void Drawable::updateDrawable(Real timeScale)
 {
-	//USE_PERF_TIMER(updateDrawable)
-
 	UnsignedInt now = TheGameLogic->getFrame();
 	Object *obj = getObject();
 	m_shipRollStepPending = TRUE;
+	updateWadeConditions(*this, obj);
 
 	if (RetailFileLayers::enabled())
 	{

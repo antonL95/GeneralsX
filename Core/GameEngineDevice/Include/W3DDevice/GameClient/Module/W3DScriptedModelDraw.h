@@ -99,6 +99,7 @@ public:
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
 	Bool isGlowEnabled() const override { return m_glowEnabled; }
 	Bool isGlowEmissive() const override { return m_glowEmissive; }
+	const AsciiString& wadingParticleSys() const { return m_wadingParticleSys; }
 	Bool getWallRampMeshes(AsciiString& model, AsciiString& wall, AsciiString& ramp1, AsciiString& ramp2) const override
 	{
 		model = m_defaultModel.draw.m_modelName;
@@ -170,6 +171,9 @@ class W3DScriptedModelDraw : public W3DModelDraw
 
 public:
 	W3DScriptedModelDraw(Thing* thing, const ModuleData* data);
+	void doDrawModule(const Matrix3D* transformMtx) override;
+	void setHidden(Bool h) override;
+	void setFullyObscuredByShroud(Bool fullyObscured) override;
 	static void updatePlacementDecal(const Drawable* ghost, WorldGroundDecal& decal);
 	static ModuleData* friend_newModuleData(INI* ini);
 
@@ -181,5 +185,11 @@ protected:
 #endif
 
 private:
+	void updateWadingParticleSystem();
+	void destroyWadingParticleSystem();
+
 	DrawScript::Environment m_scriptGlobals;
+	ParticleSystemID m_wadingParticleSystemID = INVALID_PARTICLE_SYSTEM_ID;
+	const ParticleSystemTemplate* m_wadingParticleTemplate = nullptr;
+	Bool m_wadingParticleTemplateResolved = FALSE;
 };
