@@ -285,6 +285,8 @@ public:
 	void updateLayer(Object *obj, PathfindLayerEnum layer); ///< Updates object's layer.
 
 	static void classifyMapCell( Int x, Int y, PathfindCell *cell);					///< Classify the given map cell
+	static PathfindCell::CellType terrainCellType(Int x, Int y);
+	PathfindCell::CellType unlayeredGroundType(Int x, Int y) const;
 	Int clearCellForDiameter( Bool crusher, Int cellX, Int cellY, PathfindLayerEnum layer, Int pathDiameter );		///< Return true if given position is a valid movement location
 
 protected:

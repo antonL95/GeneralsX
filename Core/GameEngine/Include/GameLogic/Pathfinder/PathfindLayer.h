@@ -42,6 +42,7 @@ public:
 	void rebuildWallCells(const IRegion2D &extent, const std::vector<ObjectID>& wallPieces);
 	Real getAuthoredWallHeight(UnsignedByte band) const { return m_wallHeights[band - 1]; }
 	void classifyCells();
+	void markGroundClearance(const IRegion2D& cells);
 	void classifyWallCells(const ObjectID *wallPieces, Int numPieces);
 	Bool setDestroyed(Bool destroyed);
 	Bool isUnused(); // True if it doesn't contain a bridge.
@@ -62,6 +63,7 @@ public:
 #endif
 protected:
 	void classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bridge *theBridge);
+	void markGroundClearanceCell(Int i, Int j, const PathfindCell* cell, Bridge* theBridge);
 	void classifyWallMapCell( Int i, Int j, PathfindCell *cell, const ObjectID *wallPieces, Int numPieces);
 
 private:

@@ -746,12 +746,30 @@ void PathfindLayer::classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bri
 		}
 #endif
 	}
-	Coord3D center = topLeftCorner;
-	center.x += PATHFIND_CELL_SIZE/2;
-	center.y += PATHFIND_CELL_SIZE/2;
+	markGroundClearanceCell(i, j, cell, theBridge);
+}
+
+void PathfindLayer::markGroundClearance(const IRegion2D& cells)
+{
+	if (!m_bridge || !m_layerCells)
+		return;
+	const Int left = MAX(cells.lo.x, m_xOrigin);
+	const Int right = MIN(cells.hi.x, m_xOrigin + m_width - 1);
+	const Int bottom = MAX(cells.lo.y, m_yOrigin);
+	const Int top = MIN(cells.hi.y, m_yOrigin + m_height - 1);
+	for (Int x = left; x <= right; ++x)
+		for (Int y = bottom; y <= top; ++y)
+			markGroundClearanceCell(x, y, &m_layerCells[x - m_xOrigin][y - m_yOrigin], m_bridge);
+}
+
+void PathfindLayer::markGroundClearanceCell(Int i, Int j, const PathfindCell* cell, Bridge* theBridge)
+{
+	Coord3D center;
+	center.x = (Real)i * PATHFIND_CELL_SIZE_F + PATHFIND_CELL_SIZE/2;
+	center.y = (Real)j * PATHFIND_CELL_SIZE_F + PATHFIND_CELL_SIZE/2;
+	center.z = 0;
 	if (cell->getType()!=PathfindCell::CELL_IMPASSABLE) {
 		if (!(cell->getConnectLayer()==LAYER_GROUND) ) {
-			// Check for bridge clearance.  If the ground isn't 1 pathfind cells below, mark impassable.
 			Real groundHeight = TheTerrainLogic->getLayerHeight( center.x, center.y, LAYER_GROUND );
 			Real bridgeHeight = theBridge->getBridgeHeight( &center, nullptr );
 			if (groundHeight+LAYER_Z_CLOSE_ENOUGH_F > bridgeHeight) {

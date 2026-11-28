@@ -536,18 +536,24 @@ void Pathfinder::removeAuthoredRamp(Bridge* bridge)
 	const Int layer = bridge->getLayer();
 	if (layer <= LAYER_GROUND || layer >= LAYER_WALL)
 		return;
+	std::vector<ICoord2D> groundCells;
+	IRegion2D cells = {};
 	if (m_map)
 	{
 		const Region2D* bounds = bridge->getBounds();
-		const Int left = MAX(m_extent.lo.x, REAL_TO_INT_FLOOR(bounds->lo.x / PATHFIND_CELL_SIZE_F) - 1);
-		const Int right = MIN(m_extent.hi.x, REAL_TO_INT_CEIL(bounds->hi.x / PATHFIND_CELL_SIZE_F) + 1);
-		const Int bottom = MAX(m_extent.lo.y, REAL_TO_INT_FLOOR(bounds->lo.y / PATHFIND_CELL_SIZE_F) - 1);
-		const Int top = MIN(m_extent.hi.y, REAL_TO_INT_CEIL(bounds->hi.y / PATHFIND_CELL_SIZE_F) + 1);
-		for (Int x = left; x <= right; ++x)
-			for (Int y = bottom; y <= top; ++y)
+		cells.lo.x = MAX(m_extent.lo.x, REAL_TO_INT_FLOOR(bounds->lo.x / PATHFIND_CELL_SIZE_F) - 1);
+		cells.hi.x = MIN(m_extent.hi.x, REAL_TO_INT_CEIL(bounds->hi.x / PATHFIND_CELL_SIZE_F) + 1);
+		cells.lo.y = MAX(m_extent.lo.y, REAL_TO_INT_FLOOR(bounds->lo.y / PATHFIND_CELL_SIZE_F) - 1);
+		cells.hi.y = MIN(m_extent.hi.y, REAL_TO_INT_CEIL(bounds->hi.y / PATHFIND_CELL_SIZE_F) + 1);
+		for (Int x = cells.lo.x; x <= cells.hi.x; ++x)
+			for (Int y = cells.lo.y; y <= cells.hi.y; ++y)
 			{
 				PathfindCell* cell = m_layers[layer].getCell(x, y);
-				if (!cell || cell->getConnectLayer() == LAYER_INVALID)
+				if (!cell)
+					continue;
+				if (m_map[x][y].getType() == PathfindCell::CELL_BRIDGE_IMPASSABLE)
+					groundCells.push_back({x, y});
+				if (cell->getConnectLayer() == LAYER_INVALID)
 					continue;
 				const Int target = cell->getConnectLayer();
 				PathfindCell* other = target == LAYER_GROUND ? &m_map[x][y] : m_layers[target].getCell(x, y);
@@ -556,6 +562,14 @@ void Pathfinder::removeAuthoredRamp(Bridge* bridge)
 			}
 	}
 	m_layers[layer].reset();
+	for (const ICoord2D& cell : groundCells)
+		m_map[cell.x][cell.y].setType(unlayeredGroundType(cell.x, cell.y));
+	if (!groundCells.empty())
+	{
+		for (Int other = LAYER_GROUND + 1; other <= LAYER_LAST; ++other)
+			if (!m_layers[other].isUnused())
+				m_layers[other].markGroundClearance(cells);
+	}
 	if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
 		m_zoneManager.setZoneUpdateFrame(TheGameLogic->getFrame());
 }
@@ -1232,18 +1246,22 @@ void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
  */
 void Pathfinder::classifyMapCell( Int i, Int j , PathfindCell *cell)
 {
+	const Bool hasObstacle = cell->getType() == PathfindCell::CELL_OBSTACLE;
+	cell->setPinched(false);
+	const PathfindCell::CellType type = terrainCellType(i, j);
+	cell->setType(hasObstacle ? PathfindCell::CELL_OBSTACLE : type);
+	cell->releaseInfo();
+}
+
+PathfindCell::CellType Pathfinder::terrainCellType(Int i, Int j)
+{
 	Coord3D topLeftCorner, bottomRightCorner;
-
-
-	Bool hasObstacle =  (cell->getType() == PathfindCell::CELL_OBSTACLE) ;
 
 	topLeftCorner.y = (Real)j * PATHFIND_CELL_SIZE_F;
 	bottomRightCorner.y = topLeftCorner.y + PATHFIND_CELL_SIZE_F;
 
 	topLeftCorner.x = (Real)i * PATHFIND_CELL_SIZE_F;
 	bottomRightCorner.x = topLeftCorner.x + PATHFIND_CELL_SIZE_F;
-
-	cell->setPinched(false);
 
 	PathfindCell::CellType type = PathfindCell::CELL_CLEAR;
 	if (TheTerrainLogic->isCliffCell(topLeftCorner.x, topLeftCorner.y))
@@ -1272,12 +1290,19 @@ void Pathfinder::classifyMapCell( Int i, Int j , PathfindCell *cell)
 		classifyWaterCorner(bottomRightCorner.x, bottomRightCorner.y);
 		classifyWaterCorner(bottomRightCorner.x, topLeftCorner.y);
 	}
+	return type;
+}
 
-	if (hasObstacle) {
-		type =  PathfindCell::CELL_OBSTACLE;
-	}
-	cell->setType( type );
-	cell->releaseInfo();
+PathfindCell::CellType Pathfinder::unlayeredGroundType(Int x, Int y) const
+{
+	const PathfindCell::CellType type = terrainCellType(x, y);
+	if (type != PathfindCell::CELL_CLEAR)
+		return type;
+	for (Int k = MAX(x - 1, m_extent.lo.x); k <= MIN(x + 1, m_extent.hi.x); ++k)
+		for (Int l = MAX(y - 1, m_extent.lo.y); l <= MIN(y + 1, m_extent.hi.y); ++l)
+			if ((k != x || l != y) && terrainCellType(k, l) == PathfindCell::CELL_CLIFF)
+				return PathfindCell::CELL_CLIFF;
+	return type;
 }
 
 /**
