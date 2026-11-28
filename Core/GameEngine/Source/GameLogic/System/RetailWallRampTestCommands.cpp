@@ -53,6 +53,36 @@ void probeFootprint(const RetailTestCommands::Context& ctx)
 	}
 }
 
+std::vector<ICoord2D> groundBefore;
+
+void probeGround(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	if (!object)
+		return;
+	ICoord2D center;
+	TheAI->pathfinder()->worldToCell(object->getPosition(), &center);
+	std::vector<ICoord2D> cells;
+	for (Int x = center.x - 30; x <= center.x + 30; ++x)
+		for (Int y = center.y - 30; y <= center.y + 30; ++y)
+		{
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND, x, y);
+			if (cell && cell->getType() == PathfindCell::CELL_BRIDGE_IMPASSABLE)
+				cells.push_back({x, y});
+		}
+	if (ctx.frame == 181)
+	{
+		groundBefore = cells;
+		std::fprintf(stderr, "TEST wall-ramp-ground frame=%u cells=%u\n", ctx.frame, static_cast<unsigned>(cells.size()));
+		return;
+	}
+	Bool equal = cells.size() == groundBefore.size();
+	for (size_t i = 0; equal && i < cells.size(); ++i)
+		equal = cells[i].x == groundBefore[i].x && cells[i].y == groundBefore[i].y;
+	std::fprintf(stderr, "TEST wall-ramp-ground frame=%u cells=%u same=%d\n", ctx.frame,
+		static_cast<unsigned>(cells.size()), equal ? 1 : 0);
+}
+
 void probePinched(const RetailTestCommands::Context& ctx)
 {
 	Object* object = ctx.requireObject(FALSE);
@@ -215,6 +245,7 @@ void registerRetailWallRampTestCommands()
 	registerAction("wall-ramp-move", moveToWall);
 	registerAction("wall-ramp-unit", probeUnit);
 	registerAction("wall-ramp-footprint", probeFootprint);
+	registerAction("wall-ramp-ground", probeGround);
 	registerAction("wall-ramp-revoke", revokeUpgrade);
 	registerAction("wall-ramp-pinched", probePinched);
 	registerAction("wall-ramp-weapon", fireWeaponAt);

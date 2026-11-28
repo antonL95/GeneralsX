@@ -3,6 +3,7 @@ check() {
         expect 'TEST wall-ramp-weapon frame=250 fired=1'
     fi
     if covers 181; then
+        expect 'TEST wall-ramp-ground frame=181 cells=11'
         expect 'TEST wall-ramp frame=181 wall=1 ramp1=1 ramp2=1 vertices=6,6,6 faces=2,2,2 heights=44.29,68.13,0.00'
         expect 'TEST wall-ramp-shape frame=181 polygon=4 ramp1=1 ramp2=1'
         expect 'TEST wall-ramp-cell frame=181 inside=1 outside=0 height=44.29'
@@ -12,9 +13,11 @@ check() {
         expect 'TEST wall-ramp-cell frame=186 inside=0 outside=0 height=-21.99'
         expect 'TEST wall-ramp-links frame=186 first=0 second=1'
         expect 'TEST wall-ramp-footprint upgraded different=1'
+        expect 'TEST wall-ramp-ground frame=186 cells=14 same=0'
     fi
     if covers 191; then
         expect 'TEST wall-ramp-footprint reset equal=1'
+        expect 'TEST wall-ramp-ground frame=191 cells=11 same=1'
     fi
     if covers 220; then
         awk '
