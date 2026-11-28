@@ -114,8 +114,8 @@ check() {
         $1 == "TEST" && $2 == "health" && $4 == "Player_2" && $5 == "AiPowersFollowMarker" {
             split($11, value, "=")
             split(value[2], pos, ",")
-            dx = pos[1] - ($3 == 1315 ? 3430 : 3470)
-            dy = pos[2] - ($3 == 1315 ? 1450 : 1470)
+            dx = pos[1] - ($3 == 1315 ? 3440 : 3480)
+            dy = pos[2] - ($3 == 1315 ? 1750 : 1770)
             if (dx * dx + dy * dy <= 100) near[$3] = 1
         }
         END { exit (!near[1315] || !near[1440]) }
