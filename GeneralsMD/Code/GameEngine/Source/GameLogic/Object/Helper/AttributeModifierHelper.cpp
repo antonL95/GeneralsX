@@ -401,7 +401,7 @@ UpdateSleepTime AttributeModifierHelper::update()
 
 DisabledMaskType AttributeModifierHelper::getDisabledTypesToProcess() const
 {
-	return RetailFileLayers::enabled() ? DISABLEDMASK_ALL : ObjectHelper::getDisabledTypesToProcess();
+	return RetailFileLayers::enabled() ? MAKE_DISABLED_MASK(DISABLED_PARALYZED) : ObjectHelper::getDisabledTypesToProcess();
 }
 
 void AttributeModifierHelper::crc( Xfer *xfer )
