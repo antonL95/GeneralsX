@@ -144,3 +144,4 @@
 4 ability-custom-animation
 3 pkg-armor-flank
 3 pkg-garrison-range
+3 pkg-contained-weaponset

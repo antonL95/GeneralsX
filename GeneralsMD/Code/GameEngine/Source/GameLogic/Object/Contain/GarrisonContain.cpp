@@ -1614,6 +1614,24 @@ void GarrisonContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor 
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static void setContainedWeaponSet(Object* obj, Bool contained)
+{
+	WeaponSetFlags flags;
+	flags.set(WEAPONSET_CONTAINED);
+	const auto apply = [&](Object* unit) -> Bool {
+		const WeaponTemplateSet* set = unit->getTemplate()->findWeaponTemplateSet(flags);
+		if (!set || !set->friend_getWeaponSetFlags().test(WEAPONSET_CONTAINED))
+			return FALSE;
+		unit->setWeaponSetFlags(flags, contained);
+		return TRUE;
+	};
+	if (!apply(obj))
+		return;
+	if (const HordeContain* horde = HordeContain::get(obj))
+		for (Object* member : *horde->getContainedItemsList())
+			apply(member);
+}
+
 void GarrisonContain::onContaining( Object *obj, Bool wasSelected )
 {
 
@@ -1628,6 +1646,7 @@ void GarrisonContain::onContaining( Object *obj, Bool wasSelected )
 	structure->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_CAN_ATTACK ) );
 
 	obj->setWeaponBonusCondition( WEAPONBONUSCONDITION_GARRISONED );
+	setContainedWeaponSet(obj, TRUE);
 
 	if (RetailFileLayers::enabled())
 	{
@@ -1679,6 +1698,7 @@ void GarrisonContain::onRemoving( Object *obj )
     obj->setPositionZ( TheTerrainLogic->getGroundHeight( obj->getPosition()->x, obj->getPosition()->y ) );
   }
 	obj->clearWeaponBonusCondition( WEAPONBONUSCONDITION_GARRISONED );
+	setContainedWeaponSet(obj, FALSE);
 
 	obj->clearDisabled( DISABLED_HELD );
 

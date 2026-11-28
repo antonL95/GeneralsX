@@ -1,0 +1,12 @@
+214 create Player_1 ContainedWeaponGarrison 0 2640,2740,0
+215 create Player_1 IsengardWildmanHorde 0 2600,2740,0
+215 create PlyrCreeps ContainedWeaponTarget 0 2840,2740,0
+216 pkg61-range Player_1 IsengardWildmanHorde 0 PlyrCreeps:ContainedWeaponTarget:0
+217 pkg08-enter Player_1 IsengardWildmanHorde 0 Player_1:ContainedWeaponGarrison:0
+240 pkg61-range Player_1 IsengardWildmanHorde 0 PlyrCreeps:ContainedWeaponTarget:0
+250 pkg61-range Player_1 IsengardWildmanHorde 0 PlyrCreeps:ContainedWeaponTarget:0
+252 pkg31-msg-evacuate Player_1 ContainedWeaponGarrison 0
+262 pkg61-range Player_1 IsengardWildmanHorde 0 PlyrCreeps:ContainedWeaponTarget:0
+265 destroy Player_1 IsengardWildmanHorde 0
+266 destroy Player_1 ContainedWeaponGarrison 0
+266 destroy PlyrCreeps ContainedWeaponTarget 0
