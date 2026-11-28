@@ -1,5 +1,5 @@
 200 create Player_1 HaradWarlord 0 800,800,0
-200 create Player_1 GuldurOrcArcher 0 800,1800,0
+200 create Player_1 GuldurOrcArcher 0 200,3400,0
 200 create Player_1 GuldurOrcArcher 1 800,2200,0
 200 create Player_1 GuldurOrcPikemanHorde 0 1400,2000,0
 200 create Player_1 GuldurSorceryTower 0 1600,2200,0
@@ -11,7 +11,7 @@
 202 science Player_1 - 0 SCIENCE_GuldurGreenMist
 202 science Player_1 - 0 SCIENCE_BalrogAlly
 202 science Player_1 - 0 SCIENCE_DragonStrike
-205 summon-rules-census Player_1 GuldurOrcArcher 0 1000 800 2000
+205 summon-rules-census Player_1 GuldurOrcArcher 0 1600 800 2000
 205 summon-rules-census Player_1 GuldurOrcPikeman 0 1000 1400 2000
 205 modapply Player_1 GuldurOrcArcher 1 GuldurDarkPresence
 210 objupgrade Player_1 HaradWarlord 0 Upgrade_ThrallMasterOrcWarriors
