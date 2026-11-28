@@ -233,7 +233,9 @@ class AudioManager : public SubsystemInterface
 		virtual Bool isPlayingLowerPriority( AudioEventRTS *event ) const = 0;
 		virtual Bool isPlayingAlready( AudioEventRTS *event ) const = 0;
 		virtual Bool isObjectPlayingVoice( UnsignedInt objID ) const = 0;
+		virtual Bool isObjectPlayingVoice( UnsignedInt objID, AudioHandle exemptGroup ) const { return isObjectPlayingVoice( objID ); }
 		virtual void stopObjectVoice( UnsignedInt objID ) {}
+		virtual void stopObjectVoice( UnsignedInt objID, AudioHandle exemptGroup ) { stopObjectVoice( objID ); }
 		virtual Int getMusicTrackCompletionCount( AudioHandle handle ) const { return 0; }
 		virtual void advanceVirtualMusic( Real ms ) {}
 		virtual void dumpAudioTraceStatus() const {}
@@ -409,7 +411,7 @@ class AudioManager : public SubsystemInterface
 			std::shared_ptr<AudioEventRTS> event;
 			Bool loop = FALSE;
 		};
-		std::vector<AudioHandle> startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop);
+		std::vector<AudioHandle> startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop, AudioHandle group);
 		std::map<AudioHandle, MultiAudioGroup> m_multiAudioHandles;
 		std::unique_ptr<RetailScriptAudio> m_scriptAudio;
 };

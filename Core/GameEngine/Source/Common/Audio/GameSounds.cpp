@@ -274,7 +274,7 @@ Bool SoundManager::canPlayNow( AudioEventRTS *event )
 Bool SoundManager::violatesVoice( AudioEventRTS *event )
 {
 	if (event->getAudioEventInfo()->m_type & ST_VOICE) {
-		return (event->getObjectID() && TheAudio->isObjectPlayingVoice(event->getObjectID()));
+		return (event->getObjectID() && TheAudio->isObjectPlayingVoice(event->getObjectID(), event->getMultiSoundGroup()));
 	}
 	return false;
 }

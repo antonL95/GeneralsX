@@ -244,6 +244,7 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 	m_decayName						= right.m_decayName;
 	m_portionToPlayNext		= right.m_portionToPlayNext;
 	m_uninterruptible			= right.m_uninterruptible;
+	m_multiSoundGroup			= right.m_multiSoundGroup;
 
 	if( m_ownerType == OT_Positional || m_ownerType == OT_Dead )
 	{
@@ -292,6 +293,7 @@ AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 	m_decayName						= right.m_decayName;
 	m_portionToPlayNext		= right.m_portionToPlayNext;
 	m_uninterruptible			= right.m_uninterruptible;
+	m_multiSoundGroup			= right.m_multiSoundGroup;
 
 	if( m_ownerType == OT_Positional || m_ownerType == OT_Dead )
 	{

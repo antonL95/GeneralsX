@@ -154,7 +154,9 @@ public:
 	virtual Bool isPlayingLowerPriority(AudioEventRTS *event) const;
 	virtual Bool isPlayingAlready(AudioEventRTS *event) const;
 	virtual Bool isObjectPlayingVoice(UnsignedInt objID) const;
+	virtual Bool isObjectPlayingVoice(UnsignedInt objID, AudioHandle exemptGroup) const override;
 	virtual void stopObjectVoice(UnsignedInt objID) override;
+	virtual void stopObjectVoice(UnsignedInt objID, AudioHandle exemptGroup) override;
 	virtual Int getMusicTrackCompletionCount(AudioHandle handle) const override;
 	virtual void advanceVirtualMusic(Real ms) override;
 	virtual void dumpAudioTraceStatus() const override;

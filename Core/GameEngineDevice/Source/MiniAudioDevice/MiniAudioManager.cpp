@@ -626,13 +626,14 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		return;
 	}
 	const ObjectID voiceOwner = audioOwnerObject(event);
-	if ((info->m_type & ST_VOICE) && voiceOwner != INVALID_ID && isObjectPlayingVoice(voiceOwner)) {
+	const AudioHandle voiceGroup = event->getMultiSoundGroup();
+	if ((info->m_type & ST_VOICE) && voiceOwner != INVALID_ID && isObjectPlayingVoice(voiceOwner, voiceGroup)) {
 		if (!(info->m_control & AC_INTERRUPT)) {
 			if (m_traceEnabled)
 				traceEvent("voice-suppress", voiceOwner, event->getPlayingHandle(), event->getEventName());
 			return;
 		}
-		stopObjectVoice(voiceOwner);
+		stopObjectVoice(voiceOwner, voiceGroup);
 	}
 
 	AsciiString fileToPlay = event->getFilename();
@@ -1525,9 +1526,15 @@ Bool MiniAudioManager::isPlayingAlready(AudioEventRTS *event) const
 //-------------------------------------------------------------------------------------------------
 Bool MiniAudioManager::isObjectPlayingVoice(UnsignedInt objID) const
 {
+	return isObjectPlayingVoice(objID, 0);
+}
+
+Bool MiniAudioManager::isObjectPlayingVoice(UnsignedInt objID, AudioHandle exemptGroup) const
+{
 	if (objID == 0) return false;
 	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end(); ++it) {
 		if (!(*it)->m_audioEventRTS) continue;
+		if (exemptGroup != 0 && (*it)->m_audioEventRTS->getMultiSoundGroup() == exemptGroup) continue;
 		const AudioEventInfo *info = (*it)->m_audioEventRTS->getAudioEventInfo();
 		if (info && audioOwnerObject((*it)->m_audioEventRTS.Peek()) == objID && (info->m_type & ST_VOICE))
 			return true;
@@ -1537,11 +1544,17 @@ Bool MiniAudioManager::isObjectPlayingVoice(UnsignedInt objID) const
 
 void MiniAudioManager::stopObjectVoice(UnsignedInt objID)
 {
+	stopObjectVoice(objID, 0);
+}
+
+void MiniAudioManager::stopObjectVoice(UnsignedInt objID, AudioHandle exemptGroup)
+{
 	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end();) {
 		PlayingAudio *playing = *it;
 		AudioEventRTS *event = playing && playing->m_audioEventRTS ? playing->m_audioEventRTS.Peek() : nullptr;
 		const AudioEventInfo *info = event ? event->getAudioEventInfo() : nullptr;
-		if (info && (info->m_type & ST_VOICE) && audioOwnerObject(event) == objID) {
+		const Bool exempt = exemptGroup != 0 && event && event->getMultiSoundGroup() == exemptGroup;
+		if (!exempt && info && (info->m_type & ST_VOICE) && audioOwnerObject(event) == objID) {
 			if (m_traceEnabled)
 				traceEvent("interrupt", static_cast<ObjectID>(objID), event->getPlayingHandle(), event->getEventName());
 			it = m_playingSounds.erase(it);

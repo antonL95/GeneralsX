@@ -164,6 +164,8 @@ public:
 
 	Bool getUninterruptible() const { return m_uninterruptible; }
 	void setUninterruptible( Bool uninterruptible ) { m_uninterruptible = uninterruptible; }
+	AudioHandle getMultiSoundGroup() const { return m_multiSoundGroup; }
+	void setMultiSoundGroup( AudioHandle group ) { m_multiSoundGroup = group; }
 
 
 	// This will retrieve the appropriate position based on type.
@@ -205,6 +207,7 @@ protected:
 	Bool m_playMusicOnce = FALSE;
 	Bool m_isLogicalAudio;					///< Should probably only be true for scripted sounds
 	Bool m_uninterruptible;
+	AudioHandle m_multiSoundGroup = 0;
 	Bool m_ambient = FALSE;
 	Bool m_loopCountOverride = FALSE;
 	AsciiString m_logicalTrackName;

@@ -351,12 +351,13 @@ void AudioManager::reset()
 	m_disallowSpeech = FALSE;
 }
 
-std::vector<AudioHandle> AudioManager::startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop)
+std::vector<AudioHandle> AudioManager::startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop, AudioHandle group)
 {
 	std::vector<AudioHandle> handles;
 	for (const AsciiString& name : names) {
 		AudioEventRTS child(*source);
 		child.setEventName(name);
+		child.setMultiSoundGroup(group);
 		if (loop && isValidAudioEvent(&child) && child.getAudioEventInfo()->m_soundType == AT_Music)
 			child.setPlayMusicOnce();
 		const AudioHandle handle = addAudioEvent(&child);
@@ -383,7 +384,7 @@ void AudioManager::update()
 		std::vector<AsciiString> names;
 		Bool loop = FALSE;
 		if (group.loop && RetailLargeGroupAudio::expandMultiSound(group.event->getEventName(), names, loop))
-			group.children = startMultiAudioChildren(group.event.get(), names, loop);
+			group.children = startMultiAudioChildren(group.event.get(), names, loop, it->first);
 		else
 			group.children.clear();
 		if (group.children.empty())
@@ -500,10 +501,10 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	std::vector<AsciiString> children;
 	Bool loopPlaylist = FALSE;
 	if (RetailLargeGroupAudio::expandMultiSound(eventToAdd->getEventName(), children, loopPlaylist)) {
-		std::vector<AudioHandle> handles = startMultiAudioChildren(eventToAdd, children, loopPlaylist);
+		const AudioHandle group = allocateNewHandle();
+		std::vector<AudioHandle> handles = startMultiAudioChildren(eventToAdd, children, loopPlaylist, group);
 		if (handles.empty())
 			return AHSV_NoSound;
-		const AudioHandle group = allocateNewHandle();
 		m_multiAudioHandles.emplace(group, MultiAudioGroup{std::move(handles), std::make_shared<AudioEventRTS>(*eventToAdd), loopPlaylist});
 		return group;
 	}

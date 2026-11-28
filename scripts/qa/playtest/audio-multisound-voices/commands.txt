@@ -1,0 +1,12 @@
+10 audio-loop-trace - - 0 virtual
+12 create Player_1 AudioVoiceMultiProbe 0 2520,1010,0
+13 reveal Player_1 AudioVoiceMultiProbe 0
+14 create PlyrCreeps GondorFarm 0 2650,1120,0
+15 audio-loop-select Player_1 AudioVoiceMultiProbe 0
+18 audio-loop-move Player_1 AudioVoiceMultiProbe 0 2520,1060,0
+22 audio-loop-attack Player_1 AudioVoiceMultiProbe 0 PlyrCreeps:GondorFarm:0
+30 create Player_1 AudioVoicePairProbe 0 2560,1010,0
+31 reveal Player_1 AudioVoicePairProbe 0
+32 audio-loop-select Player_1 AudioVoicePairProbe 0
+40 audio-loop-move Player_1 AudioVoicePairProbe 0 2560,1060,0
+40 audio-loop-attack Player_1 AudioVoicePairProbe 0 PlyrCreeps:GondorFarm:0
