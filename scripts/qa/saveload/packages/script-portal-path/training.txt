@@ -1,0 +1,16 @@
+246 create PlyrCivilian PortalPathWall 0 1150,2600,0
+246 create Player_1 PortalPathLadder 0 1020,2520,60
+246 create Player_1 PortalPathClimber 0 980,2470,0
+246 create Player_1 PortalPathBlocked 0 950,2470,0
+248 power Player_1 PortalPathLadder 0 SpecialAbilitySiegeDeploy
+249 aim Player_1 PortalPathLadder 0 PlyrCivilian:PortalPathWall:0
+260 script-portal-path-probe Player_1 PortalPathClimber 0 Player_1:PortalPathLadder:0
+260 script-portal-path-probe Player_1 PortalPathBlocked 0 Player_1:PortalPathLadder:0
+360 script-portal-path-probe Player_1 PortalPathClimber 0 Player_1:PortalPathLadder:0
+360 script-portal-path-probe Player_1 PortalPathBlocked 0 Player_1:PortalPathLadder:0
+380 script-portal-path-probe Player_1 PortalPathClimber 0 Player_1:PortalPathLadder:0
+380 script-portal-path-probe Player_1 PortalPathBlocked 0 Player_1:PortalPathLadder:0
+390 destroy Player_1 PortalPathClimber 0
+390 destroy Player_1 PortalPathBlocked 0
+390 destroy Player_1 PortalPathLadder 0
+390 destroy PlyrCivilian PortalPathWall 0

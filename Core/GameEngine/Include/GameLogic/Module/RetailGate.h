@@ -173,10 +173,17 @@ class DynamicPortalBehaviour final : public UpdateModule
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(DynamicPortalBehaviour, DynamicPortalBehaviourModuleData)
 
 public:
+	struct PortalTransition
+	{
+		Coord3D from;
+		Coord3D to;
+	};
+
 	DynamicPortalBehaviour(Thing* thing, const ModuleData* data);
 	static DynamicPortalBehaviour* find(const Object* object);
 	Bool isActive() const { return m_active; }
 	Bool permits(const Object& unit) const;
+	Bool collectPortalTransitions(const Object& unit, std::vector<PortalTransition>& transitions) const;
 	Bool canDockOnWall() const;
 	Bool getAboveWallPosition(Coord3D& position) const;
 	Bool getClimbEntryPosition(Coord3D& position) const;

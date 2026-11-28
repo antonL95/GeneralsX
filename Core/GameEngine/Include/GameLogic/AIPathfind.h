@@ -148,6 +148,7 @@ public:
 	virtual void loadPostProcess() override;
 
 	Bool clientSafeQuickDoesPathExist(const LocomotorSet& locomotorSet, const Coord3D* from, const Coord3D* to, const Object* obj = nullptr);
+	Bool canReachZoneThroughPortals(const LocomotorSet& locomotorSet, const Object* obj, const Coord3D* from, const Coord3D* to);
 	Bool clientSafeQuickDoesPathExistForUI(const LocomotorSet& locomotorSet, const Coord3D* from, const Coord3D* to, const Object* obj = nullptr);
 	Bool quickDoesPathExistToObject( const Object *obj, const Coord3D *from, const Object *target );
 	Bool slowDoesPathExist( Object *obj, const Coord3D *from,

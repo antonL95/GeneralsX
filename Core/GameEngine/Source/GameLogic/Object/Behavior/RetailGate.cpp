@@ -624,6 +624,43 @@ Bool DynamicPortalBehaviour::permits(const Object& unit) const
 	return TRUE;
 }
 
+Bool DynamicPortalBehaviour::collectPortalTransitions(const Object& unit, std::vector<PortalTransition>& transitions) const
+{
+	transitions.clear();
+	if (!permits(unit))
+		return FALSE;
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	if (data->m_numberOfBones <= 0 || data->m_bonePrefix.isEmpty() ||
+		data->m_wayPoints.empty() || data->m_links.empty())
+		return FALSE;
+
+	std::vector<Coord3D> bones(static_cast<size_t>(data->m_numberOfBones));
+	const Int found = getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(),
+		data->m_numberOfBones, bones.data(), nullptr);
+	if (found <= 0)
+		return FALSE;
+
+	const auto isSupportedWaypoint = [data, found](Int waypointIndex) -> Bool
+	{
+		if (waypointIndex < 0 || static_cast<size_t>(waypointIndex) >= data->m_wayPoints.size())
+			return FALSE;
+		const auto& wp = data->m_wayPoints[static_cast<size_t>(waypointIndex)];
+		if (wp.index < 0 || wp.index >= found)
+			return FALSE;
+		return wp.type == 1 || wp.type == 2 || wp.type == 3 || wp.type == 4 || wp.type == 7 || wp.type == 8;
+	};
+
+	for (const auto& link : data->m_links)
+	{
+		if (!isSupportedWaypoint(link.from) || !isSupportedWaypoint(link.to))
+			continue;
+		const Int fromBone = data->m_wayPoints[static_cast<size_t>(link.from)].index;
+		const Int toBone = data->m_wayPoints[static_cast<size_t>(link.to)].index;
+		transitions.push_back({bones[static_cast<size_t>(fromBone)], bones[static_cast<size_t>(toBone)]});
+	}
+	return !transitions.empty();
+}
+
 Bool DynamicPortalBehaviour::canDockOnWall() const
 {
 	const auto* data = getDynamicPortalBehaviourModuleData();

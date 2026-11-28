@@ -3200,7 +3200,8 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			if (surfaces == 0)
 				return FALSE;
 			return surfaces == LOCOMOTORSURFACE_AIR ||
-				TheAI->pathfinder()->clientSafeQuickDoesPathExist(locomotors, unit->getPosition(), waypoint->getLocation());
+				TheAI->pathfinder()->clientSafeQuickDoesPathExist(locomotors, unit->getPosition(), waypoint->getLocation()) ||
+				TheAI->pathfinder()->canReachZoneThroughPortals(locomotors, unit, unit->getPosition(), waypoint->getLocation());
 		}
 		case Condition::TEAM_HAS_FEWER_THAN_X_UNITS_WITH_KINDOF:
 		{

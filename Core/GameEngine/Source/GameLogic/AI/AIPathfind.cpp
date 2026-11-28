@@ -51,6 +51,10 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 
+#include <map>
+#include <queue>
+#include <set>
+
 static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/CastleBehavior.h"
 #include "Common/ModuleFactory.h"
@@ -5036,6 +5040,110 @@ Bool Pathfinder::clientSafeQuickDoesPathExist(const LocomotorSet& locomotorSet,
 	}
 	return FALSE;
 
+}
+
+Bool Pathfinder::canReachZoneThroughPortals(const LocomotorSet& locomotorSet,
+	const Object* obj, const Coord3D* from, const Coord3D* to)
+{
+	if (!obj || !from || !to || !RetailFileLayers::enabled())
+		return FALSE;
+
+	const PathfindLayerEnum destinationLayer = TheTerrainLogic->getLayerForDestination(to);
+	if (!validMovementPosition(false, destinationLayer, locomotorSet, to))
+		return FALSE;
+
+	const PathfindLayerEnum fromLayer = TheTerrainLogic->getLayerForDestination(from);
+	const PathfindCell* parentCell = getClippedCell(fromLayer, from);
+	const PathfindCell* goalCell = getClippedCell(destinationLayer, to);
+	if (!parentCell || !goalCell || goalCell->getType() == PathfindCell::CELL_CLIFF)
+		return FALSE;
+
+	const LocomotorSurfaceTypeMask validSurfaces = locomotorSet.getValidSurfaces();
+	const Bool canScale = locomotorSet.canScaleWalls(obj);
+	const Bool doingTerrainZone = canScale ||
+		parentCell->getType() == PathfindCell::CELL_OBSTACLE ||
+		goalCell->getType() == PathfindCell::CELL_OBSTACLE;
+
+	const auto effectiveZoneForCell = [this, validSurfaces, doingTerrainZone](const PathfindCell* cell) -> Int
+	{
+		if (!cell)
+			return PathfindZoneManager::UNINITIALIZED_ZONE;
+		zoneStorageType zone = cell->getZone();
+		if (doingTerrainZone || cell->getType() == PathfindCell::CELL_OBSTACLE)
+		{
+			zone = m_zoneManager.getEffectiveTerrainZone(zone);
+			zone = m_zoneManager.getEffectiveZone(validSurfaces, FALSE, zone);
+			return m_zoneManager.getEffectiveTerrainZone(zone);
+		}
+		return m_zoneManager.getEffectiveZone(validSurfaces, FALSE, zone);
+	};
+
+	const Int startZone = effectiveZoneForCell(parentCell);
+	const Int goalZone = effectiveZoneForCell(goalCell);
+	if (startZone == goalZone ||
+		startZone == PathfindZoneManager::UNINITIALIZED_ZONE ||
+		goalZone == PathfindZoneManager::UNINITIALIZED_ZONE)
+		return FALSE;
+
+	const auto resolveEffectiveZone = [this, &effectiveZoneForCell](const Coord3D& pos) -> Int
+	{
+		const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(&pos);
+		return effectiveZoneForCell(getClippedCell(layer, &pos));
+	};
+
+	std::map<Int, std::vector<Int>> edges;
+	const NameKeyType portalKey = NAMEKEY("DynamicPortalBehaviour");
+
+	for (const Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
+	{
+		if (candidate->isEffectivelyDead() || candidate->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+			continue;
+
+		for (BehaviorModule** module = candidate->getBehaviorModules(); module && *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != portalKey)
+				continue;
+			const auto* portal = static_cast<const DynamicPortalBehaviour*>(*module);
+			std::vector<DynamicPortalBehaviour::PortalTransition> transitions;
+			if (!portal->collectPortalTransitions(*obj, transitions))
+				continue;
+			for (const auto& edge : transitions)
+			{
+				const Int fromZone = resolveEffectiveZone(edge.from);
+				const Int toZone = resolveEffectiveZone(edge.to);
+				if (fromZone == PathfindZoneManager::UNINITIALIZED_ZONE ||
+					toZone == PathfindZoneManager::UNINITIALIZED_ZONE ||
+					fromZone == toZone)
+					continue;
+				edges[fromZone].push_back(toZone);
+			}
+		}
+	}
+
+	if (edges.empty())
+		return FALSE;
+
+	std::queue<Int> pending;
+	std::set<Int> visited;
+	visited.insert(startZone);
+	pending.push(startZone);
+
+	while (!pending.empty())
+	{
+		const Int current = pending.front();
+		pending.pop();
+		const auto it = edges.find(current);
+		if (it == edges.end())
+			continue;
+		for (Int next : it->second)
+		{
+			if (next == goalZone)
+				return TRUE;
+			if (visited.insert(next).second)
+				pending.push(next);
+		}
+	}
+	return FALSE;
 }
 
 /**
