@@ -19,3 +19,39 @@
 490 destroy Player_1 GuardRetaliateMelee 0
 490 destroy Player_1 GuardRetaliateMeleeAlly 0
 490 destroy PlyrCreeps GuardRetaliateMeleeBait 0
+
+500 create Player_1 GuardRetaliateInnerAlly 0 650,1680,0
+500 create PlyrCreeps GuardRetaliateRangedBait 0 870,1680,180
+500 create PlyrCreeps GuardRetaliateInnerPassiveBait 0 650,1530,0
+520 create Player_1 GuardRetaliateInnerRanged 0 650,1650,0
+595 guard-retaliate-probe Player_1 GuardRetaliateInnerRanged 0
+600 guard-retaliate-relocate PlyrCreeps GuardRetaliateRangedBait 0 1400,1650
+600 destroy Player_1 GuardRetaliateInnerAlly 0
+650 guard-retaliate-probe Player_1 GuardRetaliateInnerRanged 0
+660 destroy Player_1 GuardRetaliateInnerRanged 0
+660 destroy PlyrCreeps GuardRetaliateRangedBait 0
+660 destroy PlyrCreeps GuardRetaliateInnerPassiveBait 0
+
+680 create Player_1 GuardRetaliateInnerAlly 0 650,1680,0
+680 create PlyrCreeps GuardRetaliateRangedBait 0 870,1680,180
+680 create PlyrCreeps GuardRetaliateInnerPassiveBait 0 650,1600,0
+700 create Player_1 GuardRetaliateInnerRanged 0 650,1650,0
+775 guard-retaliate-probe Player_1 GuardRetaliateInnerRanged 0
+780 guard-retaliate-relocate PlyrCreeps GuardRetaliateRangedBait 0 1400,1650
+780 destroy Player_1 GuardRetaliateInnerAlly 0
+830 guard-retaliate-probe Player_1 GuardRetaliateInnerRanged 0
+840 destroy Player_1 GuardRetaliateInnerRanged 0
+840 destroy PlyrCreeps GuardRetaliateRangedBait 0
+840 destroy PlyrCreeps GuardRetaliateInnerPassiveBait 0
+
+860 create Player_1 GuardRetaliateInnerAlly 0 2300,3180,0
+860 create PlyrCreeps GuardRetaliateMeleeBait 0 2520,3180,180
+860 create PlyrCreeps GuardRetaliateInnerPassiveBait 0 2300,3070,0
+880 create Player_1 GuardRetaliateInnerMelee 0 2300,3150,0
+955 guard-retaliate-probe Player_1 GuardRetaliateInnerMelee 0
+960 guard-retaliate-relocate PlyrCreeps GuardRetaliateMeleeBait 0 3050,3180
+960 destroy Player_1 GuardRetaliateInnerAlly 0
+1100 guard-retaliate-probe Player_1 GuardRetaliateInnerMelee 0
+1110 destroy Player_1 GuardRetaliateInnerMelee 0
+1110 destroy PlyrCreeps GuardRetaliateMeleeBait 0
+1110 destroy PlyrCreeps GuardRetaliateInnerPassiveBait 0
