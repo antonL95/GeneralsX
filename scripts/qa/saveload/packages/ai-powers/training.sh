@@ -90,7 +90,7 @@ check() {
     if covers 875; then
         expect 'TEST powers-fire-state frame=875 template=AiPowersSummonMarker alive=1' || return 1
         expect 'TEST powers-fire-state frame=875 template=AiPowersSummonCaster alive=2 ready=1' || return 1
-        if ! grep -F 'TEST health 875 Player_2 AiPowersSummonMarker 0 ' "$log" | grep -Fq ' pos=3432.4,1407.6'; then
+        if ! grep -F 'TEST health 875 Player_2 AiPowersSummonMarker 0 ' "$log" | grep -Fq ' pos=3442.4,1707.6'; then
             printf 'Expected the summon in the southeast cluster at frame 875\n' >&2
             grep -F 'TEST health 875 Player_2 AiPowersSummonMarker 0 ' "$log" >&2 || true
             return 1

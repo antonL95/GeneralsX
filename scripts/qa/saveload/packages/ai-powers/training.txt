@@ -43,11 +43,11 @@
 481 destroy Player_2 AiPowersStanceHoldControl 0
 575 mods Player_2 AiPowersStanceInjured 0
 576 destroy Player_2 AiPowersStanceInjured 0
-600 create Player_2 AiPowersSummonCaster 0 3390,1450,0
-600 create Player_2 AiPowersSummonCaster 1 3650,1150,0
-601 create Player_1 AiPowersCombatTarget 0 3430,1450,0
-601 create Player_1 AiPowersCombatTarget 1 3435,1430,0
-601 create Player_1 AiPowersCombatTarget 2 3690,1150,0
+600 create Player_2 AiPowersSummonCaster 0 3400,1750,0
+600 create Player_2 AiPowersSummonCaster 1 3650,1750,0
+601 create Player_1 AiPowersCombatTarget 0 3440,1750,0
+601 create Player_1 AiPowersCombatTarget 1 3445,1730,0
+601 create Player_1 AiPowersCombatTarget 2 3690,1750,0
 602 attack Player_2 AiPowersSummonCaster 0 Player_1:AiPowersCombatTarget:0
 602 attack Player_2 AiPowersSummonCaster 1 Player_1:AiPowersCombatTarget:2
 745 powers-fire-state Player_2 AiPowersSummonMarker 0
