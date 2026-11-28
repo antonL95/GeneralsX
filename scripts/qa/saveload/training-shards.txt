@@ -152,3 +152,4 @@
 1 timed-lifetime-update
 1 timed-upgrade-removal
 1 timed-special-ability-end
+4 spirit-of-zigur

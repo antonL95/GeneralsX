@@ -1,0 +1,37 @@
+260 create Player_1 SanctumofZigur 0 2650,1400,0
+260 create Player_1 HaradCultistsofZigurHorde 0 2800,1400,0
+260 reveal Player_1 HaradCultistsofZigurHorde 0
+262 hero-ability-select Player_1 HaradCultistsofZigurHorde 0 -
+263 hero-ability-button Player_1 HaradCultistsofZigurHorde 0 Command_PurchaseUpgradeSpiritOfZigur
+265 hero-ability-upgrade Player_1 - 0 Upgrade_TechnologyAngmarCorpseRain
+267 hero-ability-button Player_1 HaradCultistsofZigurHorde 0 Command_PurchaseUpgradeSpiritOfZigur
+270 hero-ability-press Player_1 HaradCultistsofZigurHorde 0 Command_PurchaseUpgradeSpiritOfZigur
+385 hero-ability-select Player_1 HaradCultistsofZigurHorde 0 -
+386 hero-ability-probe Player_1 HaradCultistsofZigurHorde 0 cultists_upgraded|SpecialAbilitySpiritOfZigur
+386 hero-ability-button Player_1 HaradCultistsofZigurHorde 0 Command_ZigurCultistsSpiritOfZigur
+388 create PlyrCreeps GondorFighter 0 2840,1400,0
+390 hero-ability-press Player_1 HaradCultistsofZigurHorde 0 Command_ZigurCultistsSpiritOfZigur 2840 1400
+420 hero-ability-world - - 0 cultists_flames|HaradZigurCultistSpiritOfZigurFlamesCaster
+455 hero-ability-probe Player_1 HaradCultistsofZigurHorde 0 cultists_after_cast1|SpecialAbilitySpiritOfZigur
+465 hero-ability-probe PlyrCreeps GondorFighter 0 cultists_enemy_after
+470 hero-ability-press Player_1 HaradCultistsofZigurHorde 0 Command_ZigurCultistsSpiritOfZigur 2840 1400
+505 hero-ability-probe Player_1 HaradCultistsofZigurHorde 0 cultists_after_cast2|SpecialAbilitySpiritOfZigur
+505 hero-ability-world - - 0 cultists_flames_after2|HaradZigurCultistSpiritOfZigurFlamesCaster
+520 destroy Player_1 HaradCultistsofZigurHorde 0
+520 destroy Player_1 SanctumofZigur 0
+520 destroy PlyrCreeps GondorFighter 0
+540 create Player_1 ArbiterofZigurHorde 0 2800,1400,0
+540 reveal Player_1 ArbiterofZigurHorde 0
+542 hero-ability-select Player_1 ArbiterofZigurHorde 0 -
+543 hero-ability-button Player_1 ArbiterofZigurHorde 0 Command_ZigurArbiterSpiritOfZigur
+548 hero-ability-rank Player_1 ArbiterofZigurHorde 0 5
+550 hero-ability-select Player_1 ArbiterofZigurHorde 0 -
+550 hero-ability-button Player_1 ArbiterofZigurHorde 0 Command_ZigurArbiterSpiritOfZigur
+553 create PlyrCreeps GondorFighter 0 2880,1400,0
+555 hero-ability-press Player_1 ArbiterofZigurHorde 0 Command_ZigurArbiterSpiritOfZigur|GondorFighter
+575 hero-ability-world - - 0 arbiter_flames_pre|HaradZigurArbiterSpiritOfZigurFlamesCaster
+585 hero-ability-world - - 0 arbiter_flames|HaradZigurArbiterSpiritOfZigurFlamesCaster
+600 hero-ability-probe Player_1 ArbiterofZigurHorde 0 arbiter_after_cast|SpecialAbilitySpiritOfZigurArbiter
+620 hero-ability-probe PlyrCreeps GondorFighter 0 arbiter_enemy_after
+640 destroy Player_1 ArbiterofZigurHorde 0
+640 destroy PlyrCreeps GondorFighter 0
