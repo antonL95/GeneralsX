@@ -1285,7 +1285,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		if (!killSelf && nugget.m_flankingBonus != 0.0f && HordeContain::isFlanked(victim, source, FALSE))
 			amount *= 1.0f + nugget.m_flankingBonus;
 		const Player* player = source ? source->getControllingPlayer() : nullptr;
-		return {scalar, amount, player ? player->getPlayerMask() : 0, forceKill};
+		return {scalar, amount, player ? UnsignedInt(player->getPlayerMask()) : 0u, forceKill};
 	};
 
 	const auto damage = [&](Object* victim, const WeaponNuggetDamage& hit) -> Bool
