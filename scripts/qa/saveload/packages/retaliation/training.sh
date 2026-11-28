@@ -1,6 +1,6 @@
 check() {
     if covers 254; then
-        horde=$(sed -n 's/^TEST frame 235: create PartitionScaleHorde for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
+        horde=$(sed -n 's/^TEST frame 235: create RetaliationSaveHorde for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
         bulwark=$(sed -n 's/^TEST frame 230: create RetaliationSaveBulwark for PlyrCreeps id=\([0-9]*\) .*/\1/p' "$out/continue.log")
         test -n "$horde"
         test -n "$bulwark"
