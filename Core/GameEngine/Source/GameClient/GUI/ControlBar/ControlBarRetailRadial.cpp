@@ -269,10 +269,12 @@ void ControlBar::updateRetailRadial()
 		return;
 	}
 
-	const double scale = UiScale::scale(TheDisplay->getWidth(), TheDisplay->getHeight());
+	const Int displayWidth = TheDisplay->getWidth();
+	const Int displayHeight = TheDisplay->getHeight();
+	const double scale = UiScale::scale(displayWidth, displayHeight);
 	const Bool compact = obj->isKindOf(KINDOF_EXPANSION_PAD) || obj->isKindOf(KINDOF_CASTLE_KEEP);
 	const std::vector<UiRadialRing::PixelButton> buttons = UiRadialRing::layout(static_cast<int>(ring.size()),
-		screen.x, screen.y, scale, compact);
+		screen.x, screen.y, scale, compact, displayWidth, displayHeight);
 	Int left = buttons.front().x;
 	Int top = buttons.front().y;
 	Int right = left;

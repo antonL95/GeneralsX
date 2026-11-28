@@ -1,0 +1,3 @@
+11 reveal Player_1 MenPorter 0
+35 select Player_1 MenFortressCitadel 0
+45 screenpos Player_1 MenFortressCitadel 0

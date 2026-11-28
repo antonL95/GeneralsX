@@ -61,3 +61,73 @@ TEST(UiRadialRing, ButtonsScaleWithTheInterface)
 	EXPECT_EQ(large[0].size, 110);
 	EXPECT_NEAR(large[0].y + large[0].size / 2, 2 * (small[0].y + small[0].size / 2), 2);
 }
+
+TEST(UiRadialRing, ClampsToViewportAcrossSupportedResolutions)
+{
+	struct Resolution
+	{
+		int width;
+		int height;
+	};
+	const Resolution resolutions[] = {
+		{ 1024, 768 },
+		{ 1280, 720 },
+		{ 1440, 900 },
+		{ 1600, 900 },
+		{ 1920, 1080 },
+		{ 2560, 1440 },
+	};
+
+	for (const Resolution &res : resolutions)
+	{
+		const double scale = static_cast<double>(res.height) / 768.0;
+		const std::pair<int, int> centers[] = {
+			{ res.width / 2, 0 },
+			{ res.width / 2, 20 },
+			{ res.width / 2, res.height },
+			{ 0, res.height / 2 },
+			{ res.width, res.height / 2 },
+			{ 10, 10 },
+			{ res.width - 10, res.height - 10 },
+		};
+		for (const bool compact : { false, true })
+		{
+			for (const auto &[cx, cy] : centers)
+			{
+				const auto buttons = UiRadialRing::layout(8, cx, cy, scale, compact, res.width, res.height);
+				ASSERT_EQ(buttons.size(), 8u);
+				for (const UiRadialRing::PixelButton &b : buttons)
+				{
+					EXPECT_GE(b.x, 0);
+					EXPECT_GE(b.y, 0);
+					EXPECT_LE(b.x + b.size, res.width);
+					EXPECT_LE(b.y + b.size, res.height);
+				}
+			}
+		}
+	}
+}
+
+TEST(UiRadialRing, PreservesRelativeOffsetsWhenClampingAndLeavesInteriorUntouched)
+{
+	const auto unclamped = UiRadialRing::layout(6, 960, 540, 1.4, false, 1920, 1080);
+	const auto rawInterior = UiRadialRing::layout(6, 960, 540, 1.4, false);
+	ASSERT_EQ(unclamped.size(), rawInterior.size());
+	for (size_t i = 0; i < unclamped.size(); ++i)
+	{
+		EXPECT_EQ(unclamped[i].x, rawInterior[i].x);
+		EXPECT_EQ(unclamped[i].y, rawInterior[i].y);
+	}
+
+	const auto clampedTop = UiRadialRing::layout(6, 640, 25, 1.0, false, 1280, 720);
+	const auto rawTop = UiRadialRing::layout(6, 640, 25, 1.0, false);
+	ASSERT_EQ(clampedTop.size(), rawTop.size());
+	const int shiftY = clampedTop[0].y - rawTop[0].y;
+	EXPECT_GT(shiftY, 0);
+	EXPECT_EQ(clampedTop[0].y, 0);
+	for (size_t i = 0; i < clampedTop.size(); ++i)
+	{
+		EXPECT_EQ(clampedTop[i].x, rawTop[i].x);
+		EXPECT_EQ(clampedTop[i].y - rawTop[i].y, shiftY);
+	}
+}
