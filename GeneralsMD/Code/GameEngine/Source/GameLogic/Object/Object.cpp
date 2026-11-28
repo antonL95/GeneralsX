@@ -2500,38 +2500,46 @@ ObjectID Object::getSoleHealingBenefactor() const
 
 }
 
-Bool Object::attemptHealingFromSoleBenefactor ( Real amount, const Object* source, UnsignedInt duration )
+Bool Object::attemptHealingFromSoleBenefactor(Real amount, const Object* source, UnsignedInt duration)
 {
-	///< for the non-stacking healers like ambulance and propaganda
-
-	if( ! source ) // sanity
+	if (!source)
 		return FALSE;
 
 	UnsignedInt now = TheGameLogic->getFrame();
 	ObjectID id = source->getID();
+	const Bool isSwarmDozer = source->isKindOf(KINDOF_SWARM_DOZER);
 
-// Either it is ok to accept healing from any who offer or this is my guy, calling again
-	if( now > m_soleHealingBenefactorExpirationFrame || m_soleHealingBenefactorID == id )
+	if (!isSwarmDozer && now <= m_soleHealingBenefactorExpirationFrame && m_soleHealingBenefactorID != id)
+		return FALSE;
+
+	if (!isSwarmDozer)
 	{
 		m_soleHealingBenefactorID = id;
 		m_soleHealingBenefactorExpirationFrame = now + duration;
-
-		BodyModuleInterface* body = getBodyModule();
-		if (body)
-		{
-			DamageInfo damageInfo;
-			damageInfo.in.m_damageType = DAMAGE_HEALING;
-			damageInfo.in.m_deathType = DEATH_NONE;
-			damageInfo.in.m_sourceID = source ? source->getID() : INVALID_ID;
-			damageInfo.in.m_amount = amount;
-			body->attemptHealing( &damageInfo );
-		}
-
-		return TRUE;
 	}
 
-	return FALSE;
+	BodyModuleInterface* body = getBodyModule();
+	if (body)
+	{
+		DamageInfo damageInfo;
+		damageInfo.in.m_damageType = DAMAGE_HEALING;
+		damageInfo.in.m_deathType = DEATH_NONE;
+		damageInfo.in.m_sourceID = id;
+		damageInfo.in.m_amount = amount;
+		body->attemptHealing(&damageInfo);
+	}
 
+	if (getTemplate()->getRotWKObjectData().keepSelectableWhenDead)
+	{
+		clearModelConditionState(MODELCONDITION_RUBBLE);
+		if (isEffectivelyDead())
+		{
+			setModelConditionState(MODELCONDITION_REALLY_DAMAGED);
+			setEffectivelyDead(FALSE);
+		}
+	}
+
+	return TRUE;
 }
 
 

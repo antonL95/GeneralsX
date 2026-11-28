@@ -5018,13 +5018,10 @@ Bool InGameUI::canSelectedObjectsDoAction( ActionType action, const Object *obje
 				break;
 			case ACTIONTYPE_REPAIR_OBJECT:
 			{
+				Object* repairer = other->getObject();
 				ObjectID currentRepairer = objectToInteractWith->getSoleHealingBenefactor();
-				success = ( TheActionManager->canRepairObject( other->getObject(), objectToInteractWith, CMD_FROM_PLAYER ) &&
-										( currentRepairer == INVALID_ID || currentRepairer == other->getObject()->getID() ) );
-											// unless someone else is already healing it...
-											// please note that this add'l test is left out of canRepairObject() since canRepairObject
-											// gets called from within the Dozer/WorkerAIUpdates' stateMachines as they continue the repair process.
-											// This remains true.
+				success = (TheActionManager->canRepairObject(repairer, objectToInteractWith, CMD_FROM_PLAYER) &&
+					(repairer->isKindOf(KINDOF_SWARM_DOZER) || currentRepairer == INVALID_ID || currentRepairer == repairer->getID()));
 				break;
 			}
 			case ACTIONTYPE_RESUME_CONSTRUCTION:

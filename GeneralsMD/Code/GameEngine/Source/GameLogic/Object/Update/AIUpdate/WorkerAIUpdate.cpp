@@ -572,16 +572,14 @@ void WorkerAIUpdate::privateRepair( Object *obj, CommandSourceType )
 {
 	Object *dozer = getObject();
 
-	// if we are already repairing this target do nothing
-	if( canAcceptNewRepair( obj ) == FALSE )
-		return;
-
-	//
-	// if this object has already been targeted for repair by an object we won't also try to
-	// go repair it
-	ObjectID currentRepairer = obj->getSoleHealingBenefactor();
-	if( currentRepairer != INVALID_ID && currentRepairer != dozer->getID() )
-		return;
+	if (!dozer->isKindOf(KINDOF_SWARM_DOZER))
+	{
+		if (canAcceptNewRepair(obj) == FALSE)
+			return;
+		ObjectID currentRepairer = obj->getSoleHealingBenefactor();
+		if (currentRepairer != INVALID_ID && currentRepairer != dozer->getID())
+			return;
+	}
 
 	// start the new task
 	newTask( DOZER_TASK_REPAIR, obj );

@@ -2201,6 +2201,8 @@ static Bool canIssueRepairPower(const Object* actor, const Object* target, Comma
 	if (!ai || !ai->getDozerAIInterface() || actor->isDisabled() ||
 		!RepairSpecialPower::canRepairTarget(actor, target, source))
 		return FALSE;
+	if (actor->isKindOf(KINDOF_SWARM_DOZER))
+		return TRUE;
 	const ObjectID repairer = target->getSoleHealingBenefactor();
 	return repairer == INVALID_ID || repairer == actor->getID();
 }

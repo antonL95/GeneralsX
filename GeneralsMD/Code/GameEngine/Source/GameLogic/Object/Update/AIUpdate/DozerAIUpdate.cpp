@@ -359,17 +359,20 @@ StateReturnType DozerActionMoveToActionPosState::update()
 		return STATE_FAILURE;
 
 	AIUpdateInterface *ai = dozer->getAIUpdateInterface();
-	ObjectID currentRepairer = goalObject->getSoleHealingBenefactor();
-	if( m_task==DOZER_TASK_REPAIR && currentRepairer != INVALID_ID && currentRepairer != dozer->getID() )//oops I guess someone beat me to it!
+	if (m_task == DOZER_TASK_REPAIR && !dozer->isKindOf(KINDOF_SWARM_DOZER))
 	{
-		if ( ai )
+		ObjectID currentRepairer = goalObject->getSoleHealingBenefactor();
+		if (currentRepairer != INVALID_ID && currentRepairer != dozer->getID())
 		{
-			DozerAIInterface *dozerAI = ai->getDozerAIInterface();
-			if ( dozerAI )
-				dozerAI->internalTaskComplete( m_task );
+			if (ai)
+			{
+				DozerAIInterface *dozerAI = ai->getDozerAIInterface();
+				if (dozerAI)
+					dozerAI->internalTaskComplete(m_task);
+			}
+			getMachine()->setGoalObject(nullptr);
+			return STATE_FAILURE;
 		}
-		getMachine()->setGoalObject( nullptr );
-		return STATE_FAILURE;
 	}
 
 	// Double oops, someone else has taken over the build responsibility for this building.  We can't double up.
@@ -2125,10 +2128,12 @@ void DozerAIUpdate::privateRepair( Object *obj, CommandSourceType )
 	if( canAcceptNewRepair( obj ) == FALSE )
 		return;
 
-	// if this object is already actively being repaired by another dozertype we won't also try to go repair it
-	ObjectID currentRepairer = obj->getSoleHealingBenefactor();
-	if( currentRepairer != INVALID_ID && currentRepairer != dozer->getID() )
-		return;
+	if (!dozer->isKindOf(KINDOF_SWARM_DOZER))
+	{
+		ObjectID currentRepairer = obj->getSoleHealingBenefactor();
+		if (currentRepairer != INVALID_ID && currentRepairer != dozer->getID())
+			return;
+	}
 
 	// Bridges have been made indestructible, so these checks were in vain. -- ML
 

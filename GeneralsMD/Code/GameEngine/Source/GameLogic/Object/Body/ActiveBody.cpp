@@ -1078,12 +1078,11 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 		obj->getLogicModelConditions().test(MODELCONDITION_BURNINGDEATH))
 		return;
 
-	// srj sez: sorry, once yer dead, yer dead.
-	// Special case for bridges, cause the system now things they're dead
-	///@todo we need to figure out what has changed so we don't have to hack this (CBD 11-1-2002)
-	if( obj->isKindOf( KINDOF_BRIDGE ) == FALSE &&
-			obj->isKindOf( KINDOF_BRIDGE_TOWER ) == FALSE &&
-			obj->isEffectivelyDead())
+	if (obj->isKindOf(KINDOF_BRIDGE) == FALSE &&
+		obj->isKindOf(KINDOF_BRIDGE_TOWER) == FALSE &&
+		obj->isKindOf(KINDOF_WALL_UPGRADE) == FALSE &&
+		!obj->getTemplate()->getRotWKObjectData().keepSelectableWhenDead &&
+		obj->isEffectivelyDead())
 		return;
 
 	// initialize these, just in case we bail out early

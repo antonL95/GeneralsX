@@ -420,12 +420,9 @@ static Bool canRepairStructure(const Object* obj, const Object* objectToRepair, 
 	if( r == ENEMIES )
 		return FALSE;
 
-	//
-	// can't repair dead things ... the exception is bridges and bridge towers, which can
-	// be destroyed and die, but can be repaired to bring the bring "back to life"
-	//
-	// GS and again, repairing bridges is cut, so this is just a dead check
-	if( objectToRepair->isEffectivelyDead() )
+	if (objectToRepair->isEffectivelyDead() &&
+		!objectToRepair->getTemplate()->getRotWKObjectData().keepSelectableWhenDead &&
+		!objectToRepair->isKindOf(KINDOF_WALL_UPGRADE))
 	{
 		return FALSE;
 	}
