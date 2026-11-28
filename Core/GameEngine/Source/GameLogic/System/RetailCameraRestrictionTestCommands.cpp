@@ -65,6 +65,47 @@ void releaseCamera(const RetailTestCommands::Context &ctx)
 	deleteInstance(action);
 	checkCamera(ctx);
 }
+
+void slideCamera(const RetailTestCommands::Context &ctx)
+{
+	auto *area = makeArea();
+	const Coord3D previous = TheTacticalView->getPosition();
+
+	TheTacticalView->setPosition({380.0f, 300.0f, 0.0f});
+	TheTacticalView->updateView();
+	TheTacticalView->setPosition({430.0f, 350.0f, 0.0f});
+	TheTacticalView->updateView();
+	const Coord3D slid = TheTacticalView->getPosition();
+	const Bool clamp = area->pointInTrigger(slid) && slid.x > 395.0f && slid.x < 400.0f;
+	const Bool slide = slid.y > 330.0f && slid.y < 345.0f;
+
+	auto *probeArea = newInstance(PolygonTrigger)(4, 78003);
+	probeArea->setTriggerName("CameraRestrictionProbeFixture");
+	const Int px = static_cast<Int>(previous.x);
+	const Int py = static_cast<Int>(previous.y);
+	probeArea->addPoint({px - 100, py - 100, 0});
+	probeArea->addPoint({px + 100, py - 100, 0});
+	probeArea->addPoint({px + 100, py + 100, 0});
+	probeArea->addPoint({px - 100, py + 100, 0});
+	PolygonTrigger::addPolygonTrigger(probeArea);
+
+	TheTacticalView->setPosition(previous);
+	TheTacticalView->setScriptCameraArea(probeArea->getTriggerName());
+	TheTacticalView->setPosition({previous.x + 140.0f, previous.y, 0.0f});
+	TheTacticalView->updateView();
+	const Coord3D probed = TheTacticalView->getPosition();
+	const Bool probe = probeArea->pointInTrigger(probed) && probed.x > previous.x + 40.0f && probed.x < previous.x + 100.0f;
+
+	TheTacticalView->setPosition({300.0f, 225.0f, 0.0f});
+	TheTacticalView->setScriptCameraArea(areaName);
+	TheTacticalView->setPosition(previous);
+	PolygonTrigger::removePolygonTrigger(probeArea);
+	deleteInstance(probeArea);
+	PolygonTrigger::removePolygonTrigger(area);
+	deleteInstance(area);
+	std::fprintf(stderr, "TEST camera-restriction-slide frame=%u clamp=%d slide=%d probe=%d\n",
+		ctx.frame, clamp, slide, probe);
+}
 }
 #endif
 
@@ -76,6 +117,7 @@ void registerRetailCameraRestrictionTestCommands()
 	registerAction("camera-restriction-arm", restrictCamera);
 	registerAction("camera-restriction-check", checkCamera);
 	registerAction("camera-restriction-release", releaseCamera);
+	registerAction("camera-restriction-slide", slideCamera);
 #endif
 }
 }

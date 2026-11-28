@@ -29,12 +29,16 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GameEngine.h"
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
+#include "GameClient/Line2D.h"
 #include "GameClient/View.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -318,6 +322,142 @@ PlaneClass::IntersectionResType View::getScreenCornerWorldPointsAtZ( Coord3D *to
 // ------------------------------------------------------------------------------------------------
 /** Xfer method for a view */
 // ------------------------------------------------------------------------------------------------
+namespace
+{
+Bool isCameraPointShrouded(const Coord3D &pos)
+{
+	if (!ThePartitionManager || !ThePlayerList)
+		return FALSE;
+	const Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (!localPlayer)
+		return FALSE;
+	return ThePartitionManager->getShroudStatusForPlayer(localPlayer->getPlayerIndex(), &pos) == CELLSHROUD_SHROUDED;
+}
+
+Bool isValidCameraAreaPoint(const PolygonTrigger *area, const Coord3D &pos)
+{
+	return !isCameraPointShrouded(pos) && area->pointInTrigger(pos);
+}
+
+Bool findNearbyCameraAreaPoint(const PolygonTrigger *area, const Coord3D &pos, Coord3D &outPos)
+{
+	if (isValidCameraAreaPoint(area, pos))
+	{
+		outPos = pos;
+		return TRUE;
+	}
+	for (Real radius = 30.0f; radius < 500.0f; radius += 30.0f)
+	{
+		for (Int dx = -1; dx <= 1; ++dx)
+		{
+			for (Int dy = -1; dy <= 1; ++dy)
+			{
+				if (dx == 0 && dy == 0)
+					continue;
+				const Coord3D candidate = {
+					pos.x + static_cast<Real>(dx) * radius,
+					pos.y + static_cast<Real>(dy) * radius,
+					pos.z
+				};
+				if (isValidCameraAreaPoint(area, candidate))
+				{
+					outPos = candidate;
+					return TRUE;
+				}
+			}
+		}
+	}
+	return FALSE;
+}
+
+Bool repairScriptCameraAnchor(const PolygonTrigger *area, Coord3D &anchor)
+{
+	Coord3D center = {};
+	area->getCenterPoint(&center);
+	const Int pointCount = area->getNumPoints();
+	for (Int i = 0; i < pointCount && !area->pointInTrigger(center); ++i)
+	{
+		const auto &first = *area->getPoint(i);
+		const auto &second = *area->getPoint((i + 1) % pointCount);
+		const auto &third = *area->getPoint((i + 2) % pointCount);
+		center.x = static_cast<Real>((static_cast<Int64>(first.x) + second.x + third.x) / 3.0);
+		center.y = static_cast<Real>((static_cast<Int64>(first.y) + second.y + third.y) / 3.0);
+	}
+	if (!area->pointInTrigger(center))
+		return FALSE;
+	center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
+	anchor = center;
+	return TRUE;
+}
+
+Bool intersectCameraAreaAndSlide(const PolygonTrigger *area, const Coord3D &anchor, const Coord3D &pos, Coord3D &outPos)
+{
+	if (area->pointInTrigger(pos))
+	{
+		outPos = pos;
+		return TRUE;
+	}
+	if (!area->pointInTrigger(anchor))
+	{
+		outPos = anchor;
+		return FALSE;
+	}
+	const Coord2D move = { pos.x - anchor.x, pos.y - anchor.y };
+	const Real moveLength = move.length();
+	const Coord2D start2D = { anchor.x, anchor.y };
+	const Coord2D end2D = { pos.x, pos.y };
+	const Int pointCount = area->getNumPoints();
+	for (Int i = 0; i < pointCount; ++i)
+	{
+		const ICoord3D *ptCurr = area->getPoint(i);
+		const ICoord3D *ptPrev = area->getPoint(i == 0 ? pointCount - 1 : i - 1);
+		const Coord2D edgeA = { static_cast<Real>(ptCurr->x), static_cast<Real>(ptCurr->y) };
+		const Coord2D edgeB = { static_cast<Real>(ptPrev->x), static_cast<Real>(ptPrev->y) };
+		Coord2D hit = {};
+		if (!IntersectLine2D(&edgeA, &edgeB, &start2D, &end2D, &hit))
+			continue;
+		Coord2D normal = { edgeB.y - edgeA.y, -(edgeB.x - edgeA.x) };
+		normal.normalize();
+		const Real side = (anchor.y - edgeA.y) * (edgeB.x - edgeA.x) - (anchor.x - edgeA.x) * (edgeB.y - edgeA.y);
+		if (side > 0.0f)
+		{
+			normal.x = -normal.x;
+			normal.y = -normal.y;
+		}
+		Coord3D candidate = { hit.x + normal.x * 0.1f, hit.y + normal.y * 0.1f, pos.z };
+		if (!area->pointInTrigger(candidate))
+		{
+			outPos = anchor;
+			return FALSE;
+		}
+		Coord2D tangent = { edgeB.x - edgeA.x, edgeB.y - edgeA.y };
+		if (move.x * tangent.x + move.y * tangent.y < 0.0f)
+		{
+			tangent.x = -tangent.x;
+			tangent.y = -tangent.y;
+		}
+		const Coord2D clipped = { candidate.x - anchor.x, candidate.y - anchor.y };
+		const Real remaining = moveLength - clipped.length();
+		if (remaining > 0.1f)
+		{
+			const Real slideDist = remaining * 0.4f;
+			tangent.normalize();
+			const Coord3D slidCandidate = {
+				candidate.x + tangent.x * slideDist,
+				candidate.y + tangent.y * slideDist,
+				pos.z
+			};
+			if (area->pointInTrigger(slidCandidate))
+				candidate = slidCandidate;
+		}
+		outPos = candidate;
+		return TRUE;
+	}
+	outPos = anchor;
+	return FALSE;
+}
+}
+
 void View::setScriptCameraArea(const AsciiString &name)
 {
 	m_scriptCameraArea = name;
@@ -333,29 +473,53 @@ Bool View::enforceScriptCameraArea()
 	const PolygonTrigger *area = TheTerrainLogic->getTriggerAreaByName(m_scriptCameraArea);
 	if (!area || area->getNumPoints() < 3)
 		return FALSE;
-	if (area->pointInTrigger(m_pos))
-	{
-		m_scriptCameraAnchor = m_pos;
-		return FALSE;
-	}
 	if (!area->pointInTrigger(m_scriptCameraAnchor))
 	{
-		Coord3D anchor;
-		area->getCenterPoint(&anchor);
-		const Int pointCount = area->getNumPoints();
-		for (Int i = 0; i < pointCount && !area->pointInTrigger(anchor); ++i)
+		if (area->pointInTrigger(m_pos))
 		{
-			const auto &first = *area->getPoint(i);
-			const auto &second = *area->getPoint((i + 1) % pointCount);
-			const auto &third = *area->getPoint((i + 2) % pointCount);
-			anchor.x = static_cast<Real>((static_cast<Int64>(first.x) + second.x + third.x) / 3.0);
-			anchor.y = static_cast<Real>((static_cast<Int64>(first.y) + second.y + third.y) / 3.0);
-		}
-		if (!area->pointInTrigger(anchor))
+			m_scriptCameraAnchor = m_pos;
 			return FALSE;
-		anchor.z = TheTerrainLogic->getGroundHeight(anchor.x, anchor.y);
-		m_scriptCameraAnchor = anchor;
+		}
+		if (!repairScriptCameraAnchor(area, m_scriptCameraAnchor))
+			return FALSE;
+		setPosition(m_scriptCameraAnchor);
+		return TRUE;
 	}
+
+	const Coord3D delta = {
+		m_pos.x - m_scriptCameraAnchor.x,
+		m_pos.y - m_scriptCameraAnchor.y,
+		m_pos.z - m_scriptCameraAnchor.z
+	};
+	if (delta.length() > 100.0f)
+	{
+		Coord3D nearby = m_pos;
+		if (findNearbyCameraAreaPoint(area, m_pos, nearby))
+		{
+			const Bool moved = nearby.x != m_pos.x || nearby.y != m_pos.y || nearby.z != m_pos.z;
+			m_scriptCameraAnchor = nearby;
+			if (moved)
+				setPosition(nearby);
+			return moved;
+		}
+	}
+
+	if (isCameraPointShrouded(m_scriptCameraAnchor) || !isCameraPointShrouded(m_pos))
+	{
+		if (area->pointInTrigger(m_pos))
+		{
+			m_scriptCameraAnchor = m_pos;
+			return FALSE;
+		}
+		Coord3D clamped = m_scriptCameraAnchor;
+		if (intersectCameraAreaAndSlide(area, m_scriptCameraAnchor, m_pos, clamped))
+		{
+			m_scriptCameraAnchor = clamped;
+			setPosition(clamped);
+			return TRUE;
+		}
+	}
+
 	setPosition(m_scriptCameraAnchor);
 	return TRUE;
 }
