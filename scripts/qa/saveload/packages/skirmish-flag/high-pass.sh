@@ -1,6 +1,6 @@
 prepare() {
     if grep -q '^45 create Player_2 MordorGorbag ' "$out/commands.txt"; then
-        printf '%s\n' 'set environment GENERALSX_RETAIL_SKIRMISH_AI brutal' >> "$out/start.gdb"
+        printf '%s\n' 'set environment GENERALSX_RETAIL_SKIRMISH_AI brutal' 'set environment GENERALSX_SKIRMISH_AI_TRACE 1' >> "$out/start.gdb"
     fi
 }
 
@@ -24,10 +24,19 @@ check() {
         printf 'PASS ownership stays neutral at 151 units from the linked building boundary (%s)\n' "$phase"
     fi
     if covers 620; then
-        grep -Eq '^TEST neutralstate frame=620 object=CaptureFlag .* capture=1 captured=0 ' "$log" || {
-            printf 'Missing AI flag capture preparation (%s)\n' "$phase"
+        flag=$(sed -n -E 's/^TEST neutralstate frame=620 object=CaptureFlag id=([0-9]+).*( capture=1 captured=0 | owner=4 .* capture=0 captured=1 ).*/\1/p' "$log")
+        [ -n "$flag" ] || {
+            printf 'Missing AI flag capture preparation or ownership (%s)\n' "$phase"
             return 1
         }
+        if [ "$phase" = continue ]; then
+            tab=$(printf '\t')
+            grep -Eq "^AI_FLAG_CAPTURE${tab}[0-9]+${tab}4${tab}[0-9]+${tab}$flag${tab}" "$log" || {
+                printf 'Missing AI flag capture order (%s)\n' "$phase"
+                return 1
+            }
+        fi
+        printf 'PASS AI orders the stock flag capture (%s)\n' "$phase"
     fi
     if covers 1100; then
         grep -Eq '^TEST neutralstate frame=1100 object=CaptureFlag .* owner=4 .* capture=0 captured=1 ' "$log" &&
