@@ -16,8 +16,8 @@
 152 objupgrade Player_1 GondorGandalf 1 Upgrade_ObjectLevel10
 153 power Player_1 GondorGandalf 1 SpecialAbilityToggleMounted
 154 ability Player_1 GondorGandalf 1
-450 select Player_1 GondorGandalf 1
-453 power Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor
-454 ability Player_1 GondorGandalf 1
-455 create PlyrCreeps MordorCaveTroll 0 2580,1465,0
-485 auto-ability-state Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor
+250 select Player_1 GondorGandalf 1
+253 power Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor
+254 ability Player_1 GondorGandalf 1
+255 create PlyrCreeps MordorCaveTroll 0 2580,1465,0
+285 auto-ability-state Player_1 GondorGandalf 1 SpecialPowerShieldBubbleGondor
